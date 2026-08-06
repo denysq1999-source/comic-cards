@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Адмін-панель | Comic Cards</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f0f0f;
+      color: #ffffff;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ===== Ліве меню ===== */
+    .sidebar {
+      width: 260px;
+      background: #1a1a1a;
+      border-right: 1px solid #2a2a2a;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 0;
+    }
+
+    .logo {
+      padding: 0 20px 25px;
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #2a2a2a;
+      margin-bottom: 15px;
+      color: #ff9800;
+    }
+
+    .menu-item {
+      padding: 13px 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+      transition: all 0.2s;
+      color: #ccc;
+    }
+
+    .menu-item:hover {
+      background: #252525;
+      color: #fff;
+    }
+
+    .menu-item.active {
+      background: #2a2a2a;
+      color: #ff9800;
+      border-right: 3px solid #ff9800;
+    }
+
+    .menu-item span {
+      font-size: 18px;
+      width: 24px;
+      text-align: center;
+    }
+
+    /* ===== Основна частина ===== */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      height: 60px;
+      background: #1a1a1a;
+      border-bottom: 1px solid #2a2a2a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 30px;
+    }
+
+    .topbar h1 {
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .logout-btn {
+      background: #ff9800;
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .logout-btn:hover {
+      background: #e68900;
+    }
+
+    /* ===== Робоча область ===== */
+    .content {
+      padding: 30px;
+      flex: 1;
+    }
+
+    .section {
+      display: none;
+    }
+
+    .section.active {
+      display: block;
+    }
+
+    .placeholder {
+      background: #1a1a1a;
+      border: 1px dashed #333;
+      border-radius: 12px;
+      padding: 60px 40px;
+      text-align: center;
+      color: #777;
+      font-size: 16px;
+    }
+
+    .placeholder h2 {
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ліве меню -->
+  <aside class="sidebar">
+    <div class="logo">🃏 COMIC CARDS</div>
+
+    <div class="menu-item active" data-section="dashboard">
+      <span>🏠</span> Головна
+    </div>
+    <div class="menu-item" data-section="cards">
+      <span>🃏</span> Картки
+    </div>
+    <div class="menu-item" data-section="packs">
+      <span>📦</span> Пакунки
+    </div>
+    <div class="menu-item" data-section="series">
+      <span>📖</span> Серії
+    </div>
+    <div class="menu-item" data-section="users">
+      <span>👥</span> Користувачі
+    </div>
+    <div class="menu-item" data-section="qr">
+      <span>📷</span> QR-коди
+    </div>
+    <div class="menu-item" data-section="stats">
+      <span>📊</span> Статистика
+    </div>
+    <div class="menu-item" data-section="settings">
+      <span>⚙️</span> Налаштування
+    </div>
+  </aside>
+
+  <!-- Права частина -->
+  <div class="main">
+    <header class="topbar">
+      <h1 id="pageTitle">Головна</h1>
+      <button class="logout-btn" id="logoutBtn">Вийти</button>
+    </header>
+
+    <main class="content">
+      <!-- Головна -->
+      <section class="section active" id="dashboard">
+        <div class="placeholder">
+          <h2>Вітаю в адмін-панелі</h2>
+          <p>Обери розділ зліва, щоб почати роботу</p>
+        </div>
+      </section>
+
+      <!-- Картки -->
+      <section class="section" id="cards">
+        <div class="placeholder">
+          <h2>Картки</h2>
+          <p>Тут буде таблиця карток + кнопка «Додати картку»</p>
+        </div>
+      </section>
+
+      <!-- Пакунки -->
+      <section class="section" id="packs">
+        <div class="placeholder">
+          <h2>Пакунки</h2>
+          <p>Тут буде управління пакунками</p>
+        </div>
+      </section>
+
+      <!-- Серії -->
+      <section class="section" id="series">
+        <div class="placeholder">
+          <h2>Серії</h2>
+          <p>Тут буде управління серіями</p>
+        </div>
+      </section>
+
+      <!-- Користувачі -->
+      <section class="section" id="users">
+        <div class="placeholder">
+          <h2>Користувачі</h2>
+          <p>Тут буде список користувачів</p>
+        </div>
+      </section>
+
+      <!-- QR-коди -->
+      <section class="section" id="qr">
+        <div class="placeholder">
+          <h2>QR-коди</h2>
+          <p>Тут буде генератор QR-кодів</p>
+        </div>
+      </section>
+
+      <!-- Статистика -->
+      <section class="section" id="stats">
+        <div class="placeholder">
+          <h2>Статистика</h2>
+          <p>Тут буде аналітика</p>
+        </div>
+      </section>
+
+      <!-- Налаштування -->
+      <section class="section" id="settings">
+        <div class="placeholder">
+          <h2>Налаштування</h2>
+          <p>Тут будуть налаштування системи</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import { auth } from './js/firebase.js';
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
+
+    // Захист
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+      if (user.uid !== ADMIN_UID) {
+        alert("Немає доступу");
+        window.location.href = "index.html";
+      }
+    });
+
+    // Вихід
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.href = "login.html";
+    });
+
+    // Перемикання меню
+    const menuItems = document.querySelectorAll(".menu-item");
+    const sections = document.querySelectorAll(".section");
+    const pageTitle = document.getElementById("pageTitle");
+
+    const titles = {
+      dashboard: "Головна",
+      cards: "Картки",
+      packs: "Пакунки",
+      series: "Серії",
+      users: "Користувачі",
+      qr: "QR-коди",
+      stats: "Статистика",
+      settings: "Налаштування"
+    };
+
+    menuItems.forEach(item => {
+      item.addEventListener("click", () => {
+        menuItems.forEach(i => i.classList.remove("active"));
+        sections.forEach(s => s.classList.remove("active"));
+
+        item.classList.add("active");
+        const id = item.dataset.section;
+        document.getElementById(id).classList.add("active");
+        pageTitle.textContent = titles[id];
+      });
+    });
+  </script>
+</body>
+</html>
