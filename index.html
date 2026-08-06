@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comic Cards</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
+      text-align: center;
+    }
+
+    header {
+      background: #1f1f1f;
+      padding: 20px;
+      font-size: 32px;
+      font-weight: bold;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+    }
+
+    main {
+      margin-top: 80px;
+    }
+
+    .button {
+      display: inline-block;
+      padding: 15px 35px;
+      background: #ff9800;
+      color: white;
+      text-decoration: none;
+      border-radius: 10px;
+      font-size: 20px;
+      margin: 10px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background: #e68900;
+    }
+
+    .button.secondary {
+      background: #333;
+    }
+
+    .button.secondary:hover {
+      background: #444;
+    }
+
+    .user-info {
+      margin-top: 30px;
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    #adminBtn {
+      display: none; /* за замовчуванням схована */
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    🃏 Comic Cards
+  </header>
+
+  <main>
+    <h1>Ласкаво просимо!</h1>
+    <p>Тут незабаром з'явиться колекційна гра за моїми коміксами.</p>
+
+    <div>
+      <a class="button" href="#">Відкрити пакунок</a>
+    </div>
+
+    <!-- Кнопка адмінки (тільки для тебе) -->
+    <div>
+      <a class="button secondary" id="adminBtn" href="admin.html">⚙️ Адмін-панель</a>
+    </div>
+
+    <div class="user-info" id="userInfo"></div>
+
+    <div style="margin-top: 20px;">
+      <button class="button secondary" id="logoutBtn" style="display: none;">Вийти</button>
+      <a class="button secondary" id="loginBtn" href="login.html">Увійти</a>
+    </div>
+  </main>
+
+  <script type="module">
+    import { auth } from './js/firebase.js';
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
+
+    const adminBtn = document.getElementById("adminBtn");
+    const userInfo = document.getElementById("userInfo");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const loginBtn = document.getElementById("loginBtn");
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // Користувач залогінений
+        userInfo.textContent = `Ви увійшли як: ${user.email}`;
+        logoutBtn.style.display = "inline-block";
+        loginBtn.style.display = "none";
+
+        // Показуємо кнопку адмінки тільки тобі
+        if (user.uid === ADMIN_UID) {
+          adminBtn.style.display = "inline-block";
+        }
+      } else {
+        // Не залогінений
+        userInfo.textContent = "";
+        logoutBtn.style.display = "none";
+        loginBtn.style.display = "inline-block";
+        adminBtn.style.display = "none";
+      }
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.reload();
+    });
+  </script>
+
+</body>
+</html>
