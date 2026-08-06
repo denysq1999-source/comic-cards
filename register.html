@@ -1,1 +1,155 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Реєстрація | Comic Cards</title>
+  <style>
+    body {
+      margin: 0;
+      background: #121212;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .login-box {
+      width: 350px;
+      background: #1f1f1f;
+      padding: 30px;
+      border-radius: 15px;
+      text-align: center;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 15px;
+      border: none;
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 20px;
+      background: #ff9800;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #e68a00;
+    }
+    .link {
+      margin-top: 20px;
+      font-size: 14px;
+    }
+    .link a {
+      color: #ff9800;
+      text-decoration: none;
+    }
+    #error {
+      color: #ff5252;
+      margin-top: 15px;
+      font-size: 14px;
+      min-height: 20px;
+    }
+    #success {
+      color: #4caf50;
+      margin-top: 15px;
+      font-size: 14px;
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
 
+  <div class="login-box">
+    <h1>🃏 Comic Cards</h1>
+    <h2>Реєстрація</h2>
+
+    <input type="email" id="email" placeholder="Email" required>
+    <input type="password" id="password" placeholder="Пароль (мінімум 6 символів)" required>
+    <input type="password" id="password2" placeholder="Повторіть пароль" required>
+
+    <button id="registerBtn">Зареєструватися</button>
+
+    <div id="error"></div>
+    <div id="success"></div>
+
+    <div class="link">
+      Вже є акаунт? <a href="login.html">Увійти</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth } from './js/firebase.js';
+    import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const password2Input = document.getElementById('password2');
+    const registerBtn = document.getElementById('registerBtn');
+    const errorDiv = document.getElementById('error');
+    const successDiv = document.getElementById('success');
+
+    registerBtn.addEventListener('click', async () => {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      const password2 = password2Input.value;
+
+      errorDiv.textContent = '';
+      successDiv.textContent = '';
+
+      if (!email || !password || !password2) {
+        errorDiv.textContent = 'Заповніть усі поля';
+        return;
+      }
+
+      if (password.length < 6) {
+        errorDiv.textContent = 'Пароль має бути мінімум 6 символів';
+        return;
+      }
+
+      if (password !== password2) {
+        errorDiv.textContent = 'Паролі не співпадають';
+        return;
+      }
+
+      try {
+        registerBtn.disabled = true;
+        registerBtn.textContent = 'Реєстрація...';
+
+        await createUserWithEmailAndPassword(auth, email, password);
+
+        successDiv.textContent = 'Акаунт створено! Зараз перенаправимо...';
+        
+        setTimeout(() => {
+          window.location.href = 'login.html';
+        }, 1500);
+
+      } catch (error) {
+        console.error(error);
+        if (error.code === 'auth/email-already-in-use') {
+          errorDiv.textContent = 'Цей email вже зареєстрований';
+        } else if (error.code === 'auth/invalid-email') {
+          errorDiv.textContent = 'Невірний формат email';
+        } else if (error.code === 'auth/weak-password') {
+          errorDiv.textContent = 'Пароль занадто слабкий';
+        } else {
+          errorDiv.textContent = 'Помилка реєстрації. Спробуйте ще раз.';
+        }
+      } finally {
+        registerBtn.disabled = false;
+        registerBtn.textContent = 'Зареєструватися';
+      }
+    });
+  </script>
+
+</body>
+</html>
