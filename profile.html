@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Особистий кабінет | Comic Cards</title>
+
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;background:#0f0f0f;color:#fff;min-height:100vh}
+    header{background:#1a1a1a;border-bottom:1px solid #2a2a2a;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+    .brand{font-size:22px;font-weight:800;color:#ff9800}
+    .top-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{border:0;border-radius:8px;padding:10px 14px;text-decoration:none;color:#fff;background:#2b2b2b;cursor:pointer;font-weight:700}
+    .btn:hover{background:#3a3a3a}.btn.orange{background:#ff9800}.btn.orange:hover{background:#e68900}
+    main{width:min(1200px,calc(100% - 28px));margin:28px auto 60px}
+    .profile-card{display:grid;grid-template-columns:110px 1fr;gap:18px;align-items:center;background:#1a1a1a;border:1px solid #2c2c2c;border-radius:16px;padding:22px;margin-bottom:24px}
+    .avatar{width:110px;height:110px;border-radius:50%;background:#292929;border:2px solid #3b3b3b;display:flex;align-items:center;justify-content:center;font-size:42px}
+    .profile-info h1{font-size:28px;margin-bottom:8px}.profile-info p{color:#aaa;margin:4px 0}.badge{display:inline-block;margin-top:8px;padding:5px 9px;border-radius:999px;background:#2b2b2b;color:#ffb347;font-size:12px;font-weight:800}
+    .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:24px}
+    .stat{background:#1a1a1a;border:1px solid #2c2c2c;border-radius:12px;padding:18px;text-align:center}
+    .stat strong{display:block;font-size:28px;color:#ff9800}.stat span{color:#8d8d8d;font-size:13px}
+    .panel{background:#1a1a1a;border:1px solid #2c2c2c;border-radius:14px;padding:20px}
+    .panel h2{font-size:22px;margin-bottom:8px}.panel-sub{color:#8f8f8f;margin-bottom:18px;font-size:14px}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.toolbar select,.toolbar input{background:#101010;color:#fff;border:1px solid #363636;border-radius:8px;padding:10px 12px}.toolbar select{min-width:210px}.toolbar input{flex:1;min-width:180px}
+    .inventory{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px}
+    .item{background:#151515;border:1px solid #2c2c2c;border-radius:12px;overflow:hidden}
+    .item-img{aspect-ratio:5/7;background:#0b0b0b}.item-img img{width:100%;height:100%;object-fit:cover;display:block}
+    .item-body{padding:14px}.item-name{font-size:17px;font-weight:800;margin-bottom:6px}.item-comic{color:#8f8f8f;font-size:13px;margin-bottom:7px}.rarity{display:inline-block;background:#272727;border:1px solid #353535;border-radius:999px;padding:5px 9px;color:#ffb347;font-size:12px;font-weight:800;margin-bottom:10px}
+    .item-meta{color:#777;font-size:12px}.empty{grid-column:1/-1;border:1px dashed #333;border-radius:12px;padding:45px 20px;text-align:center;color:#777}
+    @media(max-width:650px){header{align-items:flex-start;flex-direction:column}.profile-card{grid-template-columns:1fr;text-align:center}.avatar{margin:auto}.stats{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">👤 Особистий кабінет</div>
+  <div class="top-actions">
+    <a class="btn" href="index.html">← На головну</a>
+    <a class="btn" id="adminLink" href="admin.html" style="display:none;">⚙️ Адмін-панель</a>
+    <button class="btn orange" id="logoutBtn">Вийти</button>
+  </div>
+</header>
+
+<main>
+  <section class="profile-card">
+    <div class="avatar">👤</div>
+    <div class="profile-info">
+      <h1 id="displayName">Користувач</h1>
+      <p id="emailText"></p>
+      <p id="uidText"></p>
+      <span class="badge" id="roleBadge">USER</span>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="stat">
+      <strong id="cardsCount">0</strong>
+      <span>Карток в інвентарі</span>
+    </div>
+    <div class="stat">
+      <strong id="uniqueCount">0</strong>
+      <span>Унікальних карток</span>
+    </div>
+    <div class="stat">
+      <strong id="comicsCount">0</strong>
+      <span>Коміксів у колекції</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>🎒 Інвентар карток</h2>
+    <p class="panel-sub">Тут зберігатимуться картки, які користувач отримав під час читання коміксів.</p>
+
+    <div class="toolbar">
+      <select id="comicFilter">
+        <option value="">Усі комікси</option>
+      </select>
+      <input id="searchInput" type="search" placeholder="Пошук картки...">
+    </div>
+
+    <div class="inventory" id="inventory"></div>
+  </section>
+</main>
+
+<script type="module">
+  import { auth } from './js/firebase.js';
+  import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore,
+    collection,
+    getDocs,
+    query,
+    where
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const db = getFirestore(auth.app);
+  const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
+
+  const displayName = document.getElementById("displayName");
+  const emailText = document.getElementById("emailText");
+  const uidText = document.getElementById("uidText");
+  const roleBadge = document.getElementById("roleBadge");
+  const adminLink = document.getElementById("adminLink");
+  const cardsCount = document.getElementById("cardsCount");
+  const uniqueCount = document.getElementById("uniqueCount");
+  const comicsCount = document.getElementById("comicsCount");
+  const inventory = document.getElementById("inventory");
+  const comicFilter = document.getElementById("comicFilter");
+  const searchInput = document.getElementById("searchInput");
+
+  let user = null;
+  let owned = [];
+  let cards = [];
+  let comics = [];
+
+  onAuthStateChanged(auth, async currentUser => {
+    if (!currentUser) {
+      location.href = "login.html";
+      return;
+    }
+
+    user = currentUser;
+
+    displayName.textContent =
+      currentUser.displayName ||
+      (currentUser.email ? currentUser.email.split("@")[0] : "Користувач");
+
+    emailText.textContent = currentUser.email || "";
+    uidText.textContent = `ID: ${currentUser.uid}`;
+
+    if (currentUser.uid === ADMIN_UID) {
+      roleBadge.textContent = "ADMIN";
+      adminLink.style.display = "inline-block";
+    } else {
+      roleBadge.textContent = "USER";
+    }
+
+    await loadInventory();
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await signOut(auth);
+    location.href = "login.html";
+  });
+
+  async function loadInventory() {
+    const [ownedSnap, cardSnap, comicSnap] = await Promise.all([
+      getDocs(query(collection(db, "user_cards"), where("userId", "==", user.uid))),
+      getDocs(collection(db, "cards")),
+      getDocs(collection(db, "comics"))
+    ]);
+
+    owned = ownedSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    cards = cardSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    comics = comicSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+    fillComicFilter();
+    updateStats();
+    renderInventory();
+  }
+
+  function fillComicFilter() {
+    comicFilter.innerHTML = '<option value="">Усі комікси</option>';
+
+    const ownedComicIds = new Set(
+      owned.map(o => {
+        const card = cards.find(c => c.id === o.cardId);
+        return card?.comicId;
+      }).filter(Boolean)
+    );
+
+    comics
+      .filter(c => ownedComicIds.has(c.id))
+      .sort((a,b)=>String(a.title||"").localeCompare(String(b.title||""),"uk"))
+      .forEach(c => {
+        const option = document.createElement("option");
+        option.value = c.id;
+        option.textContent = c.title || "Без назви";
+        comicFilter.appendChild(option);
+      });
+  }
+
+  function updateStats() {
+    cardsCount.textContent = owned.length;
+    uniqueCount.textContent = new Set(owned.map(o => o.cardId)).size;
+
+    const comicIds = new Set(
+      owned.map(o => cards.find(c => c.id === o.cardId)?.comicId).filter(Boolean)
+    );
+    comicsCount.textContent = comicIds.size;
+  }
+
+  function renderInventory() {
+    const filterId = comicFilter.value;
+    const search = searchInput.value.trim().toLowerCase();
+
+    const rows = owned.map(own => {
+      const card = cards.find(c => c.id === own.cardId);
+      if (!card) return null;
+      const comic = comics.find(c => c.id === card.comicId);
+
+      return { own, card, comic };
+    }).filter(Boolean).filter(row => {
+      const matchesComic = !filterId || row.card.comicId === filterId;
+      const matchesSearch = !search || String(row.card.name||"").toLowerCase().includes(search);
+      return matchesComic && matchesSearch;
+    });
+
+    if (!rows.length) {
+      inventory.innerHTML = `
+        <div class="empty">
+          🎒 Інвентар поки що порожній.<br>
+          Картки з'являться тут після того, як ми підключимо випадіння під час читання.
+        </div>
+      `;
+      return;
+    }
+
+    inventory.innerHTML = rows.map(({own, card, comic}) => `
+      <article class="item">
+        <div class="item-img">
+          <img src="${esc(card.image ? driveImage(card.image) : placeholder())}" alt="${esc(card.name||"Картка")}">
+        </div>
+        <div class="item-body">
+          <div class="item-name">${esc(card.name||"Без назви")}</div>
+          <div class="item-comic">${esc(comic?.title||"Невідомий комікс")}</div>
+          <span class="rarity">${esc(card.rarity||"Common")}</span>
+          <div class="item-meta">
+            Отримано: ${formatDate(own.obtainedAt)}
+          </div>
+        </div>
+      </article>
+    `).join("");
+  }
+
+  comicFilter.addEventListener("change", renderInventory);
+  searchInput.addEventListener("input", renderInventory);
+
+  function driveImage(url) {
+    const m =
+      url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+      url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+
+    return m
+      ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`
+      : url;
+  }
+
+  function placeholder() {
+    return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="700" height="980">' +
+      '<rect width="100%" height="100%" fill="#101010"/>' +
+      '<text x="50%" y="50%" text-anchor="middle" fill="#666" font-size="48">CARD</text>' +
+      '</svg>'
+    );
+  }
+
+  function formatDate(value) {
+    if (!value) return "—";
+
+    if (value.toDate) {
+      return value.toDate().toLocaleDateString("uk-UA");
+    }
+
+    const d = new Date(value);
+    return isNaN(d) ? "—" : d.toLocaleDateString("uk-UA");
+  }
+
+  function esc(v="") {
+    return String(v)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+</script>
+
+</body>
+</html>
