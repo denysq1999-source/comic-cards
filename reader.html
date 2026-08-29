@@ -453,7 +453,8 @@
       getDocs,
       query,
       where,
-      addDoc,
+      setDoc,
+      doc,
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -557,11 +558,22 @@
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => Number(a.number) - Number(b.number));
 
-      const cardsSnap = await getDocs(
-        query(collection(db, "cards"), where("comicId", "==", comicId))
+      const [cardsSnap, ownedSnap] = await Promise.all([
+        getDocs(
+          query(collection(db, "cards"), where("comicId", "==", comicId))
+        ),
+        getDocs(
+          query(collection(db, "user_cards"), where("userId", "==", currentUser.uid))
+        )
+      ]);
+
+      const ownedCardIds = new Set(
+        ownedSnap.docs.map(d => d.data().cardId).filter(Boolean)
       );
 
-      comicCards = cardsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      comicCards = cardsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(card => !ownedCardIds.has(card.id));
 
       comicHeader.style.display = "block";
       comicTitle.textContent = comic.title;
@@ -792,14 +804,16 @@
       dropMessage.textContent = "Зберігаю картку…";
 
       try {
-        await addDoc(collection(db, "user_cards"), {
+        const ownedId = `${currentUser.uid}_${currentDrop.card.id}`;
+
+        await setDoc(doc(db, "user_cards", ownedId), {
           userId: currentUser.uid,
           cardId: currentDrop.card.id,
           comicId,
           source: "reader_drop",
           sourceChapterId: currentDrop.chapterId,
           obtainedAt: serverTimestamp()
-        });
+        }, { merge: false });
 
         sessionStorage.setItem(currentDrop.dropKey, "1");
         dropMessage.textContent = "Картку додано в інвентар 🎒";
