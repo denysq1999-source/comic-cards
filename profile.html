@@ -67,6 +67,7 @@
     .viewer-info h3{font-size:28px;margin:0}
     .viewer-comic{color:#aaa}
     .viewer-rarity{display:inline-block;align-self:flex-start;background:#272727;border:1px solid #353535;color:#ffb347;border-radius:999px;padding:6px 10px;font-size:13px;font-weight:800}
+    .viewer-description{color:#c7c7c7;font-size:14px;line-height:1.6;white-space:pre-wrap;background:#101010;border:1px solid #292929;border-radius:10px;padding:12px;margin-top:2px}
     .viewer-close{position:absolute;top:10px;right:10px;width:38px;height:38px;border:0;border-radius:50%;background:#2a2a2a;color:#fff;cursor:pointer;font-size:20px}
     .viewer-close:hover{background:#3a3a3a}
     @media(max-width:760px){.viewer-modal{grid-template-columns:1fr}.viewer-image-wrap img{max-height:62vh}}
@@ -152,6 +153,7 @@
       <h3 id="viewerName"></h3>
       <div class="viewer-comic" id="viewerComic"></div>
       <span class="viewer-rarity" id="viewerRarity"></span>
+      <div class="viewer-description" id="viewerDescription"></div>
       <div class="item-meta" id="viewerObtained"></div>
     </div>
   </div>
@@ -197,6 +199,7 @@
   const viewerName = document.getElementById("viewerName");
   const viewerComic = document.getElementById("viewerComic");
   const viewerRarity = document.getElementById("viewerRarity");
+  const viewerDescription = document.getElementById("viewerDescription");
   const viewerObtained = document.getElementById("viewerObtained");
 
   let user = null;
@@ -363,6 +366,8 @@
         viewerName.textContent = card.name || "Без назви";
         viewerComic.textContent = comic?.title || "Невідомий комікс";
         viewerRarity.textContent = card.rarity || "Common";
+        viewerDescription.textContent =
+          card.description || card.backDescription || "Опис відсутній.";
         viewerObtained.textContent = `Отримано: ${formatDate(ownedCard.obtainedAt)}`;
 
         viewerOverlay.classList.add("show");
