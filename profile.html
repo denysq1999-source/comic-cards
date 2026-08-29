@@ -48,7 +48,6 @@
     <div class="profile-info">
       <h1 id="displayName">Користувач</h1>
       <p id="emailText"></p>
-      <p id="uidText"></p>
       <span class="badge" id="roleBadge">USER</span>
     </div>
   </section>
@@ -99,7 +98,6 @@
 
   const displayName = document.getElementById("displayName");
   const emailText = document.getElementById("emailText");
-  const uidText = document.getElementById("uidText");
   const roleBadge = document.getElementById("roleBadge");
   const adminLink = document.getElementById("adminLink");
   const cardsCount = document.getElementById("cardsCount");
@@ -127,8 +125,6 @@
       (currentUser.email ? currentUser.email.split("@")[0] : "Користувач");
 
     emailText.textContent = currentUser.email || "";
-    uidText.textContent = `ID: ${currentUser.uid}`;
-
     if (currentUser.uid === ADMIN_UID) {
       roleBadge.textContent = "ADMIN";
       adminLink.style.display = "inline-block";
