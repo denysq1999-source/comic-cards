@@ -51,38 +51,17 @@
       cursor:grab;
     }
     .viewer-image-wrap.dragging{cursor:grabbing}
-    .card-3d{
-      position:relative;
-      width:100%;
-      transform-style:preserve-3d;
-      transform:rotateX(0deg) rotateY(0deg);
-      transition:transform .35s cubic-bezier(.2,.8,.2,1);
-      will-change:transform;
-      border-radius:12px;
-      overflow:hidden;
-    }
+    .card-3d{position:relative;width:100%;aspect-ratio:5/7;transform-style:preserve-3d;transform:rotateX(0deg) rotateY(0deg);transition:transform .35s cubic-bezier(.2,.8,.2,1);will-change:transform}
     .viewer-image-wrap.dragging .card-3d{transition:none}
-    .card-3d img{
-      width:100%;
-      height:auto;
-      max-height:80vh;
-      object-fit:contain;
-      display:block;
-      pointer-events:none;
-    }
-    .card-shine{
-      position:absolute;
-      inset:0;
-      pointer-events:none;
-      opacity:0;
-      mix-blend-mode:screen;
-      background:
-        radial-gradient(circle at var(--shine-x,50%) var(--shine-y,50%),
-        rgba(255,255,255,.55) 0%,
-        rgba(255,220,120,.22) 16%,
-        rgba(255,255,255,0) 45%);
-      transition:opacity .2s ease;
-    }
+    .card-face{position:absolute;inset:0;border-radius:12px;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:#111;border:1px solid #333}
+    .card-face.front{transform:rotateY(0deg)}
+    .card-face.back{transform:rotateY(180deg)}
+    .card-face img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+    .generated-back{width:100%;height:100%;padding:34px 28px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle at 50% 30%,rgba(255,152,0,.12),transparent 40%),linear-gradient(145deg,#181818,#0b0b0b);border:10px double #6e5120;color:#eee}
+    .generated-back h4{font-size:26px;margin:0 0 14px;color:#ffb347}
+    .generated-back p{font-size:15px;line-height:1.6;color:#cfcfcf;white-space:pre-wrap}
+    .generated-back .back-mark{font-size:44px;margin-bottom:16px}
+    .card-shine{position:absolute;inset:0;pointer-events:none;opacity:0;mix-blend-mode:screen;background:radial-gradient(circle at var(--shine-x,50%) var(--shine-y,50%),rgba(255,255,255,.55) 0%,rgba(255,220,120,.22) 16%,rgba(255,255,255,0) 45%);transition:opacity .2s ease}
     .viewer-image-wrap.dragging .card-shine{opacity:.72}
     .viewer-info{display:flex;flex-direction:column;gap:10px;align-self:start}
     .viewer-info h3{font-size:28px;margin:0}
@@ -153,8 +132,19 @@
 
     <div class="viewer-image-wrap" id="viewerImageWrap" title="Затисни та рухай картку">
       <div class="card-3d" id="card3d">
-        <img id="viewerImage" alt="Картка">
-        <div class="card-shine" id="cardShine"></div>
+        <div class="card-face front">
+          <img id="viewerImage" alt="Лицьова сторона картки">
+          <div class="card-shine" id="cardShineFront"></div>
+        </div>
+        <div class="card-face back">
+          <img id="viewerBackImage" alt="Задня сторона картки" style="display:none;">
+          <div class="generated-back" id="generatedBack">
+            <div class="back-mark">🃏</div>
+            <h4 id="backCardName"></h4>
+            <p id="backCardDescription"></p>
+          </div>
+          <div class="card-shine" id="cardShineBack"></div>
+        </div>
       </div>
     </div>
 
@@ -198,7 +188,12 @@
   const viewerImage = document.getElementById("viewerImage");
   const viewerImageWrap = document.getElementById("viewerImageWrap");
   const card3d = document.getElementById("card3d");
-  const cardShine = document.getElementById("cardShine");
+  const cardShineFront = document.getElementById("cardShineFront");
+  const cardShineBack = document.getElementById("cardShineBack");
+  const viewerBackImage = document.getElementById("viewerBackImage");
+  const generatedBack = document.getElementById("generatedBack");
+  const backCardName = document.getElementById("backCardName");
+  const backCardDescription = document.getElementById("backCardDescription");
   const viewerName = document.getElementById("viewerName");
   const viewerComic = document.getElementById("viewerComic");
   const viewerRarity = document.getElementById("viewerRarity");
@@ -352,9 +347,19 @@
         const comic = comics.find(item => item.id === card.comicId);
 
         viewerImage.src = card.image ? driveImage(card.image) : placeholder();
-        card3d.style.transform = "rotateX(0deg) rotateY(0deg)";
-        cardShine.style.setProperty("--shine-x", "50%");
-        cardShine.style.setProperty("--shine-y", "50%");
+        if (card.backImage) {
+          viewerBackImage.src = driveImage(card.backImage);
+          viewerBackImage.style.display = "block";
+          generatedBack.style.display = "none";
+        } else {
+          viewerBackImage.removeAttribute("src");
+          viewerBackImage.style.display = "none";
+          generatedBack.style.display = "flex";
+          backCardName.textContent = card.name || "Без назви";
+          backCardDescription.textContent = card.backDescription || card.description || "Опис відсутній.";
+        }
+        cardRotationY = 0; cardRotationX = 0; applyCardTransform();
+        [cardShineFront, cardShineBack].forEach(sh=>{sh.style.setProperty("--shine-x","50%");sh.style.setProperty("--shine-y","50%");});
         viewerName.textContent = card.name || "Без назви";
         viewerComic.textContent = comic?.title || "Невідомий комікс";
         viewerRarity.textContent = card.rarity || "Common";
@@ -393,59 +398,16 @@
   }
 
 
-  // ===== 3D drag-rotate картки =====
-  let cardDragging = false;
-  let activePointerId = null;
-
-  function rotateCardFromPointer(event) {
-    const rect = viewerImageWrap.getBoundingClientRect();
-    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
-
-    const nx = (x / rect.width - 0.5) * 2;
-    const ny = (y / rect.height - 0.5) * 2;
-
-    const rotateY = nx * 18;
-    const rotateX = -ny * 18;
-
-    card3d.style.transform =
-      `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale(1.025)`;
-
-    cardShine.style.setProperty("--shine-x", `${(x / rect.width * 100).toFixed(1)}%`);
-    cardShine.style.setProperty("--shine-y", `${(y / rect.height * 100).toFixed(1)}%`);
-  }
-
-  function resetCard3D() {
-    cardDragging = false;
-    activePointerId = null;
-    viewerImageWrap.classList.remove("dragging");
-    card3d.style.transform = "rotateX(0deg) rotateY(0deg) scale(1)";
-    cardShine.style.setProperty("--shine-x", "50%");
-    cardShine.style.setProperty("--shine-y", "50%");
-  }
-
-  viewerImageWrap.addEventListener("pointerdown", event => {
-    if (!viewerOverlay.classList.contains("show")) return;
-
-    cardDragging = true;
-    activePointerId = event.pointerId;
-    viewerImageWrap.classList.add("dragging");
-    viewerImageWrap.setPointerCapture(event.pointerId);
-    rotateCardFromPointer(event);
-  });
-
-  viewerImageWrap.addEventListener("pointermove", event => {
-    if (!cardDragging || event.pointerId !== activePointerId) return;
-    rotateCardFromPointer(event);
-  });
-
-  viewerImageWrap.addEventListener("pointerup", event => {
-    if (event.pointerId !== activePointerId) return;
-    resetCard3D();
-  });
-
-  viewerImageWrap.addEventListener("pointercancel", resetCard3D);
-  viewerImageWrap.addEventListener("lostpointercapture", resetCard3D);
+  // ===== 3D картка: перед + зад як один об'єкт =====
+  let cardDragging=false,activePointerId=null,dragStartX=0,dragStartY=0,dragStartRotationY=0,cardRotationY=0,cardRotationX=0;
+  function normalizeAngle(a){a%=360;if(a<0)a+=360;return a}
+  function applyCardTransform(){card3d.style.transform=`rotateX(${cardRotationX.toFixed(2)}deg) rotateY(${cardRotationY.toFixed(2)}deg)`}
+  function updateShine(e){const r=viewerImageWrap.getBoundingClientRect();const x=Math.max(0,Math.min(r.width,e.clientX-r.left));const y=Math.max(0,Math.min(r.height,e.clientY-r.top));const sx=`${(x/r.width*100).toFixed(1)}%`,sy=`${(y/r.height*100).toFixed(1)}%`;[cardShineFront,cardShineBack].forEach(sh=>{sh.style.setProperty("--shine-x",sx);sh.style.setProperty("--shine-y",sy)})}
+  viewerImageWrap.addEventListener("pointerdown",e=>{if(!viewerOverlay.classList.contains("show"))return;cardDragging=true;activePointerId=e.pointerId;dragStartX=e.clientX;dragStartY=e.clientY;dragStartRotationY=cardRotationY;viewerImageWrap.classList.add("dragging");viewerImageWrap.setPointerCapture(e.pointerId);updateShine(e)});
+  viewerImageWrap.addEventListener("pointermove",e=>{if(!cardDragging||e.pointerId!==activePointerId)return;const r=viewerImageWrap.getBoundingClientRect();const dx=e.clientX-dragStartX,dy=e.clientY-dragStartY;cardRotationY=dragStartRotationY+(dx/r.width)*220;cardRotationX=Math.max(-15,Math.min(15,-(dy/r.height)*30));applyCardTransform();updateShine(e)});
+  function finishCardDrag(e){if(!cardDragging)return;if(e&&activePointerId!==null&&e.pointerId!==activePointerId)return;cardDragging=false;activePointerId=null;viewerImageWrap.classList.remove("dragging");const n=normalizeAngle(cardRotationY),back=n>90&&n<270;cardRotationY=back?Math.round(cardRotationY/360)*360+180:Math.round(cardRotationY/360)*360;cardRotationX=0;applyCardTransform()}
+  viewerImageWrap.addEventListener("pointerup",finishCardDrag);viewerImageWrap.addEventListener("pointercancel",finishCardDrag);viewerImageWrap.addEventListener("lostpointercapture",()=>{if(cardDragging)finishCardDrag()});
+  function resetCard3D(){cardDragging=false;activePointerId=null;cardRotationY=0;cardRotationX=0;viewerImageWrap.classList.remove("dragging");applyCardTransform();[cardShineFront,cardShineBack].forEach(sh=>{sh.style.setProperty("--shine-x","50%");sh.style.setProperty("--shine-y","50%")})}
 
   function closeViewer() {
     resetCard3D();
