@@ -646,14 +646,6 @@
               </div>
 
               <div class="form-group">
-                <label for="comicUrl">Посилання Google Drive для читання</label>
-                <input id="comicUrl" type="url" placeholder="https://drive.google.com/..." required>
-                <div class="hint">
-                  Сюди можна вставити посилання на PDF, файл або папку Google Drive.
-                </div>
-              </div>
-
-              <div class="form-group">
                 <label for="comicDescription">Короткий опис</label>
                 <textarea id="comicDescription" placeholder="Коротко про комікс..."></textarea>
               </div>
@@ -819,7 +811,6 @@
     const comicForm = document.getElementById("comicForm");
     const comicTitle = document.getElementById("comicTitle");
     const coverUrl = document.getElementById("coverUrl");
-    const comicUrl = document.getElementById("comicUrl");
     const comicDescription = document.getElementById("comicDescription");
     const coverPreview = document.getElementById("coverPreview");
     const coverPreviewImg = document.getElementById("coverPreviewImg");
@@ -943,13 +934,6 @@
               </div>
 
               <div class="comic-actions">
-                <a
-                  class="read-btn"
-                  href="${escapeHtml(comic.url)}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >📖 Читати</a>
-
                 <button
                   class="delete-btn"
                   type="button"
@@ -983,11 +967,10 @@
 
       const title = comicTitle.value.trim();
       const cover = coverUrl.value.trim();
-      const url = comicUrl.value.trim();
       const description = comicDescription.value.trim();
 
-      if (!title || !url) {
-        showMessage("Заповни назву та посилання для читання.", "error");
+      if (!title) {
+        showMessage("Заповни назву коміксу.", "error");
         return;
       }
 
@@ -997,7 +980,6 @@
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         title,
         cover,
-        url,
         description,
         createdAt: new Date().toISOString()
       });
