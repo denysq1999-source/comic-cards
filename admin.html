@@ -820,7 +820,27 @@
             <img id="guestBannerPreviewImg" alt="Банер головної сторінки">
           </div>
 
-          <button class="primary-btn" id="saveGuestBannerBtn" type="button">💾 Зберегти банер</button>
+          <div class="form-group">
+            <label for="tiktokUrl">TikTok</label>
+            <input id="tiktokUrl" type="url" placeholder="https://www.tiktok.com/@...">
+          </div>
+
+          <div class="form-group">
+            <label for="threadsUrl">Threads</label>
+            <input id="threadsUrl" type="url" placeholder="https://www.threads.net/@...">
+          </div>
+
+          <div class="form-group">
+            <label for="youtubeUrl">YouTube</label>
+            <input id="youtubeUrl" type="url" placeholder="https://www.youtube.com/@...">
+          </div>
+
+          <div class="form-group">
+            <label for="supportUrl">Підтримати автора</label>
+            <input id="supportUrl" type="url" placeholder="Посилання на донат / Buy Me a Coffee / іншу підтримку">
+          </div>
+
+          <button class="primary-btn" id="saveGuestBannerBtn" type="button">💾 Зберегти налаштування</button>
           <div id="bannerMessage" class="message"></div>
         </div>
       </section>
@@ -1150,6 +1170,10 @@
     const guestBannerPreviewImg = document.getElementById("guestBannerPreviewImg");
     const saveGuestBannerBtn = document.getElementById("saveGuestBannerBtn");
     const bannerMessage = document.getElementById("bannerMessage");
+    const tiktokUrl = document.getElementById("tiktokUrl");
+    const threadsUrl = document.getElementById("threadsUrl");
+    const youtubeUrl = document.getElementById("youtubeUrl");
+    const supportUrl = document.getElementById("supportUrl");
 
     function updateGuestBannerPreview() {
       const url = guestBannerUrl.value.trim();
@@ -1184,7 +1208,12 @@
       const snap = await getDoc(doc(db, "site_settings", "home"));
 
       if (snap.exists()) {
-        guestBannerUrl.value = snap.data().guestBannerUrl || "";
+        const data = snap.data();
+        guestBannerUrl.value = data.guestBannerUrl || "";
+        tiktokUrl.value = data.tiktokUrl || "";
+        threadsUrl.value = data.threadsUrl || "";
+        youtubeUrl.value = data.youtubeUrl || "";
+        supportUrl.value = data.supportUrl || "";
         updateGuestBannerPreview();
       }
     }
@@ -1192,10 +1221,14 @@
     saveGuestBannerBtn.addEventListener("click", async () => {
       await setDoc(doc(db, "site_settings", "home"), {
         guestBannerUrl: guestBannerUrl.value.trim(),
+        tiktokUrl: tiktokUrl.value.trim(),
+        threadsUrl: threadsUrl.value.trim(),
+        youtubeUrl: youtubeUrl.value.trim(),
+        supportUrl: supportUrl.value.trim(),
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      showBannerMessage("Банер збережено ✅", "success");
+      showBannerMessage("Налаштування збережено ✅", "success");
     });
 
     // ===== Розділи коміксів =====
