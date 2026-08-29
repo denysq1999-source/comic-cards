@@ -32,7 +32,21 @@
     .rarity{align-self:flex-start;background:#272727;border:1px solid #353535;color:#ffb347;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800}
     .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.stat{background:#202020;border-radius:7px;text-align:center;padding:7px 4px;color:#aaa;font-size:12px}.stat b{display:block;color:#fff;font-size:14px;margin-top:2px}
     .desc{color:#929292;font-size:13px;line-height:1.45;flex:1}.actions{display:grid;grid-template-columns:1fr auto;gap:8px}
-    .edit,.delete{border:0;border-radius:8px;padding:10px;cursor:pointer;font-weight:800}.edit{background:#2b3a4a;color:#dbeeff}.delete{background:#2a2a2a;color:#ddd}
+    .edit,.preview-btn,.publish-btn,.delete{border:0;border-radius:8px;padding:10px;cursor:pointer;font-weight:800}
+    .edit{background:#2b3a4a;color:#dbeeff}
+    .preview-btn{background:#3a3150;color:#eadcff}
+    .publish-btn{background:#1f5f36;color:#dff7e7}
+    .publish-btn.published{background:#2e7d32;color:#fff}
+    .delete{background:#2a2a2a;color:#ddd}
+    .status-badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;background:#3b2a20;color:#ffbe85}
+    .status-badge.live{background:#173c23;color:#8fe5a6}
+    .preview-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.84);display:none;align-items:center;justify-content:center;padding:20px}
+    .preview-overlay.show{display:flex}
+    .preview-modal{width:min(900px,96vw);max-height:92vh;background:#151515;border:1px solid #333;border-radius:16px;padding:20px;display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:20px;overflow:auto;position:relative}
+    .preview-modal img{width:100%;height:auto;border-radius:12px;display:block}
+    .preview-close{position:absolute;top:10px;right:10px;width:38px;height:38px;border:0;border-radius:50%;background:#2a2a2a;color:#fff;font-size:20px;cursor:pointer}
+    .preview-info h3{font-size:28px;margin:0 0 10px}.preview-info p{color:#aaa;line-height:1.55}
+    @media(max-width:760px){.preview-modal{grid-template-columns:1fr}}
     .empty{grid-column:1/-1;border:1px dashed #333;border-radius:12px;padding:45px;text-align:center;color:#777}
     .message{display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px}.message.show{display:block}.message.success{background:#122417;color:#8ae1a2}.message.error{background:#2a1515;color:#ff9696}
     @media(max-width:900px){.layout{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr}}
@@ -110,6 +124,19 @@
     </section>
   </div>
 </main>
+
+<div class="preview-overlay" id="previewOverlay">
+  <div class="preview-modal">
+    <button class="preview-close" id="previewCloseBtn" type="button">✕</button>
+    <div><img id="previewModalImage" alt="Перегляд картки"></div>
+    <div class="preview-info">
+      <h3 id="previewModalName"></h3>
+      <div class="comic" id="previewModalComic"></div>
+      <div style="margin:10px 0;"><span class="rarity" id="previewModalRarity"></span></div>
+      <p id="previewModalDescription"></p>
+    </div>
+  </div>
+</div>
 
 <script type="module">
   import { auth } from './js/firebase.js';
@@ -214,13 +241,56 @@
               <div class="stat">Defense<b>${Number(c.defense||0)}</b></div>
             </div>
             <div class="desc">${esc(c.description||"Без опису")}</div>
-            <div class="actions">
+            <div>
+              <span class="status-badge ${c.published ? "live" : ""}">
+                ${c.published ? "✅ Опубліковано" : "🕓 Чернетка"}
+              </span>
+            </div>
+            <div class="actions" style="grid-template-columns:1fr 1fr;">
+              <button class="preview-btn" data-preview="${esc(c.id)}">👁 Перегляд</button>
+              <button class="publish-btn ${c.published ? "published" : ""}" data-publish="${esc(c.id)}">
+                ${c.published ? "✅ В системі" : "✅ Опублікувати"}
+              </button>
               <button class="edit" data-edit="${esc(c.id)}">✏️ Редагувати</button>
               <button class="delete" data-delete="${esc(c.id)}">🗑️</button>
             </div>
           </div>
         </article>`;
     }).join("");
+
+    document.querySelectorAll("[data-preview]").forEach(button => {
+      button.addEventListener("click", () => {
+        const c = cards.find(x => x.id === button.dataset.preview);
+        if (!c) return;
+        const comic = comics.find(x => x.id === c.comicId);
+
+        previewModalImage.src = c.image ? driveImage(c.image) : placeholder();
+        previewModalName.textContent = c.name || "Без назви";
+        previewModalComic.textContent = comic?.title || "Невідомий комікс";
+        previewModalRarity.textContent = c.rarity || "Common";
+        previewModalDescription.textContent = c.description || c.backDescription || "Без опису";
+
+        previewOverlay.classList.add("show");
+        document.body.style.overflow = "hidden";
+      });
+    });
+
+    document.querySelectorAll("[data-publish]").forEach(button => {
+      button.addEventListener("click", async () => {
+        const c = cards.find(x => x.id === button.dataset.publish);
+        if (!c) return;
+
+        const nextPublished = !Boolean(c.published);
+
+        await setDoc(doc(db, "cards", c.id), {
+          published: nextPublished,
+          publishedAt: nextPublished ? serverTimestamp() : null,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        await loadData();
+      });
+    });
 
     document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>startEdit(b.dataset.edit));
     document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>removeCard(b.dataset.delete));
@@ -290,7 +360,11 @@
         await setDoc(doc(db,"cards",editingId), {...data, updatedAt:serverTimestamp()}, {merge:true});
         showMessage("Картку оновлено ✅","success");
       } else {
-        await addDoc(collection(db,"cards"), {...data, createdAt:serverTimestamp()});
+        await addDoc(collection(db,"cards"), {
+          ...data,
+          published:false,
+          createdAt:serverTimestamp()
+        });
         showMessage("Картку додано ✅","success");
       }
       resetForm();
@@ -307,6 +381,19 @@
     await deleteDoc(doc(db,"cards",id));
     await loadData();
   }
+
+  function closePreview() {
+    previewOverlay.classList.remove("show");
+    document.body.style.overflow = "";
+  }
+
+  previewCloseBtn.addEventListener("click", closePreview);
+  previewOverlay.addEventListener("click", e => {
+    if (e.target === previewOverlay) closePreview();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && previewOverlay.classList.contains("show")) closePreview();
+  });
 
   filterComic.onchange = renderCards;
   searchInput.oninput = renderCards;
