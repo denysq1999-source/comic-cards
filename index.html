@@ -20,14 +20,75 @@
 
     header {
       background: #1f1f1f;
-      padding: 20px;
-      font-size: 32px;
-      font-weight: bold;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 12px;
+      padding: 14px 22px;
       border-bottom: 1px solid #2d2d2d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      text-align: left;
+    }
+
+    .brand {
+      font-size: 28px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .top-nav {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .nav-link,
+    .nav-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 40px;
+      padding: 9px 13px;
+      border-radius: 8px;
+      border: 1px solid #343434;
+      background: #2b2b2b;
+      color: #fff;
+      text-decoration: none;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .nav-link:hover,
+    .nav-button:hover {
+      background: #3a3a3a;
+    }
+
+    .nav-link.social {
+      background: #202020;
+    }
+
+    .nav-link.support {
+      background: #ff9800;
+      border-color: #ff9800;
+      font-weight: 700;
+    }
+
+    .nav-link.support:hover {
+      background: #e68900;
+    }
+
+    .nav-admin {
+      display: none;
+    }
+
+    .nav-auth {
+      display: none;
     }
 
     main {
@@ -264,8 +325,23 @@
 
     @media (max-width: 650px) {
       header {
-        font-size: 25px;
-        padding: 16px;
+        padding: 12px;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .brand {
+        font-size: 24px;
+      }
+
+      .top-nav {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .nav-link,
+      .nav-button {
+        flex: 1 1 auto;
       }
 
       main {
@@ -292,7 +368,18 @@
 <body>
 
   <header>
-    🃏 Comic Cards
+    <div class="brand">🃏 Comic Cards</div>
+
+    <nav class="top-nav">
+      <a class="nav-link social" id="tiktokLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🎵 TikTok</a>
+      <a class="nav-link social" id="threadsLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🧵 Threads</a>
+      <a class="nav-link social" id="youtubeLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">▶️ YouTube</a>
+      <a class="nav-link support" id="supportLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">☕ Підтримати автора</a>
+
+      <a class="nav-link nav-auth" id="profileBtnTop" href="profile.html">👤 Особистий кабінет</a>
+      <a class="nav-link nav-admin" id="adminBtnTop" href="admin.html">⚙️ Адмін-панель</a>
+      <button class="nav-button nav-auth" id="logoutBtnTop" type="button">Вийти</button>
+    </nav>
   </header>
 
   <main>
@@ -324,20 +411,7 @@
     </section>
 
 
-    <div>
-      <a class="button secondary" id="profileBtn" href="profile.html" style="display:none;">👤 Особистий кабінет</a>
-    </div>
-
-    <!-- Кнопка адмінки тільки адміну -->
-    <div>
-      <a class="button secondary" id="adminBtn" href="admin.html">⚙️ Адмін-панель</a>
-    </div>
-
     <div class="user-info" id="userInfo"></div>
-
-    <div class="auth-actions">
-      <button class="button secondary" id="logoutBtn" style="display:none;">Вийти</button>
-    </div>
   </main>
 
   <script type="module">
@@ -362,10 +436,15 @@
     const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
 
 
-    const adminBtn = document.getElementById("adminBtn");
-    const profileBtn = document.getElementById("profileBtn");
+    const adminBtnTop = document.getElementById("adminBtnTop");
+    const profileBtnTop = document.getElementById("profileBtnTop");
+    const logoutBtnTop = document.getElementById("logoutBtnTop");
     const userInfo = document.getElementById("userInfo");
-    const logoutBtn = document.getElementById("logoutBtn");
+
+    const tiktokLink = document.getElementById("tiktokLink");
+    const threadsLink = document.getElementById("threadsLink");
+    const youtubeLink = document.getElementById("youtubeLink");
+    const supportLink = document.getElementById("supportLink");
     const guestSection = document.getElementById("guestSection");
     const catalogSection = document.getElementById("catalogSection");
     const comicsGrid = document.getElementById("comicsGrid");
@@ -411,18 +490,36 @@
     }
 
 
-    async function loadGuestBanner() {
+    async function loadSiteSettings() {
       try {
         const snap = await getDoc(doc(db, "site_settings", "home"));
         if (!snap.exists()) return;
 
-        const rawUrl = snap.data().guestBannerUrl || "";
-        if (!rawUrl) return;
+        const data = snap.data();
 
-        guestBannerImg.src = getCoverImageUrl(rawUrl);
-        guestBanner.style.display = "block";
+        const rawUrl = data.guestBannerUrl || "";
+        if (rawUrl) {
+          guestBannerImg.src = getCoverImageUrl(rawUrl);
+          guestBanner.style.display = "block";
+        }
+
+        const links = [
+          [tiktokLink, data.tiktokUrl],
+          [threadsLink, data.threadsUrl],
+          [youtubeLink, data.youtubeUrl],
+          [supportLink, data.supportUrl]
+        ];
+
+        links.forEach(([element, url]) => {
+          if (url) {
+            element.href = url;
+            element.style.display = "inline-flex";
+          } else {
+            element.style.display = "none";
+          }
+        });
       } catch (error) {
-        console.error("Banner load error:", error);
+        console.error("Site settings load error:", error);
       }
     }
 
@@ -574,7 +671,7 @@
       });
     }
 
-    loadGuestBanner();
+    loadSiteSettings();
 
     onAuthStateChanged(auth, async (user) => {
       currentUser = user;
@@ -584,13 +681,13 @@
         catalogSection.style.display = "block";
 
         userInfo.textContent = `Ви увійшли як: ${user.email}`;
-        logoutBtn.style.display = "inline-block";
-        profileBtn.style.display = "inline-block";
+        logoutBtnTop.style.display = "inline-flex";
+        profileBtnTop.style.display = "inline-flex";
 
         if (user.uid === ADMIN_UID) {
-          adminBtn.style.display = "inline-block";
+          adminBtnTop.style.display = "inline-flex";
         } else {
-          adminBtn.style.display = "none";
+          adminBtnTop.style.display = "none";
         }
 
         await renderComics();
@@ -599,13 +696,13 @@
         catalogSection.style.display = "none";
 
         userInfo.textContent = "";
-        logoutBtn.style.display = "none";
-        profileBtn.style.display = "none";
-        adminBtn.style.display = "none";
+        logoutBtnTop.style.display = "none";
+        profileBtnTop.style.display = "none";
+        adminBtnTop.style.display = "none";
       }
     });
 
-    logoutBtn.addEventListener("click", async () => {
+    logoutBtnTop.addEventListener("click", async () => {
       await signOut(auth);
       window.location.reload();
     });
