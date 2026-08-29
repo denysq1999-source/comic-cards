@@ -43,10 +43,84 @@
     .preview-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.84);display:none;align-items:center;justify-content:center;padding:20px}
     .preview-overlay.show{display:flex}
     .preview-modal{width:min(900px,96vw);max-height:92vh;background:#151515;border:1px solid #333;border-radius:16px;padding:20px;display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:20px;overflow:auto;position:relative}
-    .preview-modal img{width:100%;height:auto;border-radius:12px;display:block}
     .preview-close{position:absolute;top:10px;right:10px;width:38px;height:38px;border:0;border-radius:50%;background:#2a2a2a;color:#fff;font-size:20px;cursor:pointer}
     .preview-info h3{font-size:28px;margin:0 0 10px}.preview-info p{color:#aaa;line-height:1.55}
-    @media(max-width:760px){.preview-modal{grid-template-columns:1fr}}
+
+    .admin-card-stage{
+      perspective:1100px;
+      user-select:none;
+      touch-action:none;
+      cursor:grab;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:420px;
+    }
+    .admin-card-stage.dragging{cursor:grabbing}
+    .admin-card-3d{
+      position:relative;
+      width:100%;
+      max-width:420px;
+      aspect-ratio:5/7;
+      transform-style:preserve-3d;
+      transform:rotateX(0deg) rotateY(0deg);
+      transition:transform .35s cubic-bezier(.2,.8,.2,1);
+      will-change:transform;
+    }
+    .admin-card-stage.dragging .admin-card-3d{transition:none}
+    .admin-card-face{
+      position:absolute;
+      inset:0;
+      border-radius:12px;
+      overflow:hidden;
+      backface-visibility:hidden;
+      -webkit-backface-visibility:hidden;
+      background:#0d0d0d;
+      border:1px solid #333;
+    }
+    .admin-card-face.front{transform:rotateY(0deg)}
+    .admin-card-face.back{transform:rotateY(180deg)}
+    .admin-card-face img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      pointer-events:none;
+    }
+    .admin-generated-back{
+      width:100%;
+      height:100%;
+      padding:34px 28px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      background:
+        radial-gradient(circle at 50% 30%,rgba(255,152,0,.12),transparent 40%),
+        linear-gradient(145deg,#181818,#0b0b0b);
+      border:10px double #6e5120;
+      color:#eee;
+    }
+    .admin-generated-back h4{font-size:26px;margin:0 0 14px;color:#ffb347}
+    .admin-generated-back p{font-size:15px;line-height:1.6;color:#cfcfcf;white-space:pre-wrap}
+    .admin-generated-back .back-mark{font-size:44px;margin-bottom:16px}
+    .admin-card-shine{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      opacity:0;
+      mix-blend-mode:screen;
+      background:
+        radial-gradient(circle at var(--shine-x,50%) var(--shine-y,50%),
+        rgba(255,255,255,.55) 0%,
+        rgba(255,220,120,.22) 16%,
+        rgba(255,255,255,0) 45%);
+      transition:opacity .2s ease;
+    }
+    .admin-card-stage.dragging .admin-card-shine{opacity:.72}
+
+    @media(max-width:760px){.preview-modal{grid-template-columns:1fr}.admin-card-stage{min-height:0}}
     .empty{grid-column:1/-1;border:1px dashed #333;border-radius:12px;padding:45px;text-align:center;color:#777}
     .message{display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px}.message.show{display:block}.message.success{background:#122417;color:#8ae1a2}.message.error{background:#2a1515;color:#ff9696}
     @media(max-width:900px){.layout{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr}}
@@ -128,12 +202,32 @@
 <div class="preview-overlay" id="previewOverlay">
   <div class="preview-modal">
     <button class="preview-close" id="previewCloseBtn" type="button">✕</button>
-    <div><img id="previewModalImage" alt="Перегляд картки"></div>
+
+    <div class="admin-card-stage" id="adminCardStage" title="Затисни та рухай картку">
+      <div class="admin-card-3d" id="adminCard3d">
+        <div class="admin-card-face front">
+          <img id="previewModalImage" alt="Лицьова сторона картки">
+          <div class="admin-card-shine" id="adminShineFront"></div>
+        </div>
+
+        <div class="admin-card-face back">
+          <img id="previewModalBackImage" alt="Задня сторона картки" style="display:none;">
+          <div class="admin-generated-back" id="adminGeneratedBack">
+            <div class="back-mark">🃏</div>
+            <h4 id="adminBackName"></h4>
+            <p id="adminBackDescription"></p>
+          </div>
+          <div class="admin-card-shine" id="adminShineBack"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="preview-info">
       <h3 id="previewModalName"></h3>
       <div class="comic" id="previewModalComic"></div>
       <div style="margin:10px 0;"><span class="rarity" id="previewModalRarity"></span></div>
       <p id="previewModalDescription"></p>
+      <p style="margin-top:12px;color:#777;font-size:13px;">🖱️ Затисни картку й потягни вбік, щоб перевернути.</p>
     </div>
   </div>
 </div>
@@ -265,6 +359,29 @@
         const comic = comics.find(x => x.id === c.comicId);
 
         previewModalImage.src = c.image ? driveImage(c.image) : placeholder();
+
+        if (c.backImage) {
+          previewModalBackImage.src = driveImage(c.backImage);
+          previewModalBackImage.style.display = "block";
+          adminGeneratedBack.style.display = "none";
+        } else {
+          previewModalBackImage.removeAttribute("src");
+          previewModalBackImage.style.display = "none";
+          adminGeneratedBack.style.display = "flex";
+          adminBackName.textContent = c.name || "Без назви";
+          adminBackDescription.textContent =
+            c.backDescription || c.description || "Опис відсутній.";
+        }
+
+        adminRotationY = 0;
+        adminRotationX = 0;
+        applyAdminCardTransform();
+
+        [adminShineFront, adminShineBack].forEach(shine => {
+          shine.style.setProperty("--shine-x", "50%");
+          shine.style.setProperty("--shine-y", "50%");
+        });
+
         previewModalName.textContent = c.name || "Без назви";
         previewModalComic.textContent = comic?.title || "Невідомий комікс";
         previewModalRarity.textContent = c.rarity || "Common";
@@ -382,7 +499,109 @@
     await loadData();
   }
 
+
+  // ===== 3D-перегляд картки в адмінці =====
+  let adminDragging = false;
+  let adminPointerId = null;
+  let adminStartX = 0;
+  let adminStartY = 0;
+  let adminStartRotationY = 0;
+  let adminRotationY = 0;
+  let adminRotationX = 0;
+
+  function normalizeAdminAngle(angle) {
+    let a = angle % 360;
+    if (a < 0) a += 360;
+    return a;
+  }
+
+  function applyAdminCardTransform() {
+    adminCard3d.style.transform =
+      `rotateX(${adminRotationX.toFixed(2)}deg) rotateY(${adminRotationY.toFixed(2)}deg)`;
+  }
+
+  function updateAdminShine(event) {
+    const rect = adminCardStage.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const sx = `${(x / rect.width * 100).toFixed(1)}%`;
+    const sy = `${(y / rect.height * 100).toFixed(1)}%`;
+
+    [adminShineFront, adminShineBack].forEach(shine => {
+      shine.style.setProperty("--shine-x", sx);
+      shine.style.setProperty("--shine-y", sy);
+    });
+  }
+
+  adminCardStage.addEventListener("pointerdown", event => {
+    if (!previewOverlay.classList.contains("show")) return;
+
+    adminDragging = true;
+    adminPointerId = event.pointerId;
+    adminStartX = event.clientX;
+    adminStartY = event.clientY;
+    adminStartRotationY = adminRotationY;
+
+    adminCardStage.classList.add("dragging");
+    adminCardStage.setPointerCapture(event.pointerId);
+    updateAdminShine(event);
+  });
+
+  adminCardStage.addEventListener("pointermove", event => {
+    if (!adminDragging || event.pointerId !== adminPointerId) return;
+
+    const rect = adminCardStage.getBoundingClientRect();
+    const dx = event.clientX - adminStartX;
+    const dy = event.clientY - adminStartY;
+
+    adminRotationY = adminStartRotationY + (dx / rect.width) * 220;
+    adminRotationX = Math.max(-15, Math.min(15, -(dy / rect.height) * 30));
+
+    applyAdminCardTransform();
+    updateAdminShine(event);
+  });
+
+  function finishAdminCardDrag(event) {
+    if (!adminDragging) return;
+    if (event && adminPointerId !== null && event.pointerId !== adminPointerId) return;
+
+    adminDragging = false;
+    adminPointerId = null;
+    adminCardStage.classList.remove("dragging");
+
+    const normalized = normalizeAdminAngle(adminRotationY);
+    const showBack = normalized > 90 && normalized < 270;
+
+    adminRotationY = showBack
+      ? Math.round(adminRotationY / 360) * 360 + 180
+      : Math.round(adminRotationY / 360) * 360;
+
+    adminRotationX = 0;
+    applyAdminCardTransform();
+  }
+
+  adminCardStage.addEventListener("pointerup", finishAdminCardDrag);
+  adminCardStage.addEventListener("pointercancel", finishAdminCardDrag);
+  adminCardStage.addEventListener("lostpointercapture", () => {
+    if (adminDragging) finishAdminCardDrag();
+  });
+
+  function resetAdminCard3D() {
+    adminDragging = false;
+    adminPointerId = null;
+    adminRotationY = 0;
+    adminRotationX = 0;
+    adminCardStage.classList.remove("dragging");
+    applyAdminCardTransform();
+
+    [adminShineFront, adminShineBack].forEach(shine => {
+      shine.style.setProperty("--shine-x", "50%");
+      shine.style.setProperty("--shine-y", "50%");
+    });
+  }
+
   function closePreview() {
+    resetAdminCard3D();
     previewOverlay.classList.remove("show");
     document.body.style.overflow = "";
   }
