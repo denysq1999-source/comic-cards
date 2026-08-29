@@ -254,6 +254,24 @@
       background: #e68900;
     }
 
+    .cancel-edit-btn {
+      width: 100%;
+      border: 1px solid #3b3b3b;
+      border-radius: 9px;
+      background: #242424;
+      color: #ddd;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 11px 16px;
+      cursor: pointer;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .cancel-edit-btn:hover {
+      background: #303030;
+    }
+
     .comics-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -318,12 +336,13 @@
 
     .comic-actions {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr auto auto;
       gap: 8px;
       margin-top: 4px;
     }
 
     .read-btn,
+    .edit-btn,
     .delete-btn {
       text-decoration: none;
       border: none;
@@ -342,6 +361,15 @@
 
     .read-btn:hover {
       background: #e68900;
+    }
+
+    .edit-btn {
+      background: #2b3a4a;
+      color: #dbeeff;
+    }
+
+    .edit-btn:hover {
+      background: #35516d;
     }
 
     .delete-btn {
@@ -479,6 +507,40 @@
     .chapter-delete:hover {
       background: #3a2020;
       color: #ff8585;
+    }
+
+    .banner-settings {
+      max-width: 760px;
+    }
+
+    .banner-preview {
+      width: 100%;
+      min-height: 180px;
+      aspect-ratio: 16 / 5;
+      background: #101010;
+      border: 1px dashed #3a3a3a;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      margin: 14px 0 18px;
+    }
+
+    .banner-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    .banner-preview.has-image img {
+      display: block;
+    }
+
+    .banner-preview.has-image span {
+      display: none;
     }
 
     @media (max-width: 900px) {
@@ -650,7 +712,8 @@
                 <textarea id="comicDescription" placeholder="Коротко про комікс..."></textarea>
               </div>
 
-              <button class="primary-btn" type="submit">💾 Додати комікс</button>
+              <button class="primary-btn" id="comicSubmitBtn" type="submit">💾 Додати комікс</button>
+              <button class="cancel-edit-btn" id="cancelComicEditBtn" type="button">Скасувати редагування</button>
               <div id="formMessage" class="message"></div>
             </form>
           </div>
@@ -741,9 +804,24 @@
 
       <!-- Налаштування -->
       <section class="section" id="settings">
-        <div class="placeholder">
-          <h2>Налаштування</h2>
-          <p>Тут будуть налаштування системи</p>
+        <div class="panel banner-settings">
+          <h2>🖼️ Банер головної сторінки</h2>
+          <p class="panel-subtitle">
+            Встав посилання на зображення. Банер буде показаний гостям у блоці входу та реєстрації.
+          </p>
+
+          <div class="form-group">
+            <label for="guestBannerUrl">Посилання на банер</label>
+            <input id="guestBannerUrl" type="url" placeholder="https://drive.google.com/file/d/... або пряме посилання">
+          </div>
+
+          <div class="banner-preview" id="guestBannerPreview">
+            <span>🖼️ Тут буде банер</span>
+            <img id="guestBannerPreviewImg" alt="Банер головної сторінки">
+          </div>
+
+          <button class="primary-btn" id="saveGuestBannerBtn" type="button">💾 Зберегти банер</button>
+          <div id="bannerMessage" class="message"></div>
         </div>
       </section>
     </main>
@@ -756,6 +834,7 @@
       getFirestore,
       collection,
       getDocs,
+      getDoc,
       addDoc,
       setDoc,
       doc,
@@ -829,6 +908,10 @@
     const coverPreviewImg = document.getElementById("coverPreviewImg");
     const comicsGrid = document.getElementById("comicsGrid");
     const formMessage = document.getElementById("formMessage");
+    const comicSubmitBtn = document.getElementById("comicSubmitBtn");
+    const cancelComicEditBtn = document.getElementById("cancelComicEditBtn");
+
+    let editingComicId = null;
 
     function extractGoogleDriveFileId(url) {
       if (!url) return null;
@@ -946,6 +1029,13 @@
                 >📖 Читати</a>
 
                 <button
+                  class="edit-btn"
+                  type="button"
+                  data-edit-id="${escapeHtml(comic.id)}"
+                  title="Редагувати комікс"
+                >✏️</button>
+
+                <button
                   class="delete-btn"
                   type="button"
                   data-delete-id="${escapeHtml(comic.id)}"
@@ -956,6 +1046,24 @@
           </article>
         `;
       }).join("");
+
+      document.querySelectorAll("[data-edit-id]").forEach(button => {
+        button.addEventListener("click", async () => {
+          const comics = await loadComics();
+          const comic = comics.find(item => item.id === button.dataset.editId);
+          if (!comic) return;
+
+          editingComicId = comic.id;
+          comicTitle.value = comic.title || "";
+          coverUrl.value = comic.cover || "";
+          comicDescription.value = comic.description || "";
+          updateCoverPreview();
+
+          comicSubmitBtn.textContent = "💾 Зберегти зміни";
+          cancelComicEditBtn.style.display = "block";
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
 
       document.querySelectorAll("[data-delete-id]").forEach(button => {
         button.addEventListener("click", async () => {
@@ -994,21 +1102,101 @@
         return;
       }
 
-      await addDoc(collection(db, "comics"), {
-        title,
-        cover,
-        description,
-        createdAt: serverTimestamp()
-      });
+      if (editingComicId) {
+        await setDoc(doc(db, "comics", editingComicId), {
+          title,
+          cover,
+          description,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        showMessage("Зміни збережено ✅", "success");
+      } else {
+        await addDoc(collection(db, "comics"), {
+          title,
+          cover,
+          description,
+          createdAt: serverTimestamp()
+        });
+
+        showMessage("Комікс додано ✅", "success");
+      }
+
+      editingComicId = null;
+      comicSubmitBtn.textContent = "💾 Додати комікс";
+      cancelComicEditBtn.style.display = "none";
 
       await renderComics();
       await refreshComicSelect();
 
       comicForm.reset();
       updateCoverPreview();
-      showMessage("Комікс додано ✅", "success");
     });
 
+
+
+    cancelComicEditBtn.addEventListener("click", () => {
+      editingComicId = null;
+      comicForm.reset();
+      updateCoverPreview();
+      comicSubmitBtn.textContent = "💾 Додати комікс";
+      cancelComicEditBtn.style.display = "none";
+      showMessage("Редагування скасовано.", "success");
+    });
+
+    // ===== Банер головної сторінки =====
+    const guestBannerUrl = document.getElementById("guestBannerUrl");
+    const guestBannerPreview = document.getElementById("guestBannerPreview");
+    const guestBannerPreviewImg = document.getElementById("guestBannerPreviewImg");
+    const saveGuestBannerBtn = document.getElementById("saveGuestBannerBtn");
+    const bannerMessage = document.getElementById("bannerMessage");
+
+    function updateGuestBannerPreview() {
+      const url = guestBannerUrl.value.trim();
+
+      if (!url) {
+        guestBannerPreview.classList.remove("has-image");
+        guestBannerPreviewImg.removeAttribute("src");
+        return;
+      }
+
+      guestBannerPreviewImg.src = getCoverImageUrl(url);
+      guestBannerPreview.classList.add("has-image");
+    }
+
+    guestBannerUrl.addEventListener("input", updateGuestBannerPreview);
+
+    guestBannerPreviewImg.addEventListener("error", () => {
+      guestBannerPreview.classList.remove("has-image");
+      guestBannerPreviewImg.removeAttribute("src");
+    });
+
+    function showBannerMessage(text, type) {
+      bannerMessage.textContent = text;
+      bannerMessage.className = `message show ${type}`;
+      clearTimeout(showBannerMessage.timeout);
+      showBannerMessage.timeout = setTimeout(() => {
+        bannerMessage.className = "message";
+      }, 3500);
+    }
+
+    async function loadGuestBanner() {
+      const snap = await getDoc(doc(db, "site_settings", "home"));
+
+      if (snap.exists()) {
+        guestBannerUrl.value = snap.data().guestBannerUrl || "";
+        updateGuestBannerPreview();
+      }
+    }
+
+    saveGuestBannerBtn.addEventListener("click", async () => {
+      await setDoc(doc(db, "site_settings", "home"), {
+        guestBannerUrl: guestBannerUrl.value.trim(),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      showBannerMessage("Банер збережено ✅", "success");
+    });
 
     // ===== Розділи коміксів =====
 
@@ -1213,6 +1401,7 @@
       await refreshComicSelect();
       await renderChapters();
       await renderComics();
+      await loadGuestBanner();
     }
 
     initAdminData().catch(error => {
