@@ -572,6 +572,7 @@
 
       comicCards = cardsSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
+        .filter(card => card.published === true)
         .filter(card => !ownedCardIds.has(card.id));
 
       comicHeader.style.display = "block";
