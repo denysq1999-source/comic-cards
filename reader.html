@@ -213,6 +213,146 @@
       cursor: default;
     }
 
+
+    /* ===== Випадіння картки ===== */
+    .drop-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0,0,0,.78);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .drop-overlay.show {
+      display: flex;
+    }
+
+    .drop-modal {
+      width: min(430px, 100%);
+      background: #171717;
+      border: 1px solid #3a3a3a;
+      border-radius: 18px;
+      padding: 22px;
+      text-align: center;
+      box-shadow: 0 30px 90px rgba(0,0,0,.65);
+      animation: dropPop .22s ease-out;
+    }
+
+    @keyframes dropPop {
+      from { transform: scale(.92); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .drop-kicker {
+      color: #ffb347;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .drop-modal h2 {
+      margin-bottom: 14px;
+      font-size: 26px;
+    }
+
+    .drop-card-image {
+      width: min(260px, 78vw);
+      aspect-ratio: 5 / 7;
+      margin: 0 auto 14px;
+      background: #0c0c0c;
+      border: 1px solid #343434;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .drop-card-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .drop-name {
+      font-size: 21px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .drop-rarity {
+      display: inline-block;
+      background: #282828;
+      color: #ffb347;
+      border: 1px solid #383838;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+
+    .drop-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin-bottom: 16px;
+    }
+
+    .drop-stat {
+      background: #222;
+      border-radius: 8px;
+      padding: 8px 5px;
+      color: #aaa;
+      font-size: 12px;
+    }
+
+    .drop-stat strong {
+      display: block;
+      color: #fff;
+      margin-top: 2px;
+      font-size: 15px;
+    }
+
+    .drop-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+
+    .drop-btn {
+      border: none;
+      border-radius: 9px;
+      padding: 12px 10px;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .drop-btn.claim {
+      background: #ff9800;
+      color: #fff;
+    }
+
+    .drop-btn.skip {
+      background: #2a2a2a;
+      color: #ddd;
+    }
+
+    .drop-btn:disabled {
+      opacity: .55;
+      cursor: default;
+    }
+
+    .drop-message {
+      min-height: 18px;
+      margin-top: 10px;
+      color: #8fd9a2;
+      font-size: 13px;
+    }
+
     @media (max-width: 650px) {
       .topbar {
         padding: 9px 12px;
@@ -271,8 +411,40 @@
     </div>
   </main>
 
+
+  <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
+    <div class="drop-modal">
+      <div class="drop-kicker">✨ ВИПАДКОВА ЗНАХІДКА</div>
+      <h2>Ти знайшов картку!</h2>
+
+      <div class="drop-card-image">
+        <img id="dropCardImage" alt="Картка">
+      </div>
+
+      <div class="drop-name" id="dropCardName"></div>
+      <div class="drop-rarity" id="dropCardRarity"></div>
+
+      <div class="drop-stats">
+        <div class="drop-stat">Power<strong id="dropPower">0</strong></div>
+        <div class="drop-stat">Speed<strong id="dropSpeed">0</strong></div>
+        <div class="drop-stat">Defense<strong id="dropDefense">0</strong></div>
+      </div>
+
+      <div class="drop-actions">
+        <button class="drop-btn claim" id="claimCardBtn" type="button">🎒 Забрати</button>
+        <button class="drop-btn skip" id="skipCardBtn" type="button">Продовжити</button>
+      </div>
+
+      <div class="drop-message" id="dropMessage"></div>
+    </div>
+  </div>
+
   <script type="module">
     import { auth } from './js/firebase.js';
+    import {
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
     import {
       getFirestore,
       doc,
@@ -280,7 +452,9 @@
       collection,
       getDocs,
       query,
-      where
+      where,
+      addDoc,
+      serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const db = getFirestore(auth.app);
@@ -296,6 +470,22 @@
     const chapterPicker = document.getElementById("chapterPicker");
     const chapterButtons = document.getElementById("chapterButtons");
     const readerContent = document.getElementById("readerContent");
+
+    const dropOverlay = document.getElementById("dropOverlay");
+    const dropCardImage = document.getElementById("dropCardImage");
+    const dropCardName = document.getElementById("dropCardName");
+    const dropCardRarity = document.getElementById("dropCardRarity");
+    const dropPower = document.getElementById("dropPower");
+    const dropSpeed = document.getElementById("dropSpeed");
+    const dropDefense = document.getElementById("dropDefense");
+    const claimCardBtn = document.getElementById("claimCardBtn");
+    const skipCardBtn = document.getElementById("skipCardBtn");
+    const dropMessage = document.getElementById("dropMessage");
+
+    let currentUser = null;
+    let comicCards = [];
+    let currentDrop = null;
+    let dropObserver = null;
 
     function extractGoogleDriveFileId(url) {
       if (!url) return null;
@@ -367,6 +557,12 @@
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => Number(a.number) - Number(b.number));
 
+      const cardsSnap = await getDocs(
+        query(collection(db, "cards"), where("comicId", "==", comicId))
+      );
+
+      comicCards = cardsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
       comicHeader.style.display = "block";
       comicTitle.textContent = comic.title;
       comicDescription.textContent = comic.description || "Без опису";
@@ -437,7 +633,7 @@
 
         <div class="pages">
           ${pages.map(page => `
-            <div class="page-wrap">
+            <div class="page-wrap" data-page-index="${pages.indexOf(page)}">
               <div class="page-number">Сторінка ${escapeHtml(page.page)}</div>
               <img
                 class="comic-page"
@@ -465,6 +661,8 @@
         </div>
       `;
 
+      setupCardDrop(chapter, pages);
+
       const prevBtn = document.getElementById("prevChapterBtn");
       const nextBtn = document.getElementById("nextChapterBtn");
       const topBtn = document.getElementById("topBtn");
@@ -488,14 +686,168 @@
       });
     }
 
-    initReader().catch(error => {
-      console.error(error);
-      readerContent.innerHTML = `
-        <div class="state">
-          Не вдалося завантажити комікс.<br>
-          Перевір налаштування Firestore.
-        </div>
-      `;
+
+    function getCardImageUrl(url) {
+      return getPageImageUrl(url);
+    }
+
+    function getDropKey(chapterId) {
+      return `reader_drop_seen_${currentUser?.uid || "guest"}_${comicId}_${chapterId}`;
+    }
+
+    function setupCardDrop(chapter, pages) {
+      if (dropObserver) {
+        dropObserver.disconnect();
+        dropObserver = null;
+      }
+
+      currentDrop = null;
+      hideDrop();
+
+      if (!currentUser || comicCards.length === 0 || pages.length === 0) {
+        return;
+      }
+
+      const dropKey = getDropKey(chapter.id);
+
+      // Один випадковий дроп на розділ за одну сесію браузера.
+      if (sessionStorage.getItem(dropKey) === "1") {
+        return;
+      }
+
+      const pageElements = [...document.querySelectorAll(".page-wrap")];
+      if (pageElements.length === 0) return;
+
+      // Не показуємо знахідку одразу на першій сторінці, якщо сторінок більше однієї.
+      const minIndex = pageElements.length > 1 ? 1 : 0;
+      const targetIndex =
+        minIndex + Math.floor(Math.random() * (pageElements.length - minIndex));
+
+      const selectedCard =
+        comicCards[Math.floor(Math.random() * comicCards.length)];
+
+      const target = pageElements[targetIndex];
+      if (!target || !selectedCard) return;
+
+      dropObserver = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.45) continue;
+
+          dropObserver.disconnect();
+          dropObserver = null;
+
+          currentDrop = {
+            card: selectedCard,
+            chapterId: chapter.id,
+            dropKey
+          };
+
+          showDrop(selectedCard);
+          break;
+        }
+      }, {
+        threshold: [0.45]
+      });
+
+      dropObserver.observe(target);
+    }
+
+    function showDrop(card) {
+      dropCardImage.src = card.image
+        ? getCardImageUrl(card.image)
+        : "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="700" height="980">' +
+            '<rect width="100%" height="100%" fill="#101010"/>' +
+            '<text x="50%" y="50%" text-anchor="middle" fill="#666" font-size="48">CARD</text>' +
+            '</svg>'
+          );
+
+      dropCardName.textContent = card.name || "Без назви";
+      dropCardRarity.textContent = card.rarity || "Common";
+      dropPower.textContent = Number(card.power || 0);
+      dropSpeed.textContent = Number(card.speed || 0);
+      dropDefense.textContent = Number(card.defense || 0);
+
+      dropMessage.textContent = "";
+      claimCardBtn.disabled = false;
+      skipCardBtn.disabled = false;
+
+      dropOverlay.classList.add("show");
+      dropOverlay.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+    }
+
+    function hideDrop() {
+      dropOverlay.classList.remove("show");
+      dropOverlay.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+      dropMessage.textContent = "";
+    }
+
+    claimCardBtn.addEventListener("click", async () => {
+      if (!currentDrop || !currentUser) return;
+
+      claimCardBtn.disabled = true;
+      skipCardBtn.disabled = true;
+      dropMessage.textContent = "Зберігаю картку…";
+
+      try {
+        await addDoc(collection(db, "user_cards"), {
+          userId: currentUser.uid,
+          cardId: currentDrop.card.id,
+          comicId,
+          source: "reader_drop",
+          sourceChapterId: currentDrop.chapterId,
+          obtainedAt: serverTimestamp()
+        });
+
+        sessionStorage.setItem(currentDrop.dropKey, "1");
+        dropMessage.textContent = "Картку додано в інвентар 🎒";
+
+        setTimeout(() => {
+          currentDrop = null;
+          hideDrop();
+        }, 900);
+      } catch (error) {
+        console.error(error);
+        dropMessage.textContent = "Не вдалося додати картку.";
+        claimCardBtn.disabled = false;
+        skipCardBtn.disabled = false;
+      }
+    });
+
+    skipCardBtn.addEventListener("click", () => {
+      if (currentDrop?.dropKey) {
+        sessionStorage.setItem(currentDrop.dropKey, "1");
+      }
+
+      currentDrop = null;
+      hideDrop();
+    });
+
+    dropOverlay.addEventListener("click", event => {
+      if (event.target === dropOverlay) {
+        skipCardBtn.click();
+      }
+    });
+
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      currentUser = user;
+
+      initReader().catch(error => {
+        console.error(error);
+        readerContent.innerHTML = `
+          <div class="state">
+            Не вдалося завантажити комікс.<br>
+            Перевір налаштування Firestore.
+          </div>
+        `;
+      });
     });
   </script>
 </body>
