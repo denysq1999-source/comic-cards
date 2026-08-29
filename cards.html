@@ -21,6 +21,7 @@
     .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     .preview{aspect-ratio:5/7;background:#101010;border:1px dashed #3b3b3b;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#666;overflow:hidden;margin-bottom:16px}
     .preview img{width:100%;height:100%;object-fit:cover;display:none}.preview.has-image img{display:block}.preview.has-image span{display:none}
+    .side-label{font-size:13px;color:#ffb347;font-weight:800;margin:2px 0 7px}
     .primary,.secondary{width:100%;border:0;border-radius:9px;padding:12px;cursor:pointer;font-weight:800}
     .primary{background:#ff9800;color:#fff}.secondary{margin-top:8px;background:#2a2a2a;color:#ddd;display:none}
     .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}.toolbar select{min-width:220px}.toolbar input{flex:1;min-width:180px}
@@ -62,7 +63,21 @@
         <div class="form-group"><label for="cardName">Назва картки</label><input id="cardName" required placeholder="Наприклад: Шериф"></div>
         <div class="form-group"><label for="cardImageUrl">Посилання на зображення</label><input id="cardImageUrl" type="url" placeholder="https://drive.google.com/file/d/..."></div>
 
+        <div class="side-label">Лицьова сторона</div>
         <div class="preview" id="preview"><span>🖼️ Тут буде картка</span><img id="previewImg" alt="Прев'ю"></div>
+
+        <div class="form-group">
+          <label for="cardBackImageUrl">Посилання на задню сторону</label>
+          <input id="cardBackImageUrl" type="url" placeholder="https://drive.google.com/file/d/... (необов'язково)">
+        </div>
+
+        <div class="side-label">Задня сторона</div>
+        <div class="preview" id="backPreview"><span>🖼️ Тут буде задня сторона</span><img id="backPreviewImg" alt="Прев'ю задньої сторони"></div>
+
+        <div class="form-group">
+          <label for="backDescription">Опис на звороті</label>
+          <textarea id="backDescription" placeholder="Текст, який буде показаний на задній стороні картки..."></textarea>
+        </div>
 
         <div class="form-group"><label for="rarity">Рідкість</label>
           <select id="rarity"><option>Common</option><option>Rare</option><option>Epic</option><option>Legendary</option></select>
@@ -108,6 +123,10 @@
   const comicSelect = document.getElementById("comicSelect");
   const cardName = document.getElementById("cardName");
   const cardImageUrl = document.getElementById("cardImageUrl");
+  const cardBackImageUrl = document.getElementById("cardBackImageUrl");
+  const backDescription = document.getElementById("backDescription");
+  const backPreview = document.getElementById("backPreview");
+  const backPreviewImg = document.getElementById("backPreviewImg");
   const rarity = document.getElementById("rarity");
   const power = document.getElementById("power");
   const speed = document.getElementById("speed");
@@ -215,12 +234,15 @@
     comicSelect.value = c.comicId || "";
     cardName.value = c.name || "";
     cardImageUrl.value = c.image || "";
+    cardBackImageUrl.value = c.backImage || "";
+    backDescription.value = c.backDescription || "";
     rarity.value = c.rarity || "Common";
     power.value = Number(c.power||0);
     speed.value = Number(c.speed||0);
     defense.value = Number(c.defense||0);
     description.value = c.description || "";
     updatePreview();
+    updateBackPreview();
 
     formTitle.textContent = "✏️ Редагувати картку";
     submitBtn.textContent = "💾 Зберегти зміни";
@@ -234,6 +256,7 @@
     power.value = speed.value = defense.value = 50;
     rarity.value = "Common";
     updatePreview();
+    updateBackPreview();
     formTitle.textContent = "➕ Додати картку";
     submitBtn.textContent = "💾 Додати картку";
     cancelBtn.style.display = "none";
@@ -248,6 +271,8 @@
       comicId: comicSelect.value,
       name: cardName.value.trim(),
       image: cardImageUrl.value.trim(),
+      backImage: cardBackImageUrl.value.trim(),
+      backDescription: backDescription.value.trim(),
       rarity: rarity.value,
       power: Number(power.value||0),
       speed: Number(speed.value||0),
@@ -286,13 +311,22 @@
   filterComic.onchange = renderCards;
   searchInput.oninput = renderCards;
   cardImageUrl.oninput = updatePreview;
+  cardBackImageUrl.oninput = updateBackPreview;
   previewImg.onerror = () => { preview.classList.remove("has-image"); previewImg.removeAttribute("src"); };
+  backPreviewImg.onerror = () => { backPreview.classList.remove("has-image"); backPreviewImg.removeAttribute("src"); };
 
   function updatePreview() {
     const u = cardImageUrl.value.trim();
     if (!u) { preview.classList.remove("has-image"); previewImg.removeAttribute("src"); return; }
     previewImg.src = driveImage(u);
     preview.classList.add("has-image");
+  }
+
+  function updateBackPreview() {
+    const u = cardBackImageUrl.value.trim();
+    if (!u) { backPreview.classList.remove("has-image"); backPreviewImg.removeAttribute("src"); return; }
+    backPreviewImg.src = driveImage(u);
+    backPreview.classList.add("has-image");
   }
 
   function driveImage(url) {
