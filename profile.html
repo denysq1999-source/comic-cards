@@ -23,14 +23,30 @@
     .panel{background:#1a1a1a;border:1px solid #2c2c2c;border-radius:14px;padding:20px}
     .panel h2{font-size:22px;margin-bottom:8px}.panel-sub{color:#8f8f8f;margin-bottom:18px;font-size:14px}
     .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.toolbar select,.toolbar input{background:#101010;color:#fff;border:1px solid #363636;border-radius:8px;padding:10px 12px}.toolbar select{min-width:210px}.toolbar input{flex:1;min-width:180px}
-    .inventory{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px}
+    .inventory{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
     .item{background:#151515;border:1px solid #2c2c2c;border-radius:12px;overflow:hidden}
     .item-img{aspect-ratio:5/7;background:#0b0b0b}.item-img img{width:100%;height:100%;object-fit:cover;display:block}
     .item-body{padding:14px}.item-name{font-size:17px;font-weight:800;margin-bottom:6px}.item-comic{color:#8f8f8f;font-size:13px;margin-bottom:7px}.rarity{display:inline-block;background:#272727;border:1px solid #353535;border-radius:999px;padding:5px 9px;color:#ffb347;font-size:12px;font-weight:800;margin-bottom:10px}
     .item-meta{color:#777;font-size:12px}
-    .item-actions{margin-top:12px}
-    .trash-btn{width:100%;border:0;border-radius:8px;padding:10px 12px;background:#2a2020;color:#ff9a9a;cursor:pointer;font-weight:800}
+    .item-actions{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .view-btn,.trash-btn{width:100%;border:0;border-radius:8px;padding:10px 12px;cursor:pointer;font-weight:800}
+    .view-btn{background:#2b3a4a;color:#dbeeff}
+    .view-btn:hover{background:#35516d}
+    .trash-btn{background:#2a2020;color:#ff9a9a}
     .trash-btn:hover{background:#3a2424;color:#ffb3b3}
+
+    .viewer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.86);display:none;align-items:center;justify-content:center;padding:20px;z-index:1000}
+    .viewer-overlay.show{display:flex}
+    .viewer-modal{width:min(900px,96vw);max-height:92vh;background:#151515;border:1px solid #333;border-radius:16px;padding:18px;position:relative;display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:20px;overflow:auto}
+    .viewer-image-wrap{background:#0d0d0d;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .viewer-image-wrap img{width:100%;height:auto;max-height:80vh;object-fit:contain;display:block}
+    .viewer-info{display:flex;flex-direction:column;gap:10px;align-self:start}
+    .viewer-info h3{font-size:28px;margin:0}
+    .viewer-comic{color:#aaa}
+    .viewer-rarity{display:inline-block;align-self:flex-start;background:#272727;border:1px solid #353535;color:#ffb347;border-radius:999px;padding:6px 10px;font-size:13px;font-weight:800}
+    .viewer-close{position:absolute;top:10px;right:10px;width:38px;height:38px;border:0;border-radius:50%;background:#2a2a2a;color:#fff;cursor:pointer;font-size:20px}
+    .viewer-close:hover{background:#3a3a3a}
+    @media(max-width:760px){.viewer-modal{grid-template-columns:1fr}.viewer-image-wrap img{max-height:62vh}}
     .empty{grid-column:1/-1;border:1px dashed #333;border-radius:12px;padding:45px 20px;text-align:center;color:#777}
     @media(max-width:650px){header{align-items:flex-start;flex-direction:column}.profile-card{grid-template-columns:1fr;text-align:center}.avatar{margin:auto}.stats{grid-template-columns:1fr}}
   </style>
@@ -86,6 +102,24 @@
   </section>
 </main>
 
+
+<div class="viewer-overlay" id="viewerOverlay" aria-hidden="true">
+  <div class="viewer-modal">
+    <button class="viewer-close" id="viewerCloseBtn" type="button">✕</button>
+
+    <div class="viewer-image-wrap">
+      <img id="viewerImage" alt="Картка">
+    </div>
+
+    <div class="viewer-info">
+      <h3 id="viewerName"></h3>
+      <div class="viewer-comic" id="viewerComic"></div>
+      <span class="viewer-rarity" id="viewerRarity"></span>
+      <div class="item-meta" id="viewerObtained"></div>
+    </div>
+  </div>
+</div>
+
 <script type="module">
   import { auth } from './js/firebase.js';
   import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -112,6 +146,13 @@
   const inventory = document.getElementById("inventory");
   const comicFilter = document.getElementById("comicFilter");
   const searchInput = document.getElementById("searchInput");
+  const viewerOverlay = document.getElementById("viewerOverlay");
+  const viewerCloseBtn = document.getElementById("viewerCloseBtn");
+  const viewerImage = document.getElementById("viewerImage");
+  const viewerName = document.getElementById("viewerName");
+  const viewerComic = document.getElementById("viewerComic");
+  const viewerRarity = document.getElementById("viewerRarity");
+  const viewerObtained = document.getElementById("viewerObtained");
 
   let user = null;
   let owned = [];
@@ -234,14 +275,43 @@
 
           <div class="item-actions">
             <button
+              class="view-btn"
+              type="button"
+              data-view-owned="${esc(own.id)}"
+            >🔍 Переглянути</button>
+
+            <button
               class="trash-btn"
               type="button"
               data-delete-owned="${esc(own.id)}"
-            >🗑️ Видалити картку</button>
+            >🗑️ Видалити</button>
           </div>
         </div>
       </article>
     `).join("");
+
+    document.querySelectorAll("[data-view-owned]").forEach(button => {
+      button.addEventListener("click", () => {
+        const ownedId = button.dataset.viewOwned;
+        const ownedCard = owned.find(item => item.id === ownedId);
+        if (!ownedCard) return;
+
+        const card = cards.find(item => item.id === ownedCard.cardId);
+        if (!card) return;
+
+        const comic = comics.find(item => item.id === card.comicId);
+
+        viewerImage.src = card.image ? driveImage(card.image) : placeholder();
+        viewerName.textContent = card.name || "Без назви";
+        viewerComic.textContent = comic?.title || "Невідомий комікс";
+        viewerRarity.textContent = card.rarity || "Common";
+        viewerObtained.textContent = `Отримано: ${formatDate(ownedCard.obtainedAt)}`;
+
+        viewerOverlay.classList.add("show");
+        viewerOverlay.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      });
+    });
 
     document.querySelectorAll("[data-delete-owned]").forEach(button => {
       button.addEventListener("click", async () => {
@@ -268,6 +338,24 @@
       });
     });
   }
+
+  function closeViewer() {
+    viewerOverlay.classList.remove("show");
+    viewerOverlay.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  }
+
+  viewerCloseBtn.addEventListener("click", closeViewer);
+
+  viewerOverlay.addEventListener("click", event => {
+    if (event.target === viewerOverlay) closeViewer();
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && viewerOverlay.classList.contains("show")) {
+      closeViewer();
+    }
+  });
 
   comicFilter.addEventListener("change", renderInventory);
   searchInput.addEventListener("input", renderInventory);
