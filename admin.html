@@ -379,6 +379,108 @@
       border: 1px solid #512525;
     }
 
+
+    /* ===== Розділи ===== */
+    .chapter-form {
+      display: grid;
+      gap: 18px;
+    }
+
+    .chapter-top {
+      display: grid;
+      grid-template-columns: 1fr 180px;
+      gap: 14px;
+    }
+
+    .form-group select {
+      width: 100%;
+      border: 1px solid #343434;
+      background: #101010;
+      color: #fff;
+      padding: 11px 12px;
+      border-radius: 8px;
+      outline: none;
+      font-size: 14px;
+    }
+
+    .pages-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 14px;
+    }
+
+    .page-row {
+      display: grid;
+      grid-template-columns: 74px minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      background: #151515;
+      border: 1px solid #292929;
+      border-radius: 9px;
+      padding: 9px 10px;
+    }
+
+    .page-row span {
+      color: #ffb44c;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .page-row input {
+      width: 100%;
+      border: 1px solid #343434;
+      background: #0f0f0f;
+      color: #fff;
+      padding: 9px 10px;
+      border-radius: 7px;
+      outline: none;
+      font-size: 13px;
+    }
+
+    .chapter-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .chapter-item {
+      background: #151515;
+      border: 1px solid #2c2c2c;
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .chapter-item-main {
+      min-width: 0;
+    }
+
+    .chapter-item-title {
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .chapter-item-meta {
+      color: #8f8f8f;
+      font-size: 13px;
+    }
+
+    .chapter-delete {
+      border: none;
+      border-radius: 8px;
+      padding: 9px 11px;
+      cursor: pointer;
+      background: #2a2a2a;
+      color: #ddd;
+    }
+
+    .chapter-delete:hover {
+      background: #3a2020;
+      color: #ff8585;
+    }
+
     @media (max-width: 900px) {
       body {
         display: block;
@@ -419,6 +521,11 @@
         grid-template-columns: 1fr;
       }
 
+      .chapter-top,
+      .pages-grid {
+        grid-template-columns: 1fr;
+      }
+
       .cover-preview {
         max-width: 320px;
       }
@@ -448,6 +555,9 @@
 
     <div class="menu-item" data-section="comics">
       <span>📚</span> Комікси
+    </div>
+    <div class="menu-item" data-section="chapters">
+      <span>📖</span> Додати розділ
     </div>
 
     <div class="menu-item" data-section="users">
@@ -563,6 +673,56 @@
         </div>
       </section>
 
+      <!-- Додати розділ -->
+      <section class="section" id="chapters">
+        <div class="panel">
+          <h2>📖 Додати розділ</h2>
+          <p class="panel-subtitle">
+            Обери комікс, вкажи номер розділу та встав посилання на сторінки від 1 до 30.
+            Порожні поля можна залишати, якщо у розділі менше сторінок.
+          </p>
+
+          <form id="chapterForm" class="chapter-form">
+            <div class="chapter-top">
+              <div class="form-group">
+                <label for="chapterComic">Комікс</label>
+                <select id="chapterComic" required>
+                  <option value="">— Обери комікс —</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="chapterNumber">Номер розділу</label>
+                <input id="chapterNumber" type="number" min="1" step="1" placeholder="1" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="chapterTitle">Назва розділу</label>
+              <input id="chapterTitle" type="text" placeholder="Наприклад: Розділ 1 — Прибуття">
+            </div>
+
+            <div>
+              <div class="form-group">
+                <label>Посилання на сторінки</label>
+                <div class="hint">Вставляй прямі або звичайні посилання Google Drive на окремі зображення сторінок.</div>
+              </div>
+
+              <div class="pages-grid" id="pagesGrid"></div>
+            </div>
+
+            <button class="primary-btn" type="submit">💾 Зберегти розділ</button>
+            <div id="chapterMessage" class="message"></div>
+          </form>
+        </div>
+
+        <div class="panel" style="margin-top:24px;">
+          <h2>📚 Збережені розділи</h2>
+          <p class="panel-subtitle">Тут видно, які розділи вже додані та скільки в них сторінок.</p>
+          <div id="chaptersList" class="chapter-list"></div>
+        </div>
+      </section>
+
       <!-- Користувачі -->
       <section class="section" id="users">
         <div class="placeholder">
@@ -633,6 +793,7 @@
       packs: "Пакунки",
       series: "Серії",
       comics: "Комікси",
+      chapters: "Додати розділ",
       users: "Користувачі",
       qr: "QR-коди",
       stats: "Статистика",
@@ -847,6 +1008,221 @@
       comicForm.reset();
       updateCoverPreview();
       showMessage("Комікс додано ✅", "success");
+    });
+
+
+    // ===== Розділи коміксів =====
+    const CHAPTERS_STORAGE_KEY = "comic_cards_chapters";
+
+    const chapterForm = document.getElementById("chapterForm");
+    const chapterComic = document.getElementById("chapterComic");
+    const chapterNumber = document.getElementById("chapterNumber");
+    const chapterTitle = document.getElementById("chapterTitle");
+    const pagesGrid = document.getElementById("pagesGrid");
+    const chaptersList = document.getElementById("chaptersList");
+    const chapterMessage = document.getElementById("chapterMessage");
+
+    function loadChapters() {
+      try {
+        return JSON.parse(localStorage.getItem(CHAPTERS_STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveChapters(chapters) {
+      localStorage.setItem(CHAPTERS_STORAGE_KEY, JSON.stringify(chapters));
+    }
+
+    function buildPageInputs() {
+      pagesGrid.innerHTML = "";
+
+      for (let i = 1; i <= 30; i++) {
+        const row = document.createElement("div");
+        row.className = "page-row";
+        row.innerHTML = `
+          <span>Стор. ${i}</span>
+          <input
+            type="url"
+            id="chapterPage${i}"
+            data-page-number="${i}"
+            placeholder="https://drive.google.com/file/d/..."
+          >
+        `;
+        pagesGrid.appendChild(row);
+      }
+    }
+
+    function refreshComicSelect() {
+      const comics = loadComics();
+      const currentValue = chapterComic.value;
+
+      chapterComic.innerHTML = '<option value="">— Обери комікс —</option>';
+
+      comics.forEach(comic => {
+        const option = document.createElement("option");
+        option.value = comic.id;
+        option.textContent = comic.title;
+        chapterComic.appendChild(option);
+      });
+
+      if (comics.some(c => c.id === currentValue)) {
+        chapterComic.value = currentValue;
+      }
+    }
+
+    function showChapterMessage(text, type) {
+      chapterMessage.textContent = text;
+      chapterMessage.className = `message show ${type}`;
+
+      clearTimeout(showChapterMessage.timeout);
+      showChapterMessage.timeout = setTimeout(() => {
+        chapterMessage.className = "message";
+      }, 3500);
+    }
+
+    function renderChapters() {
+      const chapters = loadChapters();
+      const comics = loadComics();
+
+      if (chapters.length === 0) {
+        chaptersList.innerHTML = `
+          <div class="empty-state">
+            📭 Розділів поки що немає.
+          </div>
+        `;
+        return;
+      }
+
+      const sorted = [...chapters].sort((a, b) => {
+        const comicA = comics.find(c => c.id === a.comicId)?.title || "";
+        const comicB = comics.find(c => c.id === b.comicId)?.title || "";
+
+        if (comicA !== comicB) return comicA.localeCompare(comicB, "uk");
+        return Number(a.number) - Number(b.number);
+      });
+
+      chaptersList.innerHTML = sorted.map(chapter => {
+        const comic = comics.find(c => c.id === chapter.comicId);
+        const comicName = comic ? comic.title : "Невідомий комікс";
+
+        return `
+          <div class="chapter-item">
+            <div class="chapter-item-main">
+              <div class="chapter-item-title">
+                ${escapeHtml(comicName)} — Розділ ${escapeHtml(String(chapter.number))}
+                ${chapter.title ? " · " + escapeHtml(chapter.title) : ""}
+              </div>
+              <div class="chapter-item-meta">
+                Сторінок: ${chapter.pages.length}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="chapter-delete"
+              data-delete-chapter="${escapeHtml(chapter.id)}"
+              title="Видалити розділ"
+            >🗑️</button>
+          </div>
+        `;
+      }).join("");
+
+      document.querySelectorAll("[data-delete-chapter]").forEach(button => {
+        button.addEventListener("click", () => {
+          const id = button.dataset.deleteChapter;
+          const chapters = loadChapters();
+          const chapter = chapters.find(item => item.id === id);
+
+          if (!chapter) return;
+          if (!confirm(`Видалити розділ ${chapter.number}?`)) return;
+
+          saveChapters(chapters.filter(item => item.id !== id));
+          renderChapters();
+        });
+      });
+    }
+
+    chapterForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const comicId = chapterComic.value;
+      const number = chapterNumber.value.trim();
+      const title = chapterTitle.value.trim();
+
+      if (!comicId || !number) {
+        showChapterMessage("Обери комікс і вкажи номер розділу.", "error");
+        return;
+      }
+
+      const pages = [];
+
+      for (let i = 1; i <= 30; i++) {
+        const input = document.getElementById(`chapterPage${i}`);
+        const url = input.value.trim();
+
+        if (url) {
+          pages.push({
+            page: i,
+            url
+          });
+        }
+      }
+
+      if (pages.length === 0) {
+        showChapterMessage("Додай хоча б одне посилання на сторінку.", "error");
+        return;
+      }
+
+      const chapters = loadChapters();
+
+      const duplicate = chapters.find(
+        chapter => chapter.comicId === comicId && String(chapter.number) === String(number)
+      );
+
+      if (duplicate) {
+        const replace = confirm(
+          `Розділ ${number} для цього коміксу вже існує. Замінити його?`
+        );
+
+        if (!replace) return;
+
+        duplicate.title = title;
+        duplicate.pages = pages;
+        duplicate.updatedAt = new Date().toISOString();
+      } else {
+        chapters.push({
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          comicId,
+          number: Number(number),
+          title,
+          pages,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      saveChapters(chapters);
+      renderChapters();
+
+      chapterNumber.value = "";
+      chapterTitle.value = "";
+
+      for (let i = 1; i <= 30; i++) {
+        document.getElementById(`chapterPage${i}`).value = "";
+      }
+
+      showChapterMessage(`Розділ збережено. Сторінок: ${pages.length} ✅`, "success");
+    });
+
+    buildPageInputs();
+    refreshComicSelect();
+    renderChapters();
+
+    // Після додавання нового коміксу оновлюємо список у вкладці "Додати розділ"
+    comicForm.addEventListener("submit", () => {
+      setTimeout(() => {
+        refreshComicSelect();
+      }, 0);
     });
 
     renderComics();
