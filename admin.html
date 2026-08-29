@@ -623,7 +623,7 @@
           <div class="panel">
             <h2>➕ Додати комікс</h2>
             <p class="panel-subtitle">
-              Додай обкладинку та посилання на комікс у Google Drive.
+              Додай комікс. Обкладинка може зберігатися на Google Drive.
             </p>
 
             <form id="comicForm">
@@ -658,7 +658,7 @@
           <div class="panel">
             <h2>📚 Мої комікси</h2>
             <p class="panel-subtitle">
-              Додані комікси з'являться тут. Кнопка «Читати» відкриває Google Drive.
+              Додані комікси з'являться тут і будуть видимі всім авторизованим читачам.
             </p>
             <div class="comics-grid" id="comicsGrid"></div>
           </div>
@@ -752,6 +752,20 @@
   <script type="module">
     import { auth } from './js/firebase.js';
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      getDocs,
+      addDoc,
+      setDoc,
+      doc,
+      deleteDoc,
+      query,
+      where,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const db = getFirestore(auth.app);
 
     const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
 
@@ -806,7 +820,6 @@
     });
 
     // ===== Комікси =====
-    const STORAGE_KEY = "comic_cards_comics";
 
     const comicForm = document.getElementById("comicForm");
     const comicTitle = document.getElementById("comicTitle");
@@ -844,16 +857,9 @@
       return url;
     }
 
-    function loadComics() {
-      try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-      } catch {
-        return [];
-      }
-    }
-
-    function saveComics(comics) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(comics));
+    async function loadComics() {
+      const snap = await getDocs(collection(db, "comics"));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
 
     function escapeHtml(value = "") {
@@ -895,8 +901,8 @@
       coverPreviewImg.removeAttribute("src");
     });
 
-    function renderComics() {
-      const comics = loadComics();
+    async function renderComics() {
+      const comics = await loadComics();
 
       if (comics.length === 0) {
         comicsGrid.innerHTML = `
@@ -952,22 +958,31 @@
       }).join("");
 
       document.querySelectorAll("[data-delete-id]").forEach(button => {
-        button.addEventListener("click", () => {
+        button.addEventListener("click", async () => {
           const id = button.dataset.deleteId;
-          const comics = loadComics();
+          const comics = await loadComics();
           const comic = comics.find(item => item.id === id);
 
           if (!comic) return;
 
           if (!confirm(`Видалити «${comic.title}»?`)) return;
 
-          saveComics(comics.filter(item => item.id !== id));
-          renderComics();
+          await deleteDoc(doc(db, "comics", id));
+
+          // Видаляємо також розділи цього коміксу
+          const chaptersSnap = await getDocs(
+            query(collection(db, "chapters"), where("comicId", "==", id))
+          );
+          await Promise.all(chaptersSnap.docs.map(d => deleteDoc(d.ref)));
+
+          await renderComics();
+          await refreshComicSelect();
+          await renderChapters();
         });
       });
     }
 
-    comicForm.addEventListener("submit", (event) => {
+    comicForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
       const title = comicTitle.value.trim();
@@ -979,18 +994,15 @@
         return;
       }
 
-      const comics = loadComics();
-
-      comics.unshift({
-        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      await addDoc(collection(db, "comics"), {
         title,
         cover,
         description,
-        createdAt: new Date().toISOString()
+        createdAt: serverTimestamp()
       });
 
-      saveComics(comics);
-      renderComics();
+      await renderComics();
+      await refreshComicSelect();
 
       comicForm.reset();
       updateCoverPreview();
@@ -999,7 +1011,6 @@
 
 
     // ===== Розділи коміксів =====
-    const CHAPTERS_STORAGE_KEY = "comic_cards_chapters";
 
     const chapterForm = document.getElementById("chapterForm");
     const chapterComic = document.getElementById("chapterComic");
@@ -1009,16 +1020,9 @@
     const chaptersList = document.getElementById("chaptersList");
     const chapterMessage = document.getElementById("chapterMessage");
 
-    function loadChapters() {
-      try {
-        return JSON.parse(localStorage.getItem(CHAPTERS_STORAGE_KEY)) || [];
-      } catch {
-        return [];
-      }
-    }
-
-    function saveChapters(chapters) {
-      localStorage.setItem(CHAPTERS_STORAGE_KEY, JSON.stringify(chapters));
+    async function loadChapters() {
+      const snap = await getDocs(collection(db, "chapters"));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
 
     function buildPageInputs() {
@@ -1040,8 +1044,8 @@
       }
     }
 
-    function refreshComicSelect() {
-      const comics = loadComics();
+    async function refreshComicSelect() {
+      const comics = await loadComics();
       const currentValue = chapterComic.value;
 
       chapterComic.innerHTML = '<option value="">— Обери комікс —</option>';
@@ -1068,9 +1072,9 @@
       }, 3500);
     }
 
-    function renderChapters() {
-      const chapters = loadChapters();
-      const comics = loadComics();
+    async function renderChapters() {
+      const chapters = await loadChapters();
+      const comics = await loadComics();
 
       if (chapters.length === 0) {
         chaptersList.innerHTML = `
@@ -1116,21 +1120,21 @@
       }).join("");
 
       document.querySelectorAll("[data-delete-chapter]").forEach(button => {
-        button.addEventListener("click", () => {
+        button.addEventListener("click", async () => {
           const id = button.dataset.deleteChapter;
-          const chapters = loadChapters();
+          const chapters = await loadChapters();
           const chapter = chapters.find(item => item.id === id);
 
           if (!chapter) return;
           if (!confirm(`Видалити розділ ${chapter.number}?`)) return;
 
-          saveChapters(chapters.filter(item => item.id !== id));
-          renderChapters();
+          await deleteDoc(doc(db, "chapters", id));
+          await renderChapters();
         });
       });
     }
 
-    chapterForm.addEventListener("submit", (event) => {
+    chapterForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
       const comicId = chapterComic.value;
@@ -1161,7 +1165,7 @@
         return;
       }
 
-      const chapters = loadChapters();
+      const chapters = await loadChapters();
 
       const duplicate = chapters.find(
         chapter => chapter.comicId === comicId && String(chapter.number) === String(number)
@@ -1174,22 +1178,24 @@
 
         if (!replace) return;
 
-        duplicate.title = title;
-        duplicate.pages = pages;
-        duplicate.updatedAt = new Date().toISOString();
-      } else {
-        chapters.push({
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        await setDoc(doc(db, "chapters", duplicate.id), {
           comicId,
           number: Number(number),
           title,
           pages,
-          createdAt: new Date().toISOString()
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } else {
+        await addDoc(collection(db, "chapters"), {
+          comicId,
+          number: Number(number),
+          title,
+          pages,
+          createdAt: serverTimestamp()
         });
       }
 
-      saveChapters(chapters);
-      renderChapters();
+      await renderChapters();
 
       chapterNumber.value = "";
       chapterTitle.value = "";
@@ -1202,17 +1208,17 @@
     });
 
     buildPageInputs();
-    refreshComicSelect();
-    renderChapters();
 
-    // Після додавання нового коміксу оновлюємо список у вкладці "Додати розділ"
-    comicForm.addEventListener("submit", () => {
-      setTimeout(() => {
-        refreshComicSelect();
-      }, 0);
+    async function initAdminData() {
+      await refreshComicSelect();
+      await renderChapters();
+      await renderComics();
+    }
+
+    initAdminData().catch(error => {
+      console.error("Firestore error:", error);
+      alert("Не вдалося завантажити дані Firestore. Перевір, чи Firestore увімкнено в Firebase.");
     });
-
-    renderComics();
   </script>
 </body>
 </html>
