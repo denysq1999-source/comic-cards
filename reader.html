@@ -271,9 +271,19 @@
     </div>
   </main>
 
-  <script>
-    const COMICS_STORAGE_KEY = "comic_cards_comics";
-    const CHAPTERS_STORAGE_KEY = "comic_cards_chapters";
+  <script type="module">
+    import { auth } from './js/firebase.js';
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      collection,
+      getDocs,
+      query,
+      where
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const db = getFirestore(auth.app);
 
     const params = new URLSearchParams(window.location.search);
     const comicId = params.get("comic");
@@ -286,14 +296,6 @@
     const chapterPicker = document.getElementById("chapterPicker");
     const chapterButtons = document.getElementById("chapterButtons");
     const readerContent = document.getElementById("readerContent");
-
-    function loadJson(key) {
-      try {
-        return JSON.parse(localStorage.getItem(key)) || [];
-      } catch {
-        return [];
-      }
-    }
 
     function extractGoogleDriveFileId(url) {
       if (!url) return null;
@@ -331,28 +333,40 @@
         .replaceAll("'", "&#039;");
     }
 
-    const comics = loadJson(COMICS_STORAGE_KEY);
-    const chapters = loadJson(CHAPTERS_STORAGE_KEY);
+    let comicChapters = [];
 
-    const comic = comics.find(item => item.id === comicId);
-    const comicChapters = chapters
-      .filter(item => item.comicId === comicId)
-      .sort((a, b) => Number(a.number) - Number(b.number));
+    async function initReader() {
+      if (!comicId) {
+        readerContent.innerHTML = `
+          <div class="state">
+            Комікс не вибрано.<br>
+            Відкрий читалку кнопкою «Читати» з картки коміксу.
+          </div>
+        `;
+        return;
+      }
 
-    if (!comicId) {
-      readerContent.innerHTML = `
-        <div class="state">
-          Комікс не вибрано.<br>
-          Відкрий читалку кнопкою «Читати» з картки коміксу.
-        </div>
-      `;
-    } else if (!comic) {
-      readerContent.innerHTML = `
-        <div class="state">
-          Комікс не знайдено в цьому браузері.
-        </div>
-      `;
-    } else {
+      const comicSnap = await getDoc(doc(db, "comics", comicId));
+
+      if (!comicSnap.exists()) {
+        readerContent.innerHTML = `
+          <div class="state">
+            Комікс не знайдено.
+          </div>
+        `;
+        return;
+      }
+
+      const comic = { id: comicSnap.id, ...comicSnap.data() };
+
+      const chaptersSnap = await getDocs(
+        query(collection(db, "chapters"), where("comicId", "==", comicId))
+      );
+
+      comicChapters = chaptersSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => Number(a.number) - Number(b.number));
+
       comicHeader.style.display = "block";
       comicTitle.textContent = comic.title;
       comicDescription.textContent = comic.description || "Без опису";
@@ -365,31 +379,32 @@
             Для цього коміксу ще не додано жодного розділу.
           </div>
         `;
-      } else {
-        chapterPicker.style.display = "block";
-
-        chapterButtons.innerHTML = comicChapters.map(chapter => `
-          <button
-            class="chapter-btn"
-            type="button"
-            data-chapter-id="${escapeHtml(chapter.id)}"
-          >
-            Розділ ${escapeHtml(chapter.number)}
-          </button>
-        `).join("");
-
-        const initialChapter =
-          comicChapters.find(ch => String(ch.number) === String(requestedChapter)) ||
-          comicChapters[0];
-
-        renderChapter(initialChapter.id);
-
-        document.querySelectorAll(".chapter-btn").forEach(button => {
-          button.addEventListener("click", () => {
-            renderChapter(button.dataset.chapterId);
-          });
-        });
+        return;
       }
+
+      chapterPicker.style.display = "block";
+
+      chapterButtons.innerHTML = comicChapters.map(chapter => `
+        <button
+          class="chapter-btn"
+          type="button"
+          data-chapter-id="${escapeHtml(chapter.id)}"
+        >
+          Розділ ${escapeHtml(chapter.number)}
+        </button>
+      `).join("");
+
+      const initialChapter =
+        comicChapters.find(ch => String(ch.number) === String(requestedChapter)) ||
+        comicChapters[0];
+
+      renderChapter(initialChapter.id);
+
+      document.querySelectorAll(".chapter-btn").forEach(button => {
+        button.addEventListener("click", () => {
+          renderChapter(button.dataset.chapterId);
+        });
+      });
     }
 
     function renderChapter(chapterId) {
@@ -407,7 +422,7 @@
       const prev = comicChapters[chapterIndex - 1];
       const next = comicChapters[chapterIndex + 1];
 
-      const pages = [...chapter.pages].sort(
+      const pages = [...(chapter.pages || [])].sort(
         (a, b) => Number(a.page) - Number(b.page)
       );
 
@@ -436,23 +451,17 @@
         </div>
 
         <div class="reader-nav">
-          <button
-            type="button"
-            id="prevChapterBtn"
-            ${prev ? "" : "disabled"}
-          >← Попередній розділ</button>
+          <button type="button" id="prevChapterBtn" ${prev ? "" : "disabled"}>
+            ← Попередній розділ
+          </button>
 
-          <button
-            type="button"
-            class="primary"
-            id="topBtn"
-          >↑ На початок</button>
+          <button type="button" class="primary" id="topBtn">
+            ↑ На початок
+          </button>
 
-          <button
-            type="button"
-            id="nextChapterBtn"
-            ${next ? "" : "disabled"}
-          >Наступний розділ →</button>
+          <button type="button" id="nextChapterBtn" ${next ? "" : "disabled"}>
+            Наступний розділ →
+          </button>
         </div>
       `;
 
@@ -478,6 +487,16 @@
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
     }
+
+    initReader().catch(error => {
+      console.error(error);
+      readerContent.innerHTML = `
+        <div class="state">
+          Не вдалося завантажити комікс.<br>
+          Перевір налаштування Firestore.
+        </div>
+      `;
+    });
   </script>
 </body>
 </html>
