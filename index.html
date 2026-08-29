@@ -321,10 +321,19 @@
       signOut
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+    import {
+      getFirestore,
+      collection,
+      getDocs,
+      setDoc,
+      doc,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const db = getFirestore(auth.app);
+
     const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
 
-    const COMICS_STORAGE_KEY = "comic_cards_comics";
-    const RATINGS_STORAGE_KEY = "comic_cards_ratings";
 
     const adminBtn = document.getElementById("adminBtn");
     const userInfo = document.getElementById("userInfo");
@@ -334,18 +343,6 @@
     const comicsGrid = document.getElementById("comicsGrid");
 
     let currentUser = null;
-
-    function loadJson(key) {
-      try {
-        return JSON.parse(localStorage.getItem(key)) || [];
-      } catch {
-        return [];
-      }
-    }
-
-    function saveJson(key, value) {
-      localStorage.setItem(key, JSON.stringify(value));
-    }
 
     function escapeHtml(value = "") {
       return String(value)
@@ -383,61 +380,54 @@
       return url;
     }
 
-    function getRatings() {
-      return loadJson(RATINGS_STORAGE_KEY);
+    async function loadComics() {
+      const snap = await getDocs(collection(db, "comics"));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
 
-    function getComicRatingData(comicId) {
-      const ratings = getRatings().filter(item => item.comicId === comicId);
+    async function loadRatings() {
+      const snap = await getDocs(collection(db, "ratings"));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
 
-      if (ratings.length === 0) {
-        return {
-          average: 0,
-          count: 0
-        };
+    function getComicRatingData(comicId, ratings) {
+      const comicRatings = ratings.filter(item => item.comicId === comicId);
+
+      if (comicRatings.length === 0) {
+        return { average: 0, count: 0 };
       }
 
-      const total = ratings.reduce((sum, item) => sum + Number(item.value || 0), 0);
-
+      const total = comicRatings.reduce((sum, item) => sum + Number(item.value || 0), 0);
       return {
-        average: total / ratings.length,
-        count: ratings.length
+        average: total / comicRatings.length,
+        count: comicRatings.length
       };
     }
 
-    function getUserRating(comicId) {
+    function getUserRating(comicId, ratings) {
       if (!currentUser) return 0;
 
-      const rating = getRatings().find(
+      const rating = ratings.find(
         item => item.comicId === comicId && item.userId === currentUser.uid
       );
 
       return rating ? Number(rating.value) : 0;
     }
 
-    function saveRating(comicId, value) {
+    async function saveRating(comicId, value) {
       if (!currentUser) return;
 
-      const ratings = getRatings();
+      // Один документ на одну пару user + comic.
+      const ratingId = `${currentUser.uid}_${comicId}`;
 
-      const existing = ratings.find(
-        item => item.comicId === comicId && item.userId === currentUser.uid
-      );
+      await setDoc(doc(db, "ratings", ratingId), {
+        comicId,
+        userId: currentUser.uid,
+        value,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
-      if (existing) {
-        existing.value = value;
-        existing.updatedAt = new Date().toISOString();
-      } else {
-        ratings.push({
-          comicId,
-          userId: currentUser.uid,
-          value,
-          createdAt: new Date().toISOString()
-        });
-      }
-
-      saveJson(RATINGS_STORAGE_KEY, ratings);
-      renderComics();
+      await renderComics();
     }
 
     function starsText(average) {
@@ -445,8 +435,8 @@
       return "★".repeat(rounded) + "☆".repeat(5 - rounded);
     }
 
-    function renderComics() {
-      const comics = loadJson(COMICS_STORAGE_KEY);
+    async function renderComics() {
+      const [comics, ratings] = await Promise.all([loadComics(), loadRatings()]);
 
       if (comics.length === 0) {
         comicsGrid.innerHTML = `
@@ -458,8 +448,8 @@
       }
 
       comicsGrid.innerHTML = comics.map(comic => {
-        const rating = getComicRatingData(comic.id);
-        const userRating = getUserRating(comic.id);
+        const rating = getComicRatingData(comic.id, ratings);
+        const userRating = getUserRating(comic.id, ratings);
 
         const cover = comic.cover
           ? getCoverImageUrl(comic.cover)
@@ -533,12 +523,12 @@
           saveRating(
             button.dataset.comicId,
             Number(button.dataset.rating)
-          );
+          ).catch(console.error);
         });
       });
     }
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
       currentUser = user;
 
       if (user) {
@@ -554,7 +544,7 @@
           adminBtn.style.display = "none";
         }
 
-        renderComics();
+        await renderComics();
       } else {
         guestSection.style.display = "block";
         catalogSection.style.display = "none";
