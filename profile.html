@@ -27,7 +27,11 @@
     .item{background:#151515;border:1px solid #2c2c2c;border-radius:12px;overflow:hidden}
     .item-img{aspect-ratio:5/7;background:#0b0b0b}.item-img img{width:100%;height:100%;object-fit:cover;display:block}
     .item-body{padding:14px}.item-name{font-size:17px;font-weight:800;margin-bottom:6px}.item-comic{color:#8f8f8f;font-size:13px;margin-bottom:7px}.rarity{display:inline-block;background:#272727;border:1px solid #353535;border-radius:999px;padding:5px 9px;color:#ffb347;font-size:12px;font-weight:800;margin-bottom:10px}
-    .item-meta{color:#777;font-size:12px}.empty{grid-column:1/-1;border:1px dashed #333;border-radius:12px;padding:45px 20px;text-align:center;color:#777}
+    .item-meta{color:#777;font-size:12px}
+    .item-actions{margin-top:12px}
+    .trash-btn{width:100%;border:0;border-radius:8px;padding:10px 12px;background:#2a2020;color:#ff9a9a;cursor:pointer;font-weight:800}
+    .trash-btn:hover{background:#3a2424;color:#ffb3b3}
+    .empty{grid-column:1/-1;border:1px dashed #333;border-radius:12px;padding:45px 20px;text-align:center;color:#777}
     @media(max-width:650px){header{align-items:flex-start;flex-direction:column}.profile-card{grid-template-columns:1fr;text-align:center}.avatar{margin:auto}.stats{grid-template-columns:1fr}}
   </style>
 </head>
@@ -90,7 +94,9 @@
     collection,
     getDocs,
     query,
-    where
+    where,
+    deleteDoc,
+    doc
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const db = getFirestore(auth.app);
@@ -225,9 +231,42 @@
           <div class="item-meta">
             Отримано: ${formatDate(own.obtainedAt)}
           </div>
+
+          <div class="item-actions">
+            <button
+              class="trash-btn"
+              type="button"
+              data-delete-owned="${esc(own.id)}"
+            >🗑️ Видалити картку</button>
+          </div>
         </div>
       </article>
     `).join("");
+
+    document.querySelectorAll("[data-delete-owned]").forEach(button => {
+      button.addEventListener("click", async () => {
+        const ownedId = button.dataset.deleteOwned;
+        const ownedCard = owned.find(item => item.id === ownedId);
+        if (!ownedCard) return;
+
+        const card = cards.find(item => item.id === ownedCard.cardId);
+        const cardName = card?.name || "цю картку";
+
+        const confirmed = confirm(
+          `Картку «${cardName}» буде видалено з інвентарю. Ви впевнені?`
+        );
+
+        if (!confirmed) return;
+
+        try {
+          await deleteDoc(doc(db, "user_cards", ownedId));
+          await loadInventory();
+        } catch (error) {
+          console.error(error);
+          alert("Не вдалося видалити картку.");
+        }
+      });
+    });
   }
 
   comicFilter.addEventListener("change", renderInventory);
