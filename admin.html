@@ -10,7 +10,6 @@
       padding: 0;
       box-sizing: border-box;
     }
-
     body {
       font-family: Arial, sans-serif;
       background: #0f0f0f;
@@ -18,7 +17,6 @@
       display: flex;
       min-height: 100vh;
     }
-
     /* ===== Ліве меню ===== */
     .sidebar {
       width: 260px;
@@ -28,7 +26,6 @@
       flex-direction: column;
       padding: 20px 0;
     }
-
     .logo {
       padding: 0 20px 25px;
       font-size: 20px;
@@ -38,7 +35,6 @@
       margin-bottom: 15px;
       color: #ff9800;
     }
-
     .menu-item {
       padding: 13px 22px;
       cursor: pointer;
@@ -49,31 +45,26 @@
       transition: all 0.2s;
       color: #ccc;
     }
-
     .menu-item:hover {
       background: #252525;
       color: #fff;
     }
-
     .menu-item.active {
       background: #2a2a2a;
       color: #ff9800;
       border-right: 3px solid #ff9800;
     }
-
     .menu-item span {
       font-size: 18px;
       width: 24px;
       text-align: center;
     }
-
     /* ===== Основна частина ===== */
     .main {
       flex: 1;
       display: flex;
       flex-direction: column;
     }
-
     .topbar {
       height: 60px;
       background: #1a1a1a;
@@ -83,12 +74,10 @@
       justify-content: space-between;
       padding: 0 30px;
     }
-
     .topbar h1 {
       font-size: 18px;
       font-weight: 500;
     }
-
     .logout-btn {
       background: #ff9800;
       border: none;
@@ -98,25 +87,20 @@
       cursor: pointer;
       font-size: 14px;
     }
-
     .logout-btn:hover {
       background: #e68900;
     }
-
     /* ===== Робоча область ===== */
     .content {
       padding: 30px;
       flex: 1;
     }
-
     .section {
       display: none;
     }
-
     .section.active {
       display: block;
     }
-
     .placeholder {
       background: #1a1a1a;
       border: 1px dashed #333;
@@ -126,7 +110,6 @@
       color: #777;
       font-size: 16px;
     }
-
     .placeholder h2 {
       color: #aaa;
       margin-bottom: 10px;
@@ -134,11 +117,9 @@
   </style>
 </head>
 <body>
-
   <!-- Ліве меню -->
   <aside class="sidebar">
     <div class="logo">🃏 COMIC CARDS</div>
-
     <div class="menu-item active" data-section="dashboard">
       <span>🏠</span> Головна
     </div>
@@ -150,6 +131,9 @@
     </div>
     <div class="menu-item" data-section="series">
       <span>📖</span> Серії
+    </div>
+    <div class="menu-item" data-section="comics">
+      <span>📚</span> Комікси
     </div>
     <div class="menu-item" data-section="users">
       <span>👥</span> Користувачі
@@ -164,14 +148,12 @@
       <span>⚙️</span> Налаштування
     </div>
   </aside>
-
   <!-- Права частина -->
   <div class="main">
     <header class="topbar">
       <h1 id="pageTitle">Головна</h1>
       <button class="logout-btn" id="logoutBtn">Вийти</button>
     </header>
-
     <main class="content">
       <!-- Головна -->
       <section class="section active" id="dashboard">
@@ -180,7 +162,6 @@
           <p>Обери розділ зліва, щоб почати роботу</p>
         </div>
       </section>
-
       <!-- Картки -->
       <section class="section" id="cards">
         <div class="placeholder">
@@ -188,7 +169,6 @@
           <p>Тут буде таблиця карток + кнопка «Додати картку»</p>
         </div>
       </section>
-
       <!-- Пакунки -->
       <section class="section" id="packs">
         <div class="placeholder">
@@ -196,7 +176,6 @@
           <p>Тут буде управління пакунками</p>
         </div>
       </section>
-
       <!-- Серії -->
       <section class="section" id="series">
         <div class="placeholder">
@@ -204,7 +183,13 @@
           <p>Тут буде управління серіями</p>
         </div>
       </section>
-
+      <!-- Комікси -->
+      <section class="section" id="comics">
+        <div class="placeholder">
+          <h2>Комікси</h2>
+          <p>Тут буде управління коміксами</p>
+        </div>
+      </section>
       <!-- Користувачі -->
       <section class="section" id="users">
         <div class="placeholder">
@@ -212,7 +197,6 @@
           <p>Тут буде список користувачів</p>
         </div>
       </section>
-
       <!-- QR-коди -->
       <section class="section" id="qr">
         <div class="placeholder">
@@ -220,7 +204,6 @@
           <p>Тут буде генератор QR-кодів</p>
         </div>
       </section>
-
       <!-- Статистика -->
       <section class="section" id="stats">
         <div class="placeholder">
@@ -228,7 +211,6 @@
           <p>Тут буде аналітика</p>
         </div>
       </section>
-
       <!-- Налаштування -->
       <section class="section" id="settings">
         <div class="placeholder">
@@ -238,13 +220,10 @@
       </section>
     </main>
   </div>
-
   <script type="module">
     import { auth } from './js/firebase.js';
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
     const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
-
     // Захист
     onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -256,34 +235,30 @@
         window.location.href = "index.html";
       }
     });
-
     // Вихід
     document.getElementById("logoutBtn").addEventListener("click", async () => {
       await signOut(auth);
       window.location.href = "login.html";
     });
-
     // Перемикання меню
     const menuItems = document.querySelectorAll(".menu-item");
     const sections = document.querySelectorAll(".section");
     const pageTitle = document.getElementById("pageTitle");
-
     const titles = {
       dashboard: "Головна",
       cards: "Картки",
       packs: "Пакунки",
       series: "Серії",
+      comics: "Комікси",
       users: "Користувачі",
       qr: "QR-коди",
       stats: "Статистика",
       settings: "Налаштування"
     };
-
     menuItems.forEach(item => {
       item.addEventListener("click", () => {
         menuItems.forEach(i => i.classList.remove("active"));
         sections.forEach(s => s.classList.remove("active"));
-
         item.classList.add("active");
         const id = item.dataset.section;
         document.getElementById(id).classList.add("active");
