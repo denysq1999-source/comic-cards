@@ -84,6 +84,23 @@
       padding: 42px 28px;
     }
 
+    .guest-banner {
+      width: 100%;
+      aspect-ratio: 16 / 5;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 26px;
+      display: none;
+      background: #101010;
+    }
+
+    .guest-banner img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
     .guest-box h1 {
       margin-top: 0;
       font-size: 34px;
@@ -281,6 +298,10 @@
   <main>
     <!-- Для неавторизованих -->
     <section class="guest-box" id="guestSection">
+      <div class="guest-banner" id="guestBanner">
+        <img id="guestBannerImg" alt="Банер">
+      </div>
+
       <h1>Ласкаво просимо!</h1>
       <p>
         Увійди або зареєструйся, щоб читати комікси та виставляти оцінки.
@@ -325,6 +346,7 @@
       getFirestore,
       collection,
       getDocs,
+      getDoc,
       setDoc,
       doc,
       serverTimestamp
@@ -341,6 +363,8 @@
     const guestSection = document.getElementById("guestSection");
     const catalogSection = document.getElementById("catalogSection");
     const comicsGrid = document.getElementById("comicsGrid");
+    const guestBanner = document.getElementById("guestBanner");
+    const guestBannerImg = document.getElementById("guestBannerImg");
 
     let currentUser = null;
 
@@ -378,6 +402,22 @@
       }
 
       return url;
+    }
+
+
+    async function loadGuestBanner() {
+      try {
+        const snap = await getDoc(doc(db, "site_settings", "home"));
+        if (!snap.exists()) return;
+
+        const rawUrl = snap.data().guestBannerUrl || "";
+        if (!rawUrl) return;
+
+        guestBannerImg.src = getCoverImageUrl(rawUrl);
+        guestBanner.style.display = "block";
+      } catch (error) {
+        console.error("Banner load error:", error);
+      }
     }
 
     async function loadComics() {
@@ -527,6 +567,8 @@
         });
       });
     }
+
+    loadGuestBanner();
 
     onAuthStateChanged(auth, async (user) => {
       currentUser = user;
