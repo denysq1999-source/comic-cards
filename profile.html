@@ -481,11 +481,57 @@
             <div class="figure-item-comic">${esc(comic?.title || "Невідомий комікс")}</div>
             <div class="figure-item-desc">${esc(figure.description || "Без опису")}</div>
             <div class="item-meta">Отримано: ${formatDate(own.obtainedAt)}</div>
+            <button class="view-btn" type="button" data-view-figure="${esc(own.id)}">🔍 Переглянути</button>
           </div>
         </article>
       `;
     }).join("");
   }
+
+
+    document.querySelectorAll("[data-view-figure]").forEach(button => {
+      button.addEventListener("click", () => {
+        const ownedFigure = ownedFigures.find(item => item.id === button.dataset.viewFigure);
+        if (!ownedFigure) return;
+
+        const figure = figures.find(item => item.id === ownedFigure.figureId);
+        if (!figure) return;
+
+        const comic = comics.find(item => item.id === figure.comicId);
+
+        viewerImage.src = figure.image ? driveImage(figure.image) : placeholder();
+
+        if (figure.backImage) {
+          viewerBackImage.src = driveImage(figure.backImage);
+          viewerBackImage.style.display = "block";
+          generatedBack.style.display = "none";
+        } else {
+          viewerBackImage.removeAttribute("src");
+          viewerBackImage.style.display = "none";
+          generatedBack.style.display = "flex";
+          backCardName.textContent = figure.name || "Без назви";
+          backCardDescription.textContent = figure.description || "Опис відсутній.";
+        }
+
+        cardRotationY = 0;
+        cardRotationX = 0;
+        card3d.style.transform = "rotateX(0deg) rotateY(0deg)";
+        [cardShineFront, cardShineBack].forEach(shine => {
+          shine.style.setProperty("--shine-x", "50%");
+          shine.style.setProperty("--shine-y", "50%");
+        });
+
+        viewerName.textContent = figure.name || "Без назви";
+        viewerComic.textContent = comic?.title || "Невідомий комікс";
+        viewerRarity.textContent = "Колекційна фігурка";
+        viewerDescription.textContent = figure.description || "Без опису";
+        viewerObtained.textContent = `Отримано: ${formatDate(ownedFigure.obtainedAt)}`;
+
+        viewerOverlay.classList.add("show");
+        viewerOverlay.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      });
+    });
 
   function closeViewer() {
     resetCard3D();
