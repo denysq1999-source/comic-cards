@@ -517,49 +517,62 @@
   }
 
 
-    document.querySelectorAll("[data-view-figure]").forEach(button => {
-      button.addEventListener("click", () => {
-        const ownedFigure = ownedFigures.find(item => item.id === button.dataset.viewFigure);
-        if (!ownedFigure) return;
+  figureShelf.addEventListener("click", event => {
+    const button = event.target.closest("[data-view-figure]");
+    if (!button || !figureShelf.contains(button)) return;
 
-        const figure = figures.find(item => item.id === ownedFigure.figureId);
-        if (!figure) return;
+    const ownedFigure = ownedFigures.find(
+      item => item.id === button.dataset.viewFigure
+    );
+    if (!ownedFigure) return;
 
-        const comic = comics.find(item => item.id === figure.comicId);
+    const figure = figures.find(
+      item => item.id === ownedFigure.figureId
+    );
+    if (!figure) return;
 
-        viewerImage.src = figure.image ? driveImage(figure.image) : placeholder();
+    const comic = comics.find(
+      item => item.id === figure.comicId
+    );
 
-        if (figure.backImage) {
-          viewerBackImage.src = driveImage(figure.backImage);
-          viewerBackImage.style.display = "block";
-          generatedBack.style.display = "none";
-        } else {
-          viewerBackImage.removeAttribute("src");
-          viewerBackImage.style.display = "none";
-          generatedBack.style.display = "flex";
-          backCardName.textContent = figure.name || "Без назви";
-          backCardDescription.textContent = figure.description || "Опис відсутній.";
-        }
+    viewerImage.src = figure.image
+      ? driveImage(figure.image)
+      : placeholder();
 
-        cardRotationY = 0;
-        cardRotationX = 0;
-        card3d.style.transform = "rotateX(0deg) rotateY(0deg)";
-        [cardShineFront, cardShineBack].forEach(shine => {
-          shine.style.setProperty("--shine-x", "50%");
-          shine.style.setProperty("--shine-y", "50%");
-        });
+    if (figure.backImage) {
+      viewerBackImage.src = driveImage(figure.backImage);
+      viewerBackImage.style.display = "block";
+      generatedBack.style.display = "none";
+    } else {
+      viewerBackImage.removeAttribute("src");
+      viewerBackImage.style.display = "none";
+      generatedBack.style.display = "flex";
+      backCardName.textContent = figure.name || "Без назви";
+      backCardDescription.textContent =
+        figure.description || "Опис відсутній.";
+    }
 
-        viewerName.textContent = figure.name || "Без назви";
-        viewerComic.textContent = comic?.title || "Невідомий комікс";
-        viewerRarity.textContent = "Колекційна фігурка";
-        viewerDescription.textContent = figure.description || "Без опису";
-        viewerObtained.textContent = `Отримано: ${formatDate(ownedFigure.obtainedAt)}`;
+    cardRotationY = 0;
+    cardRotationX = 0;
+    applyCardTransform();
 
-        viewerOverlay.classList.add("show");
-        viewerOverlay.setAttribute("aria-hidden", "false");
-        document.body.style.overflow = "hidden";
-      });
+    [cardShineFront, cardShineBack].forEach(shine => {
+      shine.style.setProperty("--shine-x", "50%");
+      shine.style.setProperty("--shine-y", "50%");
     });
+
+    viewerName.textContent = figure.name || "Без назви";
+    viewerComic.textContent = comic?.title || "Невідомий комікс";
+    viewerRarity.textContent = "Колекційна фігурка";
+    viewerDescription.textContent =
+      figure.description || "Без опису";
+    viewerObtained.textContent =
+      `Отримано: ${formatDate(ownedFigure.obtainedAt)}`;
+
+    viewerOverlay.classList.add("show");
+    viewerOverlay.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  });
 
   function closeViewer() {
     resetCard3D();
