@@ -569,6 +569,22 @@
     .figure-video-fallback img{width:100%;height:100%;object-fit:contain}
     .figure-video-stage.no-video .figure-video-fallback{display:flex}
     .figure-video-stage.no-video video{display:none}
+    .figure-video-status{
+      position:absolute;
+      left:12px;
+      right:12px;
+      bottom:12px;
+      padding:8px 10px;
+      border-radius:8px;
+      background:rgba(0,0,0,.58);
+      color:#ddd;
+      font-size:12px;
+      text-align:center;
+      pointer-events:none;
+      display:none;
+    }
+    .figure-video-stage.loading .figure-video-status{display:block}
+    .figure-video-stage.video-error .figure-video-status{display:block;color:#ff9a9a}
     .figure-viewer-info h3{font-size:28px;margin:0 0 10px}
     .figure-viewer-comic{color:#aaa;margin-bottom:14px}
     .figure-viewer-description{color:#c7c7c7;line-height:1.6;white-space:pre-wrap}
@@ -819,8 +835,8 @@
 
               <div class="form-group">
                 <label for="figureVideoUrl">360° відео для інтерактивного перегляду</label>
-                <input id="figureVideoUrl" type="url" placeholder="Пряме посилання на MP4 / WebM">
-                <div class="hint">Відео не відтворюється саме. Користувач затискає фігурку і рухає мишкою або пальцем — відео непомітно перемотується вперед/назад.</div>
+                <input id="figureVideoUrl" type="url" placeholder="Google Drive: https://drive.google.com/file/d/.../view">
+                <div class="hint">Можна вставити звичайне посилання на сам MP4-файл у Google Drive. Доступ файла: «Усі, хто має посилання». Сайт сам перетворить його для відеоплеєра.</div>
               </div>
 
               <div class="form-group">
@@ -1055,6 +1071,7 @@
         <div class="figure-video-fallback" id="figureVideoFallback">
           <img id="figureViewerFallbackImg" alt="Фігурка">
         </div>
+        <div class="figure-video-status" id="figureVideoStatus">Завантаження 360° відео…</div>
       </div>
 
       <div class="figure-viewer-info">
@@ -1343,6 +1360,20 @@
       return url;
     }
 
+    function getFigureVideoUrl(url) {
+      if (!url) return "";
+
+      const fileId = extractGoogleDriveFileId(url);
+
+      if (fileId) {
+        // Звичайне публічне посилання Google Drive перетворюємо
+        // на URL самого файла, який можна передати у <video>.
+        return `https://drive.google.com/uc?export=download&id=${fileId}`;
+      }
+
+      return url;
+    }
+
     async function loadComics() {
       const snap = await getDocs(collection(db, "comics"));
       return snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1567,6 +1598,7 @@
     const figureVideoStage=document.getElementById("figureVideoStage");
     const figureViewerVideo=document.getElementById("figureViewerVideo");
     const figureViewerFallbackImg=document.getElementById("figureViewerFallbackImg");
+    const figureVideoStatus=document.getElementById("figureVideoStatus");
     const figureViewerName=document.getElementById("figureViewerName");
     const figureViewerComic=document.getElementById("figureViewerComic");
     const figureViewerDescription=document.getElementById("figureViewerDescription");
@@ -1642,13 +1674,17 @@
         figureViewerDescription.textContent=figure.description||"Без опису";
         figureViewerFallbackImg.src=figure.image?getCoverImageUrl(figure.image):"";
 
-        const videoUrl=figure.video360||"";
+        const videoUrl=getFigureVideoUrl(figure.video360||"");
+
+        figureVideoStage.classList.remove("loading","video-error","no-video");
+        figureVideoStatus.textContent="Завантаження 360° відео…";
+
         if(videoUrl){
-          figureVideoStage.classList.remove("no-video");
-          figureViewerVideo.src=videoUrl;
+          figureVideoStage.classList.add("loading");
           figureViewerVideo.controls=false;
           figureViewerVideo.pause();
-          figureViewerVideo.currentTime=0;
+          figureViewerVideo.src=videoUrl;
+          figureViewerVideo.load();
         }else{
           figureVideoStage.classList.add("no-video");
           figureViewerVideo.removeAttribute("src");
@@ -1730,8 +1766,29 @@
 
     figureViewerVideo.addEventListener("play",()=>figureViewerVideo.pause());
 
+    figureViewerVideo.addEventListener("loadedmetadata",()=>{
+      figureVideoStage.classList.remove("loading","video-error");
+      try{
+        figureViewerVideo.currentTime=0.001;
+        figureViewerVideo.pause();
+      }catch(e){}
+    });
+
+    figureViewerVideo.addEventListener("canplay",()=>{
+      figureVideoStage.classList.remove("loading","video-error");
+      figureViewerVideo.pause();
+    });
+
+    figureViewerVideo.addEventListener("error",()=>{
+      figureVideoStage.classList.remove("loading");
+      figureVideoStage.classList.add("video-error");
+      figureVideoStatus.textContent="Не вдалося відкрити відео. Перевір доступ Google Drive: «Усі, хто має посилання».";
+    });
+
     figureVideoStage.addEventListener("pointerdown",event=>{
-      if(!figureViewer.classList.contains("show")||!figureViewerVideo.src)return;
+      if(!figureViewer.classList.contains("show"))return;
+      if(figureVideoStage.classList.contains("no-video")||figureVideoStage.classList.contains("video-error"))return;
+      if(figureViewerVideo.readyState<1||!Number.isFinite(figureViewerVideo.duration)||figureViewerVideo.duration<=0)return;
       figureScrubbing=true;
       figurePointerId=event.pointerId;
       figureStartX=event.clientX;
