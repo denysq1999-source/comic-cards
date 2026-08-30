@@ -731,9 +731,9 @@
         return;
       }
 
-      // 25% шанс, що в цьому розділі взагалі щось випаде.
+      // 45% шанс, що в цьому розділі взагалі щось випаде.
       // Якщо не випало — повторного ролу в цій сесії для цього розділу не буде.
-      const DROP_CHANCE = 0.25;
+      const DROP_CHANCE = 0.45;
       if (Math.random() > DROP_CHANCE) {
         sessionStorage.setItem(dropKey, "1");
         return;
