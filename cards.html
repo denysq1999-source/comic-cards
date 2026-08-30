@@ -25,6 +25,12 @@
     .primary,.secondary{width:100%;border:0;border-radius:9px;padding:12px;cursor:pointer;font-weight:800}
     .primary{background:#ff9800;color:#fff}.secondary{margin-top:8px;background:#2a2a2a;color:#ddd;display:none}
     .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}.toolbar select{min-width:220px}.toolbar input{flex:1;min-width:180px}
+    .cleanup-row{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:-4px 0 16px;flex-wrap:wrap}
+    .cleanup-btn{border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:800;background:#5a2b1f;color:#ffd8ca}
+    .cleanup-btn:hover{background:#743626}
+    .cleanup-btn:disabled{opacity:.5;cursor:default}
+    .cleanup-status{color:#8f8f8f;font-size:13px}
+
     .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px}
     .card{background:#151515;border:1px solid #2c2c2c;border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
     .card-img{aspect-ratio:5/7;background:#0b0b0b}.card-img img{width:100%;height:100%;object-fit:cover;display:block}
@@ -194,6 +200,11 @@
         <input id="searchInput" type="search" placeholder="Пошук картки...">
       </div>
 
+      <div class="cleanup-row">
+        <span class="cleanup-status" id="cleanupStatus"></span>
+        <button class="cleanup-btn" id="cleanupOrphansBtn" type="button">🧹 Очистити сирітські записи</button>
+      </div>
+
       <div class="cards-grid" id="cardsGrid"></div>
     </section>
   </div>
@@ -235,7 +246,7 @@
 <script type="module">
   import { auth } from './js/firebase.js';
   import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, collection, getDocs, addDoc, setDoc, doc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getFirestore, collection, getDocs, addDoc, setDoc, doc, deleteDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const db = getFirestore(auth.app);
   const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
@@ -262,6 +273,8 @@
   const cardsGrid = document.getElementById("cardsGrid");
   const filterComic = document.getElementById("filterComic");
   const searchInput = document.getElementById("searchInput");
+  const cleanupOrphansBtn = document.getElementById("cleanupOrphansBtn");
+  const cleanupStatus = document.getElementById("cleanupStatus");
 
   let comics = [];
   let cards = [];
@@ -499,6 +512,68 @@
     await loadData();
   }
 
+
+
+  // ===== Очищення сирітських записів user_cards =====
+  async function cleanupOrphanedUserCards() {
+    cleanupOrphansBtn.disabled = true;
+    cleanupStatus.textContent = "Перевіряю інвентарі…";
+
+    try {
+      const [cardsSnap, userCardsSnap] = await Promise.all([
+        getDocs(collection(db, "cards")),
+        getDocs(collection(db, "user_cards"))
+      ]);
+
+      const existingCardIds = new Set(cardsSnap.docs.map(d => d.id));
+      const orphanDocs = userCardsSnap.docs.filter(d => {
+        const cardId = d.data()?.cardId;
+        return !cardId || !existingCardIds.has(cardId);
+      });
+
+      if (!orphanDocs.length) {
+        cleanupStatus.textContent = "✅ Сирітських записів немає";
+        return;
+      }
+
+      const ok = confirm(
+        `Знайдено сирітських записів: ${orphanDocs.length}.\n\n` +
+        `Вони посилаються на картки, яких уже немає в системі.\n` +
+        `Видалити ці записи з user_cards?`
+      );
+
+      if (!ok) {
+        cleanupStatus.textContent = `Знайдено: ${orphanDocs.length}. Очищення скасовано.`;
+        return;
+      }
+
+      // Firestore batch має обмеження на кількість операцій,
+      // тому видаляємо безпечними пачками по 400.
+      const CHUNK_SIZE = 400;
+
+      for (let i = 0; i < orphanDocs.length; i += CHUNK_SIZE) {
+        const batch = writeBatch(db);
+        orphanDocs.slice(i, i + CHUNK_SIZE).forEach(d => batch.delete(d.ref));
+        await batch.commit();
+
+        const done = Math.min(i + CHUNK_SIZE, orphanDocs.length);
+        cleanupStatus.textContent = `Очищення: ${done}/${orphanDocs.length}`;
+      }
+
+      cleanupStatus.textContent = `✅ Видалено сирітських записів: ${orphanDocs.length}`;
+    } catch (err) {
+      console.error("Cleanup user_cards error:", err);
+      cleanupStatus.textContent = "❌ Не вдалося очистити записи";
+      alert(
+        "Не вдалося очистити user_cards.\n" +
+        "Перевір Firestore Rules: адміністратор повинен мати право видаляти сирітські записи."
+      );
+    } finally {
+      cleanupOrphansBtn.disabled = false;
+    }
+  }
+
+  cleanupOrphansBtn.addEventListener("click", cleanupOrphanedUserCards);
 
   // ===== 3D-перегляд картки в адмінці =====
   let adminDragging = false;
