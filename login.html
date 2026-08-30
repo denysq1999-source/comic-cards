@@ -165,9 +165,10 @@
     const errorDiv = document.getElementById('error');
 
     const googleProvider = new GoogleAuthProvider();
-    googleProvider.setCustomParameters({
-      prompt: 'select_account'
-    });
+
+    // Після першого успішного Google-входу запам'ятовуємо це локально.
+    // Наступного разу спочатку пробуємо тихий вхід без вибору акаунта.
+    const GOOGLE_LOGIN_KEY = 'comicCardsGoogleLoginUsed';
 
     function showAuthError(error) {
       console.error(error);
@@ -231,7 +232,43 @@
         googleBtn.disabled = true;
         googleBtn.innerHTML = '<span class="google-icon">G</span> Вхід...';
 
-        await signInWithPopup(auth, googleProvider);
+        const usedGoogleBefore = localStorage.getItem(GOOGLE_LOGIN_KEY) === '1';
+        const provider = new GoogleAuthProvider();
+
+        if (usedGoogleBefore) {
+          // Якщо Google уже використовувався на цьому пристрої,
+          // просимо не показувати вибір акаунта повторно.
+          provider.setCustomParameters({ prompt: 'none' });
+        }
+
+        try {
+          await signInWithPopup(auth, provider);
+        } catch (error) {
+          // Якщо браузер/Google не дозволив тихий вхід,
+          // автоматично відкриваємо звичайний Google-вхід один раз.
+          const silentCodes = [
+            'auth/credential-already-in-use',
+            'auth/operation-not-allowed',
+            'auth/internal-error'
+          ];
+
+          const message = String(error?.message || '').toLowerCase();
+          const shouldRetry =
+            usedGoogleBefore &&
+            (
+              silentCodes.includes(error?.code) ||
+              message.includes('interaction_required') ||
+              message.includes('login_required') ||
+              message.includes('consent_required')
+            );
+
+          if (!shouldRetry) throw error;
+
+          const fallbackProvider = new GoogleAuthProvider();
+          await signInWithPopup(auth, fallbackProvider);
+        }
+
+        localStorage.setItem(GOOGLE_LOGIN_KEY, '1');
         window.location.href = 'index.html';
       } catch (error) {
         showAuthError(error);
