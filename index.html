@@ -377,13 +377,69 @@
         gap: 14px;
       }
     }
+  
+    .brand-support {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      margin-left:12px;
+      padding:6px 10px;
+      border:1px solid #3a3a3a;
+      border-radius:999px;
+      background:#292929;
+      color:#d8d8d8;
+      text-decoration:none;
+      font-size:12px;
+      font-weight:700;
+      line-height:1;
+      vertical-align:middle;
+      box-shadow:0 2px 8px rgba(0,0,0,.18);
+      transition:background .18s ease,border-color .18s ease,transform .18s ease,color .18s ease;
+    }
+    .brand-support:hover {
+      background:#333;
+      border-color:#555;
+      color:#fff;
+      transform:translateY(-1px);
+    }
+    .brand-support .warning {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:18px;
+      height:18px;
+      border-radius:50%;
+      background:#d93636;
+      color:#fff;
+      font-size:11px;
+      font-weight:900;
+      line-height:1;
+      box-shadow:0 0 0 2px rgba(217,54,54,.12);
+    }
+    @media (max-width:650px) {
+      .brand-support {
+        margin-left:7px;
+        padding:6px 8px;
+      }
+      .brand-support .support-text {display:none;}
+    }
+
+
   </style>
 </head>
 
 <body>
 
   <header>
-    <div class="brand">🃏 Comic Cards</div>
+    <div class="brand">🃏 Comic Cards
+    <a class="brand-support"
+       href="https://t.me/Denysq21"
+       target="_blank"
+       rel="noopener noreferrer"
+       title="Повідомити про технічну проблему або залишити зворотний зв’язок">
+      <span class="warning">!</span>
+      <span class="support-text">Зворотний зв’язок</span>
+    </a></div>
 
     <nav class="top-nav">
       <a class="nav-link social" id="tiktokLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🎵 TikTok</a>
