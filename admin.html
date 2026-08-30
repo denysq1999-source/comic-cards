@@ -559,23 +559,112 @@
     .figure-view-btn{background:#3b3152;color:#eee2ff}
     .figure-edit-btn{background:#2b3a4a;color:#dbeeff}
     .figure-delete-btn{background:#2a2a2a;color:#ddd}
-    .figure-viewer{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.84);display:none;align-items:center;justify-content:center;padding:20px}
+    .figure-viewer{
+      position:fixed;
+      inset:0;
+      z-index:1200;
+      background:rgba(0,0,0,.88);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      overflow:hidden;
+    }
     .figure-viewer.show{display:flex}
-    .figure-viewer-modal{width:min(940px,96vw);max-height:92vh;overflow:auto;background:#151515;border:1px solid #333;border-radius:16px;padding:20px;display:grid;grid-template-columns:minmax(320px,480px) 1fr;gap:22px;position:relative}
-    .figure-flip-stage{min-height:560px;display:flex;align-items:center;justify-content:center;perspective:1100px;touch-action:none;user-select:none;cursor:grab;background:#0c0c0c;border-radius:14px;overflow:hidden}
+    .figure-viewer-modal{
+      width:min(980px,94vw);
+      height:min(760px,88vh);
+      max-height:88vh;
+      overflow:hidden;
+      background:#151515;
+      border:1px solid #333;
+      border-radius:18px;
+      padding:18px;
+      display:grid;
+      grid-template-columns:minmax(300px,48%) 1fr;
+      gap:22px;
+      position:relative;
+      box-shadow:0 24px 70px rgba(0,0,0,.55);
+    }
+    .figure-flip-stage{
+      min-height:0;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      perspective:1100px;
+      touch-action:none;
+      user-select:none;
+      cursor:grab;
+      background:#0c0c0c;
+      border-radius:14px;
+      overflow:hidden;
+      padding:16px;
+    }
     .figure-flip-stage.dragging{cursor:grabbing}
-    .figure-flip-card{position:relative;width:min(390px,82%);aspect-ratio:3/4;transform-style:preserve-3d;transition:transform .35s cubic-bezier(.2,.8,.2,1);will-change:transform}
+    .figure-flip-card{
+      position:relative;
+      width:min(390px,86%);
+      height:min(620px,92%);
+      aspect-ratio:3/4;
+      transform-style:preserve-3d;
+      transition:transform .35s cubic-bezier(.2,.8,.2,1);
+      will-change:transform;
+    }
     .figure-flip-stage.dragging .figure-flip-card{transition:none}
     .figure-flip-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;-webkit-backface-visibility:hidden}
     .figure-flip-face.front{transform:rotateY(0deg)}
     .figure-flip-face.back{transform:rotateY(180deg)}
-    .figure-flip-face img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;filter:drop-shadow(0 18px 18px rgba(0,0,0,.42))}
-    .figure-viewer-info h3{font-size:28px;margin:0 0 10px}
+    .figure-flip-face img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      pointer-events:none;
+      filter:drop-shadow(0 18px 18px rgba(0,0,0,.42));
+    }
+    .figure-viewer-info{
+      min-width:0;
+      overflow:auto;
+      padding:12px 10px 12px 0;
+      align-self:stretch;
+    }
+    .figure-viewer-info h3{font-size:28px;margin:0 44px 10px 0}
     .figure-viewer-comic{color:#aaa;margin-bottom:14px}
     .figure-viewer-description{color:#c7c7c7;line-height:1.6;white-space:pre-wrap}
     .figure-viewer-hint{margin-top:14px;color:#777;font-size:12px}
-    .figure-viewer-close{position:absolute;top:10px;right:10px;width:38px;height:38px;border:0;border-radius:50%;background:#2a2a2a;color:#fff;cursor:pointer;font-size:20px}
-    @media(max-width:760px){.figure-viewer-modal{grid-template-columns:1fr}.figure-video-stage{min-height:430px}}
+    .figure-viewer-close{
+      position:absolute;
+      top:12px;
+      right:12px;
+      z-index:5;
+      width:40px;
+      height:40px;
+      border:1px solid #444;
+      border-radius:50%;
+      background:#242424;
+      color:#fff;
+      cursor:pointer;
+      font-size:20px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .figure-viewer-close:hover{background:#333}
+    @media(max-width:760px){
+      .figure-viewer{padding:10px}
+      .figure-viewer-modal{
+        width:96vw;
+        height:92vh;
+        max-height:92vh;
+        grid-template-columns:1fr;
+        grid-template-rows:minmax(0,1fr) auto;
+        gap:12px;
+        padding:12px;
+      }
+      .figure-flip-stage{min-height:0}
+      .figure-viewer-info{max-height:30vh;padding:4px 2px 8px}
+    }
 
       .figure-viewer-modal{grid-template-columns:1fr}
       .figure-3d-stage{min-height:430px}
