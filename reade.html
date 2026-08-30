@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Читати комікс | Comic Cards</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      min-height: 62px;
+      background: rgba(20,20,20,.96);
+      border-bottom: 1px solid #2a2a2a;
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 24px;
+    }
+
+    .brand {
+      color: #ff9800;
+      font-weight: 800;
+      letter-spacing: .4px;
+      white-space: nowrap;
+    }
+
+    .reader-title {
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .back-btn {
+      text-decoration: none;
+      background: #2b2b2b;
+      color: #fff;
+      padding: 9px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .back-btn:hover {
+      background: #3a3a3a;
+    }
+
+    .reader-shell {
+      width: min(100%, 1050px);
+      margin: 0 auto;
+      padding: 28px 18px 70px;
+    }
+
+    .comic-header {
+      background: #181818;
+      border: 1px solid #292929;
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 22px;
+      text-align: center;
+    }
+
+    .comic-header h1 {
+      font-size: clamp(24px, 4vw, 38px);
+      margin-bottom: 8px;
+    }
+
+    .comic-header p {
+      color: #999;
+      line-height: 1.5;
+    }
+
+    .chapter-picker {
+      background: #181818;
+      border: 1px solid #292929;
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 24px;
+    }
+
+    .chapter-picker h2 {
+      font-size: 18px;
+      margin-bottom: 13px;
+    }
+
+    .chapter-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .chapter-btn {
+      border: 1px solid #333;
+      background: #222;
+      color: #ddd;
+      padding: 10px 14px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .chapter-btn:hover,
+    .chapter-btn.active {
+      background: #ff9800;
+      border-color: #ff9800;
+      color: #fff;
+    }
+
+    .chapter-heading {
+      text-align: center;
+      margin: 30px 0 18px;
+    }
+
+    .chapter-heading h2 {
+      font-size: clamp(20px, 3vw, 30px);
+      margin-bottom: 6px;
+    }
+
+    .chapter-heading p {
+      color: #888;
+      font-size: 14px;
+    }
+
+    .pages {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .page-wrap {
+      width: 100%;
+      text-align: center;
+    }
+
+    .page-number {
+      color: #777;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .comic-page {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      max-height: none;
+      margin: 0 auto;
+      background: #171717;
+      border: 1px solid #272727;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+
+    .state {
+      background: #181818;
+      border: 1px dashed #333;
+      border-radius: 14px;
+      padding: 55px 25px;
+      text-align: center;
+      color: #888;
+      line-height: 1.6;
+    }
+
+    .reader-nav {
+      margin-top: 28px;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .reader-nav button {
+      border: none;
+      border-radius: 9px;
+      padding: 11px 17px;
+      cursor: pointer;
+      font-weight: 700;
+      background: #2a2a2a;
+      color: #fff;
+    }
+
+    .reader-nav button.primary {
+      background: #ff9800;
+    }
+
+    .reader-nav button:disabled {
+      opacity: .35;
+      cursor: default;
+    }
+
+
+    /* ===== Випадіння картки ===== */
+    .drop-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0,0,0,.78);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .drop-overlay.show {
+      display: flex;
+    }
+
+    .drop-modal {
+      width: min(430px, 100%);
+      background: #171717;
+      border: 1px solid #3a3a3a;
+      border-radius: 18px;
+      padding: 22px;
+      text-align: center;
+      box-shadow: 0 30px 90px rgba(0,0,0,.65);
+      animation: dropPop .22s ease-out;
+    }
+
+    @keyframes dropPop {
+      from { transform: scale(.92); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .drop-kicker {
+      color: #ffb347;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .drop-modal h2 {
+      margin-bottom: 14px;
+      font-size: 26px;
+    }
+
+    .drop-card-image {
+      width: min(260px, 78vw);
+      aspect-ratio: 5 / 7;
+      margin: 0 auto 14px;
+      background: #0c0c0c;
+      border: 1px solid #343434;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .drop-card-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .drop-name {
+      font-size: 21px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .drop-rarity {
+      display: inline-block;
+      background: #282828;
+      color: #ffb347;
+      border: 1px solid #383838;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+
+    .drop-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin-bottom: 16px;
+    }
+
+    .drop-stat {
+      background: #222;
+      border-radius: 8px;
+      padding: 8px 5px;
+      color: #aaa;
+      font-size: 12px;
+    }
+
+    .drop-stat strong {
+      display: block;
+      color: #fff;
+      margin-top: 2px;
+      font-size: 15px;
+    }
+
+    .drop-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+
+    .drop-btn {
+      border: none;
+      border-radius: 9px;
+      padding: 12px 10px;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .drop-btn.claim {
+      background: #ff9800;
+      color: #fff;
+    }
+
+    .drop-btn.skip {
+      background: #2a2a2a;
+      color: #ddd;
+    }
+
+    .drop-btn:disabled {
+      opacity: .55;
+      cursor: default;
+    }
+
+    .drop-message {
+      min-height: 18px;
+      margin-top: 10px;
+      color: #8fd9a2;
+      font-size: 13px;
+    }
+
+    @media (max-width: 650px) {
+      .topbar {
+        padding: 9px 12px;
+      }
+
+      .brand {
+        display: none;
+      }
+
+      .reader-title {
+        text-align: left;
+      }
+
+      .reader-shell {
+        padding: 18px 8px 55px;
+      }
+
+      .comic-header,
+      .chapter-picker {
+        border-radius: 10px;
+        padding: 16px;
+      }
+
+      .pages {
+        gap: 8px;
+      }
+
+      .comic-page {
+        border-left: none;
+        border-right: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">🃏 COMIC CARDS</div>
+    <div class="reader-title" id="topTitle">Читалка</div>
+    <a class="back-btn" href="index.html">← На головну</a>
+  </header>
+
+  <main class="reader-shell">
+    <section class="comic-header" id="comicHeader" style="display:none;">
+      <h1 id="comicTitle"></h1>
+      <p id="comicDescription"></p>
+    </section>
+
+    <section class="chapter-picker" id="chapterPicker" style="display:none;">
+      <h2>📖 Розділи</h2>
+      <div class="chapter-buttons" id="chapterButtons"></div>
+    </section>
+
+    <div id="readerContent">
+      <div class="state">Завантаження коміксу…</div>
+    </div>
+  </main>
+
+
+  <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
+    <div class="drop-modal">
+      <div class="drop-kicker">✨ ВИПАДКОВА ЗНАХІДКА</div>
+      <h2 id="dropTitle">Ти знайшов картку!</h2>
+
+      <div class="drop-card-image">
+        <img id="dropCardImage" alt="Картка">
+      </div>
+
+      <div class="drop-name" id="dropCardName"></div>
+      <div class="drop-rarity" id="dropCardRarity"></div>
+
+      <div class="drop-stats" id="dropStats">
+        <div class="drop-stat">Power<strong id="dropPower">0</strong></div>
+        <div class="drop-stat">Speed<strong id="dropSpeed">0</strong></div>
+        <div class="drop-stat">Defense<strong id="dropDefense">0</strong></div>
+      </div>
+
+      <div class="drop-actions">
+        <button class="drop-btn claim" id="claimCardBtn" type="button">🎒 Забрати</button>
+        <button class="drop-btn skip" id="skipCardBtn" type="button">Продовжити</button>
+      </div>
+
+      <div class="drop-message" id="dropMessage"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth } from './js/firebase.js';
+    import {
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      collection,
+      getDocs,
+      query,
+      where,
+      setDoc,
+      writeBatch,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const db = getFirestore(auth.app);
+    const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
+
+    const params = new URLSearchParams(window.location.search);
+    const comicId = params.get("comic");
+    const requestedChapter = params.get("chapter");
+
+    const comicHeader = document.getElementById("comicHeader");
+    const comicTitle = document.getElementById("comicTitle");
+    const comicDescription = document.getElementById("comicDescription");
+    const topTitle = document.getElementById("topTitle");
+    const chapterPicker = document.getElementById("chapterPicker");
+    const chapterButtons = document.getElementById("chapterButtons");
+    const readerContent = document.getElementById("readerContent");
+
+    const dropOverlay = document.getElementById("dropOverlay");
+    const dropTitle = document.getElementById("dropTitle");
+    const dropStats = document.getElementById("dropStats");
+    const dropCardImage = document.getElementById("dropCardImage");
+    const dropCardName = document.getElementById("dropCardName");
+    const dropCardRarity = document.getElementById("dropCardRarity");
+    const dropPower = document.getElementById("dropPower");
+    const dropSpeed = document.getElementById("dropSpeed");
+    const dropDefense = document.getElementById("dropDefense");
+    const claimCardBtn = document.getElementById("claimCardBtn");
+    const skipCardBtn = document.getElementById("skipCardBtn");
+    const dropMessage = document.getElementById("dropMessage");
+
+    let currentUser = null;
+    let comicCollectibles = [];
+    let currentDrop = null;
+    let dropObserver = null;
+
+    function extractGoogleDriveFileId(url) {
+      if (!url) return null;
+
+      const patterns = [
+        /\/file\/d\/([a-zA-Z0-9_-]+)/,
+        /[?&]id=([a-zA-Z0-9_-]+)/,
+        /\/d\/([a-zA-Z0-9_-]+)/
+      ];
+
+      for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) return match[1];
+      }
+
+      return null;
+    }
+
+    function getPageImageUrl(url) {
+      const fileId = extractGoogleDriveFileId(url);
+
+      if (fileId) {
+        return `https://drive.google.com/thumbnail?id=${fileId}&sz=w2000`;
+      }
+
+      return url;
+    }
+
+    function escapeHtml(value = "") {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    let comicChapters = [];
+
+    async function initReader() {
+      if (!comicId) {
+        readerContent.innerHTML = `
+          <div class="state">
+            Комікс не вибрано.<br>
+            Відкрий читалку кнопкою «Читати» з картки коміксу.
+          </div>
+        `;
+        return;
+      }
+
+      const comicSnap = await getDoc(doc(db, "comics", comicId));
+
+      if (!comicSnap.exists()) {
+        readerContent.innerHTML = `
+          <div class="state">
+            Комікс не знайдено.
+          </div>
+        `;
+        return;
+      }
+
+      const comic = { id: comicSnap.id, ...comicSnap.data() };
+
+      const chaptersSnap = await getDocs(
+        query(collection(db, "chapters"), where("comicId", "==", comicId))
+      );
+
+      comicChapters = chaptersSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => Number(a.number) - Number(b.number));
+
+      const [cardsSnap, figuresSnap, claimsSnap] = await Promise.all([
+        getDocs(query(collection(db, "cards"), where("comicId", "==", comicId))),
+        getDocs(query(collection(db, "figures"), where("comicId", "==", comicId))),
+        getDocs(query(collection(db, "collectible_claims"), where("userId", "==", currentUser.uid)))
+      ]);
+
+      const claimedKeys = new Set(
+        claimsSnap.docs.map(d => `${d.data().type}_${d.data().collectibleId}`)
+      );
+
+      const availableCards = cardsSnap.docs
+        .map(d => ({ id:d.id, type:"card", ...d.data() }))
+        .filter(item => item.published === true);
+
+      const availableFigures = figuresSnap.docs
+        .map(d => ({ id:d.id, type:"figure", ...d.data() }))
+        .filter(item => !claimedKeys.has(`figure_${item.id}`));
+
+      comicCollectibles = [...availableCards, ...availableFigures];
+
+      comicHeader.style.display = "block";
+      comicTitle.textContent = comic.title;
+      comicDescription.textContent = comic.description || "Без опису";
+      topTitle.textContent = comic.title;
+      document.title = `${comic.title} | Читалка`;
+
+      if (comicChapters.length === 0) {
+        readerContent.innerHTML = `
+          <div class="state">
+            Для цього коміксу ще не додано жодного розділу.
+          </div>
+        `;
+        return;
+      }
+
+      chapterPicker.style.display = "block";
+
+      chapterButtons.innerHTML = comicChapters.map(chapter => `
+        <button
+          class="chapter-btn"
+          type="button"
+          data-chapter-id="${escapeHtml(chapter.id)}"
+        >
+          Розділ ${escapeHtml(chapter.number)}
+        </button>
+      `).join("");
+
+      const initialChapter =
+        comicChapters.find(ch => String(ch.number) === String(requestedChapter)) ||
+        comicChapters[0];
+
+      renderChapter(initialChapter.id);
+
+      document.querySelectorAll(".chapter-btn").forEach(button => {
+        button.addEventListener("click", () => {
+          renderChapter(button.dataset.chapterId);
+        });
+      });
+    }
+
+    function renderChapter(chapterId) {
+      const chapter = comicChapters.find(item => item.id === chapterId);
+      if (!chapter) return;
+
+      document.querySelectorAll(".chapter-btn").forEach(button => {
+        button.classList.toggle(
+          "active",
+          button.dataset.chapterId === chapterId
+        );
+      });
+
+      const chapterIndex = comicChapters.findIndex(item => item.id === chapterId);
+      const prev = comicChapters[chapterIndex - 1];
+      const next = comicChapters[chapterIndex + 1];
+
+      const pages = [...(chapter.pages || [])].sort(
+        (a, b) => Number(a.page) - Number(b.page)
+      );
+
+      readerContent.innerHTML = `
+        <div class="chapter-heading">
+          <h2>
+            Розділ ${escapeHtml(chapter.number)}
+            ${chapter.title ? " — " + escapeHtml(chapter.title) : ""}
+          </h2>
+          <p>Сторінок: ${pages.length}</p>
+        </div>
+
+        <div class="pages">
+          ${pages.map(page => `
+            <div class="page-wrap" data-page-index="${pages.indexOf(page)}">
+              <div class="page-number">Сторінка ${escapeHtml(page.page)}</div>
+              <img
+                class="comic-page"
+                src="${escapeHtml(getPageImageUrl(page.url))}"
+                alt="Сторінка ${escapeHtml(page.page)}"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+              >
+            </div>
+          `).join("")}
+        </div>
+
+        <div class="reader-nav">
+          <button type="button" id="prevChapterBtn" ${prev ? "" : "disabled"}>
+            ← Попередній розділ
+          </button>
+
+          <button type="button" class="primary" id="topBtn">
+            ↑ На початок
+          </button>
+
+          <button type="button" id="nextChapterBtn" ${next ? "" : "disabled"}>
+            Наступний розділ →
+          </button>
+        </div>
+      `;
+
+      setupCollectibleDrop(chapter, pages);
+
+      const prevBtn = document.getElementById("prevChapterBtn");
+      const nextBtn = document.getElementById("nextChapterBtn");
+      const topBtn = document.getElementById("topBtn");
+
+      if (prev) {
+        prevBtn.addEventListener("click", () => {
+          renderChapter(prev.id);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      }
+
+      if (next) {
+        nextBtn.addEventListener("click", () => {
+          renderChapter(next.id);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      }
+
+      topBtn.addEventListener("click", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+
+
+    function getCardImageUrl(url) {
+      return getPageImageUrl(url);
+    }
+
+    function getDropKey(chapterId) {
+      return `reader_drop_seen_${currentUser?.uid || "guest"}_${comicId}_${chapterId}`;
+    }
+
+    function setupCollectibleDrop(chapter, pages) {
+      if (dropObserver) {
+        dropObserver.disconnect();
+        dropObserver = null;
+      }
+
+      currentDrop = null;
+      hideDrop();
+
+      if (!currentUser || comicCollectibles.length === 0 || pages.length === 0) {
+        return;
+      }
+
+      const dropKey = getDropKey(chapter.id);
+
+      // Одна спроба дропу на розділ за одну сесію браузера.
+      if (sessionStorage.getItem(dropKey) === "1") {
+        return;
+      }
+
+      // 45% шанс, що в цьому розділі взагалі щось випаде.
+      // Якщо не випало — повторного ролу в цій сесії для цього розділу не буде.
+      const DROP_CHANCE = 0.45;
+      if (Math.random() > DROP_CHANCE) {
+        sessionStorage.setItem(dropKey, "1");
+        return;
+      }
+
+      const pageElements = [...document.querySelectorAll(".page-wrap")];
+      if (pageElements.length === 0) return;
+
+      // Не показуємо знахідку одразу на першій сторінці, якщо сторінок більше однієї.
+      const minIndex = pageElements.length > 1 ? 1 : 0;
+      const targetIndex =
+        minIndex + Math.floor(Math.random() * (pageElements.length - minIndex));
+
+      const selectedCollectible =
+        comicCollectibles[Math.floor(Math.random() * comicCollectibles.length)];
+
+      const target = pageElements[targetIndex];
+      if (!target || !selectedCollectible) return;
+
+      dropObserver = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.45) continue;
+
+          dropObserver.disconnect();
+          dropObserver = null;
+
+          currentDrop = {
+            collectible: selectedCollectible,
+            chapterId: chapter.id,
+            dropKey
+          };
+
+          showDrop(selectedCollectible);
+          break;
+        }
+      }, {
+        threshold: [0.45]
+      });
+
+      dropObserver.observe(target);
+    }
+
+    function showDrop(item) {
+      const isFigure = item.type === "figure";
+      const imageUrl = item.image || item.frontImage || "";
+
+      dropCardImage.src = imageUrl
+        ? getCardImageUrl(imageUrl)
+        : "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="700" height="980">' +
+            '<rect width="100%" height="100%" fill="#101010"/>' +
+            '<text x="50%" y="50%" text-anchor="middle" fill="#666" font-size="48">' +
+            (isFigure ? 'FIGURE' : 'CARD') +
+            '</text></svg>'
+          );
+
+      dropTitle.textContent = isFigure ? "Ти знайшов фігурку!" : "Ти знайшов картку!";
+      dropCardName.textContent = item.name || "Без назви";
+
+      if (isFigure) {
+        dropCardRarity.textContent = "Колекційна фігурка";
+        dropStats.style.display = "none";
+      } else {
+        dropCardRarity.textContent = item.rarity || "Common";
+        dropStats.style.display = "grid";
+        dropPower.textContent = Number(item.power || 0);
+        dropSpeed.textContent = Number(item.speed || 0);
+        dropDefense.textContent = Number(item.defense || 0);
+      }
+
+      dropMessage.textContent = "";
+      claimCardBtn.disabled = false;
+      skipCardBtn.disabled = false;
+
+      dropOverlay.classList.add("show");
+      dropOverlay.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+    }
+
+    function hideDrop() {
+      dropOverlay.classList.remove("show");
+      dropOverlay.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+      dropMessage.textContent = "";
+    }
+
+    claimCardBtn.addEventListener("click", async () => {
+      if (!currentDrop || !currentUser) return;
+
+      claimCardBtn.disabled = true;
+      skipCardBtn.disabled = true;
+
+      const item = currentDrop.collectible;
+      const isFigure = item.type === "figure";
+      dropMessage.textContent = isFigure ? "Зберігаю фігурку…" : "Зберігаю картку…";
+
+      try {
+        const batch = writeBatch(db);
+
+        if (isFigure) {
+          // Фігурка залишається унікальною для акаунта.
+          const ownedId = `${currentUser.uid}_${item.id}`;
+          const claimId = `${currentUser.uid}_figure_${item.id}`;
+
+          batch.set(doc(db, "user_figures", ownedId), {
+            userId: currentUser.uid,
+            figureId: item.id,
+            comicId,
+            source: "reader_drop",
+            sourceChapterId: currentDrop.chapterId,
+            obtainedAt: serverTimestamp()
+          });
+
+          batch.set(doc(db, "collectible_claims", claimId), {
+            userId: currentUser.uid,
+            type: "figure",
+            collectibleId: item.id,
+            comicId,
+            obtainedAt: serverTimestamp()
+          });
+        } else {
+          // Картки тепер можуть випадати повторно.
+          // Кожен дублікат отримує окремий випадковий документ в user_cards.
+          const ownedCardRef = doc(collection(db, "user_cards"));
+
+          batch.set(ownedCardRef, {
+            userId: currentUser.uid,
+            cardId: item.id,
+            comicId,
+            source: "reader_drop",
+            sourceChapterId: currentDrop.chapterId,
+            obtainedAt: serverTimestamp()
+          });
+        }
+
+        await batch.commit();
+
+        // Фігурку прибираємо з пулу назавжди для цієї сесії,
+        // картку НЕ прибираємо — вона може випасти знову.
+        if (isFigure) {
+          comicCollectibles = comicCollectibles.filter(
+            x => !(x.type === "figure" && x.id === item.id)
+          );
+        }
+
+        sessionStorage.setItem(currentDrop.dropKey, "1");
+
+        dropMessage.textContent = isFigure
+          ? "Фігурку додано на твою поличку 🧍"
+          : "Картку додано в інвентар 🎒";
+
+        setTimeout(() => {
+          currentDrop = null;
+          hideDrop();
+        }, 900);
+      } catch (error) {
+        console.error(error);
+
+        if (isFigure && String(error?.code || "").includes("permission-denied")) {
+          dropMessage.textContent = "Цю фігурку ти вже отримував.";
+        } else {
+          dropMessage.textContent = "Не вдалося зберегти знахідку.";
+        }
+
+        claimCardBtn.disabled = false;
+        skipCardBtn.disabled = false;
+      }
+    });
+
+    skipCardBtn.addEventListener("click", () => {
+      if (currentDrop?.dropKey) {
+        sessionStorage.setItem(currentDrop.dropKey, "1");
+      }
+
+      currentDrop = null;
+      hideDrop();
+    });
+
+    dropOverlay.addEventListener("click", event => {
+      if (event.target === dropOverlay) {
+        skipCardBtn.click();
+      }
+    });
+
+    onAuthStateChanged(auth, async user => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      currentUser = user;
+
+      try {
+        if (user.uid !== ADMIN_UID) {
+          const maintenanceSnap = await getDoc(doc(db, "site_settings", "home"));
+          if (maintenanceSnap.exists() && maintenanceSnap.data().maintenanceMode === true) {
+            window.location.href = "maintenance.html";
+            return;
+          }
+        }
+
+        const blockedSnap = await getDoc(doc(db, "blocked_users", user.uid));
+
+        if (blockedSnap.exists() && blockedSnap.data().blocked === true) {
+          alert("Цей акаунт заблоковано адміністратором.");
+          window.location.href = "index.html";
+          return;
+        }
+
+        await initReader();
+      } catch (error) {
+        console.error(error);
+        readerContent.innerHTML = `
+          <div class="state">
+            ⚠️ Не вдалося завантажити комікс.<br><br>
+            <button onclick="location.reload()" style="border:0;border-radius:9px;padding:11px 16px;background:#ff9800;color:#fff;font-weight:800;cursor:pointer;">
+              ↻ Спробувати ще раз
+            </button>
+          </div>
+        `;
+      }
+    });
+  </script>
+</body>
+</html>
