@@ -121,6 +121,43 @@
       background: #444;
     }
 
+    .button.google {
+      width: min(360px, calc(100% - 20px));
+      margin-top: 8px;
+      background: #fff;
+      color: #222;
+      border: 1px solid #ddd;
+      font-size: 17px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .button.google:hover {
+      background: #f1f1f1;
+    }
+
+    .google-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      font-size: 20px;
+      font-weight: 900;
+      color: #4285f4;
+    }
+
+    #googleGuestError {
+      min-height: 18px;
+      margin-top: 8px;
+      color: #ff6b6b;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
     .user-info {
       margin-top: 20px;
       color: #aaa;
@@ -471,6 +508,14 @@
         <a class="button" id="loginBtn" href="login.html">Увійти</a>
         <a class="button secondary" href="register.html">Реєстрація</a>
       </div>
+
+      <div>
+        <button class="button google" id="googleGuestBtn" type="button">
+          <span class="google-icon">G</span>
+          Увійти через Google
+        </button>
+        <div id="googleGuestError"></div>
+      </div>
     </section>
 
     <!-- Для авторизованих -->
@@ -491,7 +536,9 @@
     import { auth } from './js/firebase.js';
     import {
       onAuthStateChanged,
-      signOut
+      signOut,
+      GoogleAuthProvider,
+      signInWithPopup
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     import {
@@ -524,6 +571,8 @@
     const comicsGrid = document.getElementById("comicsGrid");
     const guestBanner = document.getElementById("guestBanner");
     const guestBannerImg = document.getElementById("guestBannerImg");
+    const googleGuestBtn = document.getElementById("googleGuestBtn");
+    const googleGuestError = document.getElementById("googleGuestError");
 
     let currentUser = null;
 
@@ -563,6 +612,68 @@
       return url;
     }
 
+
+    const GOOGLE_LOGIN_KEY = "comicCardsGoogleLoginUsed";
+
+    function showGoogleGuestError(error) {
+      console.error(error);
+
+      if (error?.code === "auth/popup-closed-by-user") {
+        googleGuestError.textContent = "Вхід через Google скасовано.";
+      } else if (error?.code === "auth/popup-blocked") {
+        googleGuestError.textContent = "Браузер заблокував вікно Google.";
+      } else if (error?.code === "auth/account-exists-with-different-credential") {
+        googleGuestError.textContent = "Цей email уже зареєстрований іншим способом входу.";
+      } else if (error?.code === "auth/unauthorized-domain") {
+        googleGuestError.textContent = "Цей домен не дозволений у Firebase Authentication.";
+      } else {
+        googleGuestError.textContent = "Не вдалося увійти через Google.";
+      }
+    }
+
+    googleGuestBtn.addEventListener("click", async () => {
+      googleGuestError.textContent = "";
+
+      try {
+        googleGuestBtn.disabled = true;
+        googleGuestBtn.innerHTML = '<span class="google-icon">G</span> Вхід...';
+
+        const usedGoogleBefore = localStorage.getItem(GOOGLE_LOGIN_KEY) === "1";
+        const provider = new GoogleAuthProvider();
+
+        if (usedGoogleBefore) {
+          provider.setCustomParameters({ prompt: "none" });
+        }
+
+        try {
+          await signInWithPopup(auth, provider);
+        } catch (error) {
+          const message = String(error?.message || "").toLowerCase();
+          const shouldRetry =
+            usedGoogleBefore &&
+            (
+              message.includes("interaction_required") ||
+              message.includes("login_required") ||
+              message.includes("consent_required") ||
+              error?.code === "auth/internal-error"
+            );
+
+          if (!shouldRetry) throw error;
+
+          const fallbackProvider = new GoogleAuthProvider();
+          await signInWithPopup(auth, fallbackProvider);
+        }
+
+        localStorage.setItem(GOOGLE_LOGIN_KEY, "1");
+        window.location.reload();
+      } catch (error) {
+        showGoogleGuestError(error);
+      } finally {
+        googleGuestBtn.disabled = false;
+        googleGuestBtn.innerHTML =
+          '<span class="google-icon">G</span> Увійти через Google';
+      }
+    });
 
     async function loadSiteSettings() {
       try {
