@@ -545,6 +545,34 @@
 
 
     /* ===== Фігурки і поличка ===== */
+
+    .figure-sides-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:14px;
+      margin-bottom:16px;
+    }
+    .figure-side-preview{
+      aspect-ratio:3/4;
+      background:#101010;
+      border:1px dashed #3a3a3a;
+      border-radius:10px;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#666;
+      font-size:12px;
+    }
+    .figure-side-preview img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:none;
+    }
+    .figure-side-preview.has-image img{display:block}
+    .figure-side-preview.has-image span{display:none}
+
     .figures-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px}
     .figure-card{background:#151515;border:1px solid #2c2c2c;border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
     .figure-image{aspect-ratio:3/4;background:#0e0e0e;overflow:hidden}
@@ -560,13 +588,75 @@
     .figure-delete-btn{background:#2a2a2a;color:#ddd}
     .figure-viewer{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.84);display:none;align-items:center;justify-content:center;padding:20px}
     .figure-viewer.show{display:flex}
-    .figure-viewer-modal{width:min(900px,96vw);max-height:92vh;overflow:auto;background:#151515;border:1px solid #333;border-radius:16px;padding:20px;display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:20px;position:relative}
-    .figure-viewer-image img{width:100%;height:auto;max-height:80vh;object-fit:contain;display:block;border-radius:12px}
+    .figure-viewer-modal{width:min(980px,96vw);max-height:92vh;overflow:auto;background:#151515;border:1px solid #333;border-radius:16px;padding:20px;display:grid;grid-template-columns:minmax(320px,480px) 1fr;gap:22px;position:relative}
+    .figure-3d-stage{
+      min-height:560px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      perspective:1100px;
+      touch-action:none;
+      user-select:none;
+      cursor:grab;
+      background:radial-gradient(circle at center,rgba(255,255,255,.035),transparent 60%);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .figure-3d-stage.dragging{cursor:grabbing}
+    .figure-3d{
+      position:relative;
+      width:min(390px,82%);
+      aspect-ratio:3/4;
+      transform-style:preserve-3d;
+      transform:rotateX(0deg) rotateY(0deg);
+      transition:transform .35s cubic-bezier(.2,.8,.2,1);
+      will-change:transform;
+    }
+    .figure-3d-stage.dragging .figure-3d{transition:none}
+    .figure-face{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      backface-visibility:hidden;
+      -webkit-backface-visibility:hidden;
+      transform-style:preserve-3d;
+    }
+    .figure-face img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      pointer-events:none;
+      filter:drop-shadow(0 18px 18px rgba(0,0,0,.42));
+    }
+    .figure-face.front{transform:rotateY(0deg) translateZ(16px)}
+    .figure-face.right{transform:rotateY(90deg) translateZ(16px)}
+    .figure-face.back{transform:rotateY(180deg) translateZ(16px)}
+    .figure-face.left{transform:rotateY(-90deg) translateZ(16px)}
+    .figure-floor-shadow{
+      position:absolute;
+      left:18%;
+      right:18%;
+      bottom:5%;
+      height:5%;
+      border-radius:50%;
+      background:rgba(0,0,0,.45);
+      filter:blur(10px);
+      transform:translateZ(-24px) rotateX(90deg);
+      pointer-events:none;
+    }
     .figure-viewer-info h3{font-size:28px;margin:0 0 10px}
     .figure-viewer-comic{color:#aaa;margin-bottom:14px}
     .figure-viewer-description{color:#c7c7c7;line-height:1.6;white-space:pre-wrap}
+    .figure-viewer-hint{margin-top:14px;color:#777;font-size:12px}
     .figure-viewer-close{position:absolute;top:10px;right:10px;width:38px;height:38px;border:0;border-radius:50%;background:#2a2a2a;color:#fff;cursor:pointer;font-size:20px}
-    @media(max-width:760px){.figure-viewer-modal{grid-template-columns:1fr}}
+    @media(max-width:760px){
+      .figure-sides-grid{grid-template-columns:1fr}
+      .figure-viewer-modal{grid-template-columns:1fr}
+      .figure-3d-stage{min-height:430px}
+    }
 
     /* ===== Користувачі ===== */
     .users-toolbar {
@@ -794,14 +884,50 @@
                 <input id="figureName" type="text" placeholder="Наприклад: Зевс" required>
               </div>
 
-              <div class="form-group">
-                <label for="figureImageUrl">Посилання на зображення</label>
-                <input id="figureImageUrl" type="url" placeholder="https://drive.google.com/file/d/...">
-              </div>
+              <div class="figure-sides-grid">
+                <div>
+                  <div class="form-group">
+                    <label for="figureImageUrl">Перед</label>
+                    <input id="figureImageUrl" type="url" placeholder="https://drive.google.com/file/d/...">
+                  </div>
+                  <div class="figure-side-preview" id="figurePreview">
+                    <span>Перед</span>
+                    <img id="figurePreviewImg" alt="Фігурка спереду">
+                  </div>
+                </div>
 
-              <div class="cover-preview" id="figurePreview">
-                <span class="cover-placeholder">🧍 Тут буде фігурка</span>
-                <img id="figurePreviewImg" alt="Попередній перегляд фігурки">
+                <div>
+                  <div class="form-group">
+                    <label for="figureRightUrl">Правий бік</label>
+                    <input id="figureRightUrl" type="url" placeholder="https://drive.google.com/file/d/...">
+                  </div>
+                  <div class="figure-side-preview" id="figureRightPreview">
+                    <span>Правий бік</span>
+                    <img id="figureRightPreviewImg" alt="Фігурка справа">
+                  </div>
+                </div>
+
+                <div>
+                  <div class="form-group">
+                    <label for="figureBackUrl">Зад</label>
+                    <input id="figureBackUrl" type="url" placeholder="https://drive.google.com/file/d/...">
+                  </div>
+                  <div class="figure-side-preview" id="figureBackPreview">
+                    <span>Зад</span>
+                    <img id="figureBackPreviewImg" alt="Фігурка ззаду">
+                  </div>
+                </div>
+
+                <div>
+                  <div class="form-group">
+                    <label for="figureLeftUrl">Лівий бік</label>
+                    <input id="figureLeftUrl" type="url" placeholder="https://drive.google.com/file/d/...">
+                  </div>
+                  <div class="figure-side-preview" id="figureLeftPreview">
+                    <span>Лівий бік</span>
+                    <img id="figureLeftPreviewImg" alt="Фігурка зліва">
+                  </div>
+                </div>
               </div>
 
               <div class="form-group">
@@ -1030,11 +1156,22 @@
   <div class="figure-viewer" id="figureViewer" aria-hidden="true">
     <div class="figure-viewer-modal">
       <button class="figure-viewer-close" id="figureViewerClose" type="button">✕</button>
-      <div class="figure-viewer-image"><img id="figureViewerImg" alt="Фігурка"></div>
+
+      <div class="figure-3d-stage" id="figure3dStage" title="Затисни та крути фігурку">
+        <div class="figure-3d" id="figure3d">
+          <div class="figure-face front"><img id="figureViewerFront" alt="Фігурка спереду"></div>
+          <div class="figure-face right"><img id="figureViewerRight" alt="Фігурка справа"></div>
+          <div class="figure-face back"><img id="figureViewerBack" alt="Фігурка ззаду"></div>
+          <div class="figure-face left"><img id="figureViewerLeft" alt="Фігурка зліва"></div>
+          <div class="figure-floor-shadow"></div>
+        </div>
+      </div>
+
       <div class="figure-viewer-info">
         <h3 id="figureViewerName"></h3>
         <div class="figure-viewer-comic" id="figureViewerComic"></div>
         <div class="figure-viewer-description" id="figureViewerDescription"></div>
+        <div class="figure-viewer-hint">🖱️ Затисни й тягни вліво/вправо. Фігурка повертається на 360°.</div>
       </div>
     </div>
   </div>
@@ -1526,9 +1663,19 @@
     const figureComic=document.getElementById("figureComic");
     const figureName=document.getElementById("figureName");
     const figureImageUrl=document.getElementById("figureImageUrl");
+    const figureRightUrl=document.getElementById("figureRightUrl");
+    const figureBackUrl=document.getElementById("figureBackUrl");
+    const figureLeftUrl=document.getElementById("figureLeftUrl");
     const figureDescription=document.getElementById("figureDescription");
+
     const figurePreview=document.getElementById("figurePreview");
     const figurePreviewImg=document.getElementById("figurePreviewImg");
+    const figureRightPreview=document.getElementById("figureRightPreview");
+    const figureRightPreviewImg=document.getElementById("figureRightPreviewImg");
+    const figureBackPreview=document.getElementById("figureBackPreview");
+    const figureBackPreviewImg=document.getElementById("figureBackPreviewImg");
+    const figureLeftPreview=document.getElementById("figureLeftPreview");
+    const figureLeftPreviewImg=document.getElementById("figureLeftPreviewImg");
     const figureSubmitBtn=document.getElementById("figureSubmitBtn");
     const cancelFigureEditBtn=document.getElementById("cancelFigureEditBtn");
     const figureMessage=document.getElementById("figureMessage");
@@ -1536,7 +1683,12 @@
     const figureFormTitle=document.getElementById("figureFormTitle");
     const figureViewer=document.getElementById("figureViewer");
     const figureViewerClose=document.getElementById("figureViewerClose");
-    const figureViewerImg=document.getElementById("figureViewerImg");
+    const figure3dStage=document.getElementById("figure3dStage");
+    const figure3d=document.getElementById("figure3d");
+    const figureViewerFront=document.getElementById("figureViewerFront");
+    const figureViewerRight=document.getElementById("figureViewerRight");
+    const figureViewerBack=document.getElementById("figureViewerBack");
+    const figureViewerLeft=document.getElementById("figureViewerLeft");
     const figureViewerName=document.getElementById("figureViewerName");
     const figureViewerComic=document.getElementById("figureViewerComic");
     const figureViewerDescription=document.getElementById("figureViewerDescription");
@@ -1549,14 +1701,33 @@
       showFigureMessage.timeout=setTimeout(()=>figureMessage.className="message",3500);
     }
 
-    function updateFigurePreview(){
-      const url=figureImageUrl.value.trim();
-      if(!url){figurePreview.classList.remove("has-image");figurePreviewImg.removeAttribute("src");return;}
-      figurePreviewImg.src=getCoverImageUrl(url);
-      figurePreview.classList.add("has-image");
+    function updateOneFigurePreview(input,box,img){
+      const url=input.value.trim();
+      if(!url){
+        box.classList.remove("has-image");
+        img.removeAttribute("src");
+        return;
+      }
+      img.src=getCoverImageUrl(url);
+      box.classList.add("has-image");
     }
-    figureImageUrl.addEventListener("input",updateFigurePreview);
-    figurePreviewImg.addEventListener("error",()=>{figurePreview.classList.remove("has-image");figurePreviewImg.removeAttribute("src");});
+
+    function updateFigurePreview(){
+      updateOneFigurePreview(figureImageUrl,figurePreview,figurePreviewImg);
+      updateOneFigurePreview(figureRightUrl,figureRightPreview,figureRightPreviewImg);
+      updateOneFigurePreview(figureBackUrl,figureBackPreview,figureBackPreviewImg);
+      updateOneFigurePreview(figureLeftUrl,figureLeftPreview,figureLeftPreviewImg);
+    }
+
+    [
+      [figureImageUrl,figurePreview,figurePreviewImg],
+      [figureRightUrl,figureRightPreview,figureRightPreviewImg],
+      [figureBackUrl,figureBackPreview,figureBackPreviewImg],
+      [figureLeftUrl,figureLeftPreview,figureLeftPreviewImg]
+    ].forEach(([input,box,img])=>{
+      input.addEventListener("input",()=>updateOneFigurePreview(input,box,img));
+      img.addEventListener("error",()=>{box.classList.remove("has-image");img.removeAttribute("src");});
+    });
 
     async function refreshFigureComicSelect(){
       const comics=await loadComics();
@@ -1608,7 +1779,20 @@
         if(!figure)return;
         const comics=await loadComics();
         const comic=comics.find(c=>c.id===figure.comicId);
-        figureViewerImg.src=figure.image?getCoverImageUrl(figure.image):"";
+        const front=figure.image||figure.frontImage||"";
+        const right=figure.rightImage||front;
+        const back=figure.backImage||front;
+        const left=figure.leftImage||right||front;
+
+        figureViewerFront.src=front?getCoverImageUrl(front):"";
+        figureViewerRight.src=right?getCoverImageUrl(right):"";
+        figureViewerBack.src=back?getCoverImageUrl(back):"";
+        figureViewerLeft.src=left?getCoverImageUrl(left):"";
+
+        figureRotationY=0;
+        figureRotationX=0;
+        applyFigure3D();
+
         figureViewerName.textContent=figure.name||"Без назви";
         figureViewerComic.textContent=comic?.title||"Невідомий комікс";
         figureViewerDescription.textContent=figure.description||"Без опису";
@@ -1624,7 +1808,10 @@
         editingFigureId=figure.id;
         figureComic.value=figure.comicId||"";
         figureName.value=figure.name||"";
-        figureImageUrl.value=figure.image||"";
+        figureImageUrl.value=figure.image||figure.frontImage||"";
+        figureRightUrl.value=figure.rightImage||"";
+        figureBackUrl.value=figure.backImage||"";
+        figureLeftUrl.value=figure.leftImage||"";
         figureDescription.value=figure.description||"";
         updateFigurePreview();
         figureFormTitle.textContent="✏️ Редагувати фігурку";
@@ -1649,6 +1836,10 @@
         comicId:figureComic.value,
         name:figureName.value.trim(),
         image:figureImageUrl.value.trim(),
+        frontImage:figureImageUrl.value.trim(),
+        rightImage:figureRightUrl.value.trim(),
+        backImage:figureBackUrl.value.trim(),
+        leftImage:figureLeftUrl.value.trim(),
         description:figureDescription.value.trim()
       };
       if(!data.comicId||!data.name){showFigureMessage("Обери комікс і введи назву фігурки.","error");return;}
@@ -1677,7 +1868,74 @@
       cancelFigureEditBtn.style.display="none";
     });
 
+
+    // ===== 3D-перегляд фігурки з 4 ракурсів =====
+    let figureDragging=false;
+    let figurePointerId=null;
+    let figureStartX=0;
+    let figureStartY=0;
+    let figureStartRotationY=0;
+    let figureRotationY=0;
+    let figureRotationX=0;
+
+    function applyFigure3D(){
+      figure3d.style.transform=
+        `rotateX(${figureRotationX.toFixed(2)}deg) rotateY(${figureRotationY.toFixed(2)}deg)`;
+    }
+
+    figure3dStage.addEventListener("pointerdown",event=>{
+      if(!figureViewer.classList.contains("show"))return;
+      figureDragging=true;
+      figurePointerId=event.pointerId;
+      figureStartX=event.clientX;
+      figureStartY=event.clientY;
+      figureStartRotationY=figureRotationY;
+      figure3dStage.classList.add("dragging");
+      figure3dStage.setPointerCapture(event.pointerId);
+    });
+
+    figure3dStage.addEventListener("pointermove",event=>{
+      if(!figureDragging||event.pointerId!==figurePointerId)return;
+      const rect=figure3dStage.getBoundingClientRect();
+      const dx=event.clientX-figureStartX;
+      const dy=event.clientY-figureStartY;
+
+      figureRotationY=figureStartRotationY+(dx/rect.width)*300;
+      figureRotationX=Math.max(-12,Math.min(12,-(dy/rect.height)*24));
+      applyFigure3D();
+    });
+
+    function finishFigureDrag(event){
+      if(!figureDragging)return;
+      if(event&&figurePointerId!==null&&event.pointerId!==figurePointerId)return;
+
+      figureDragging=false;
+      figurePointerId=null;
+      figure3dStage.classList.remove("dragging");
+
+      // Прилипає до найближчого з 4 ракурсів: 0 / 90 / 180 / 270.
+      figureRotationY=Math.round(figureRotationY/90)*90;
+      figureRotationX=0;
+      applyFigure3D();
+    }
+
+    figure3dStage.addEventListener("pointerup",finishFigureDrag);
+    figure3dStage.addEventListener("pointercancel",finishFigureDrag);
+    figure3dStage.addEventListener("lostpointercapture",()=>{
+      if(figureDragging)finishFigureDrag();
+    });
+
+    function resetFigure3D(){
+      figureDragging=false;
+      figurePointerId=null;
+      figureRotationY=0;
+      figureRotationX=0;
+      figure3dStage.classList.remove("dragging");
+      applyFigure3D();
+    }
+
     function closeFigureViewer(){
+      resetFigure3D();
       figureViewer.classList.remove("show");
       figureViewer.setAttribute("aria-hidden","true");
       document.body.style.overflow="";
