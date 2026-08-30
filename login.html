@@ -13,15 +13,20 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
+      padding: 20px;
+      box-sizing: border-box;
     }
+
     .login-box {
-      width: 350px;
+      width: min(350px, 100%);
       background: #1f1f1f;
       padding: 30px;
       border-radius: 15px;
       text-align: center;
+      box-sizing: border-box;
     }
+
     input {
       width: 100%;
       padding: 12px;
@@ -31,33 +36,92 @@
       box-sizing: border-box;
       font-size: 16px;
     }
+
     button {
       width: 100%;
       padding: 14px;
       margin-top: 20px;
-      background: #ff9800;
       border: none;
       border-radius: 8px;
       color: white;
       font-size: 18px;
       cursor: pointer;
+      box-sizing: border-box;
     }
-    button:hover {
+
+    #loginBtn {
+      background: #ff9800;
+    }
+
+    #loginBtn:hover {
       background: #e68a00;
     }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 22px 0 0;
+      color: #777;
+      font-size: 13px;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #3a3a3a;
+    }
+
+    #googleBtn {
+      margin-top: 18px;
+      background: #fff;
+      color: #222;
+      border: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 700;
+    }
+
+    #googleBtn:hover {
+      background: #f1f1f1;
+    }
+
+    .google-icon {
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      color: #4285f4;
+      font-size: 20px;
+    }
+
+    button:disabled {
+      opacity: .6;
+      cursor: default;
+    }
+
     .link {
       margin-top: 20px;
       font-size: 14px;
     }
+
     .link a {
       color: #ff9800;
       text-decoration: none;
     }
+
     #error {
       color: #ff5252;
       margin-top: 15px;
       font-size: 14px;
       min-height: 20px;
+      line-height: 1.4;
     }
   </style>
 </head>
@@ -67,10 +131,17 @@
     <h1>🃏 Comic Cards</h1>
     <h2>Вхід</h2>
 
-    <input type="email" id="email" placeholder="Email" required>
-    <input type="password" id="password" placeholder="Пароль" required>
+    <input type="email" id="email" placeholder="Email" autocomplete="email" required>
+    <input type="password" id="password" placeholder="Пароль" autocomplete="current-password" required>
 
     <button id="loginBtn">Увійти</button>
+
+    <div class="divider">або</div>
+
+    <button id="googleBtn" type="button">
+      <span class="google-icon">G</span>
+      Увійти через Google
+    </button>
 
     <div id="error"></div>
 
@@ -81,14 +152,48 @@
 
   <script type="module">
     import { auth } from './js/firebase.js';
-    import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      signInWithEmailAndPassword,
+      GoogleAuthProvider,
+      signInWithPopup
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const loginBtn = document.getElementById('loginBtn');
+    const googleBtn = document.getElementById('googleBtn');
     const errorDiv = document.getElementById('error');
 
-    loginBtn.addEventListener('click', async () => {
+    const googleProvider = new GoogleAuthProvider();
+    googleProvider.setCustomParameters({
+      prompt: 'select_account'
+    });
+
+    function showAuthError(error) {
+      console.error(error);
+
+      if (
+        error.code === 'auth/user-not-found' ||
+        error.code === 'auth/wrong-password' ||
+        error.code === 'auth/invalid-credential'
+      ) {
+        errorDiv.textContent = 'Невірний email або пароль';
+      } else if (error.code === 'auth/invalid-email') {
+        errorDiv.textContent = 'Невірний формат email';
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        errorDiv.textContent = 'Вхід через Google скасовано.';
+      } else if (error.code === 'auth/popup-blocked') {
+        errorDiv.textContent = 'Браузер заблокував вікно Google. Дозволь спливаючі вікна та спробуй ще раз.';
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        errorDiv.textContent = 'Цей email уже зареєстрований іншим способом. Увійди через email і пароль.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorDiv.textContent = 'Цей домен ще не дозволений у Firebase Authentication.';
+      } else {
+        errorDiv.textContent = 'Помилка входу. Спробуйте ще раз.';
+      }
+    }
+
+    async function loginWithEmail() {
       const email = emailInput.value.trim();
       const password = passwordInput.value;
 
@@ -104,21 +209,35 @@
         loginBtn.textContent = 'Вхід...';
 
         await signInWithEmailAndPassword(auth, email, password);
-        
-        // Успішний вхід
         window.location.href = 'index.html';
       } catch (error) {
-        console.error(error);
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-          errorDiv.textContent = 'Невірний email або пароль';
-        } else if (error.code === 'auth/invalid-email') {
-          errorDiv.textContent = 'Невірний формат email';
-        } else {
-          errorDiv.textContent = 'Помилка входу. Спробуйте ще раз.';
-        }
+        showAuthError(error);
       } finally {
         loginBtn.disabled = false;
         loginBtn.textContent = 'Увійти';
+      }
+    }
+
+    loginBtn.addEventListener('click', loginWithEmail);
+
+    passwordInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') loginWithEmail();
+    });
+
+    googleBtn.addEventListener('click', async () => {
+      errorDiv.textContent = '';
+
+      try {
+        googleBtn.disabled = true;
+        googleBtn.innerHTML = '<span class="google-icon">G</span> Вхід...';
+
+        await signInWithPopup(auth, googleProvider);
+        window.location.href = 'index.html';
+      } catch (error) {
+        showAuthError(error);
+      } finally {
+        googleBtn.disabled = false;
+        googleBtn.innerHTML = '<span class="google-icon">G</span> Увійти через Google';
       }
     });
   </script>
