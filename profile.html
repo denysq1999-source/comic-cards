@@ -169,7 +169,10 @@
     query,
     where,
     deleteDoc,
-    doc
+    doc,
+    getDoc,
+    setDoc,
+    serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const db = getFirestore(auth.app);
@@ -213,7 +216,22 @@
       return;
     }
 
+    const blockedSnap = await getDoc(doc(db, "blocked_users", currentUser.uid));
+
+    if (blockedSnap.exists() && blockedSnap.data().blocked === true) {
+      alert("Цей акаунт заблоковано адміністратором.");
+      await signOut(auth);
+      location.href = "login.html";
+      return;
+    }
+
     user = currentUser;
+
+    await setDoc(doc(db, "users", currentUser.uid), {
+      email: currentUser.email || "",
+      role: currentUser.uid === ADMIN_UID ? "admin" : "user",
+      lastSeenAt: serverTimestamp()
+    }, { merge:true });
 
     displayName.textContent =
       currentUser.displayName ||
