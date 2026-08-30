@@ -571,8 +571,7 @@
 
       const availableCards = cardsSnap.docs
         .map(d => ({ id:d.id, type:"card", ...d.data() }))
-        .filter(item => item.published === true)
-        .filter(item => !claimedKeys.has(`card_${item.id}`));
+        .filter(item => item.published === true);
 
       const availableFigures = figuresSnap.docs
         .map(d => ({ id:d.id, type:"figure", ...d.data() }))
@@ -727,8 +726,16 @@
 
       const dropKey = getDropKey(chapter.id);
 
-      // Один випадковий дроп на розділ за одну сесію браузера.
+      // Одна спроба дропу на розділ за одну сесію браузера.
       if (sessionStorage.getItem(dropKey) === "1") {
+        return;
+      }
+
+      // 25% шанс, що в цьому розділі взагалі щось випаде.
+      // Якщо не випало — повторного ролу в цій сесії для цього розділу не буде.
+      const DROP_CHANCE = 0.25;
+      if (Math.random() > DROP_CHANCE) {
+        sessionStorage.setItem(dropKey, "1");
         return;
       }
 
@@ -824,13 +831,13 @@
       dropMessage.textContent = isFigure ? "Зберігаю фігурку…" : "Зберігаю картку…";
 
       try {
-        const claimId = `${currentUser.uid}_${item.type}_${item.id}`;
-        const claimRef = doc(db, "collectible_claims", claimId);
-
         const batch = writeBatch(db);
 
         if (isFigure) {
+          // Фігурка залишається унікальною для акаунта.
           const ownedId = `${currentUser.uid}_${item.id}`;
+          const claimId = `${currentUser.uid}_figure_${item.id}`;
+
           batch.set(doc(db, "user_figures", ownedId), {
             userId: currentUser.uid,
             figureId: item.id,
@@ -839,9 +846,20 @@
             sourceChapterId: currentDrop.chapterId,
             obtainedAt: serverTimestamp()
           });
+
+          batch.set(doc(db, "collectible_claims", claimId), {
+            userId: currentUser.uid,
+            type: "figure",
+            collectibleId: item.id,
+            comicId,
+            obtainedAt: serverTimestamp()
+          });
         } else {
-          const ownedId = `${currentUser.uid}_${item.id}`;
-          batch.set(doc(db, "user_cards", ownedId), {
+          // Картки тепер можуть випадати повторно.
+          // Кожен дублікат отримує окремий випадковий документ в user_cards.
+          const ownedCardRef = doc(collection(db, "user_cards"));
+
+          batch.set(ownedCardRef, {
             userId: currentUser.uid,
             cardId: item.id,
             comicId,
@@ -851,24 +869,18 @@
           });
         }
 
-        // Цей документ — постійна історія отримання.
-        // Якщо він уже існує, Firestore Rules не дозволять переписати його,
-        // і весь batch буде скасований атомарно.
-        batch.set(claimRef, {
-          userId: currentUser.uid,
-          type: item.type,
-          collectibleId: item.id,
-          comicId,
-          obtainedAt: serverTimestamp()
-        });
-
         await batch.commit();
 
-        comicCollectibles = comicCollectibles.filter(
-          x => !(x.type === item.type && x.id === item.id)
-        );
+        // Фігурку прибираємо з пулу назавжди для цієї сесії,
+        // картку НЕ прибираємо — вона може випасти знову.
+        if (isFigure) {
+          comicCollectibles = comicCollectibles.filter(
+            x => !(x.type === "figure" && x.id === item.id)
+          );
+        }
 
         sessionStorage.setItem(currentDrop.dropKey, "1");
+
         dropMessage.textContent = isFigure
           ? "Фігурку додано на твою поличку 🧍"
           : "Картку додано в інвентар 🎒";
@@ -880,8 +892,8 @@
       } catch (error) {
         console.error(error);
 
-        if (String(error?.code || "").includes("permission-denied")) {
-          dropMessage.textContent = "Цю знахідку вже було отримано або доступ заблоковано правилами.";
+        if (isFigure && String(error?.code || "").includes("permission-denied")) {
+          dropMessage.textContent = "Цю фігурку ти вже отримував.";
         } else {
           dropMessage.textContent = "Не вдалося зберегти знахідку.";
         }
