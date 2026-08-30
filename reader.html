@@ -415,7 +415,7 @@
   <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
     <div class="drop-modal">
       <div class="drop-kicker">✨ ВИПАДКОВА ЗНАХІДКА</div>
-      <h2>Ти знайшов картку!</h2>
+      <h2 id="dropTitle">Ти знайшов картку!</h2>
 
       <div class="drop-card-image">
         <img id="dropCardImage" alt="Картка">
@@ -424,7 +424,7 @@
       <div class="drop-name" id="dropCardName"></div>
       <div class="drop-rarity" id="dropCardRarity"></div>
 
-      <div class="drop-stats">
+      <div class="drop-stats" id="dropStats">
         <div class="drop-stat">Power<strong id="dropPower">0</strong></div>
         <div class="drop-stat">Speed<strong id="dropSpeed">0</strong></div>
         <div class="drop-stat">Defense<strong id="dropDefense">0</strong></div>
@@ -472,6 +472,8 @@
     const readerContent = document.getElementById("readerContent");
 
     const dropOverlay = document.getElementById("dropOverlay");
+    const dropTitle = document.getElementById("dropTitle");
+    const dropStats = document.getElementById("dropStats");
     const dropCardImage = document.getElementById("dropCardImage");
     const dropCardName = document.getElementById("dropCardName");
     const dropCardRarity = document.getElementById("dropCardRarity");
@@ -483,7 +485,7 @@
     const dropMessage = document.getElementById("dropMessage");
 
     let currentUser = null;
-    let comicCards = [];
+    let comicCollectibles = [];
     let currentDrop = null;
     let dropObserver = null;
 
@@ -557,23 +559,26 @@
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => Number(a.number) - Number(b.number));
 
-      const [cardsSnap, ownedSnap] = await Promise.all([
-        getDocs(
-          query(collection(db, "cards"), where("comicId", "==", comicId))
-        ),
-        getDocs(
-          query(collection(db, "user_cards"), where("userId", "==", currentUser.uid))
-        )
+      const [cardsSnap, figuresSnap, claimsSnap] = await Promise.all([
+        getDocs(query(collection(db, "cards"), where("comicId", "==", comicId))),
+        getDocs(query(collection(db, "figures"), where("comicId", "==", comicId))),
+        getDocs(query(collection(db, "collectible_claims"), where("userId", "==", currentUser.uid)))
       ]);
 
-      const ownedCardIds = new Set(
-        ownedSnap.docs.map(d => d.data().cardId).filter(Boolean)
+      const claimedKeys = new Set(
+        claimsSnap.docs.map(d => `${d.data().type}_${d.data().collectibleId}`)
       );
 
-      comicCards = cardsSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(card => card.published === true)
-        .filter(card => !ownedCardIds.has(card.id));
+      const availableCards = cardsSnap.docs
+        .map(d => ({ id:d.id, type:"card", ...d.data() }))
+        .filter(item => item.published === true)
+        .filter(item => !claimedKeys.has(`card_${item.id}`));
+
+      const availableFigures = figuresSnap.docs
+        .map(d => ({ id:d.id, type:"figure", ...d.data() }))
+        .filter(item => !claimedKeys.has(`figure_${item.id}`));
+
+      comicCollectibles = [...availableCards, ...availableFigures];
 
       comicHeader.style.display = "block";
       comicTitle.textContent = comic.title;
@@ -673,7 +678,7 @@
         </div>
       `;
 
-      setupCardDrop(chapter, pages);
+      setupCollectibleDrop(chapter, pages);
 
       const prevBtn = document.getElementById("prevChapterBtn");
       const nextBtn = document.getElementById("nextChapterBtn");
@@ -707,7 +712,7 @@
       return `reader_drop_seen_${currentUser?.uid || "guest"}_${comicId}_${chapterId}`;
     }
 
-    function setupCardDrop(chapter, pages) {
+    function setupCollectibleDrop(chapter, pages) {
       if (dropObserver) {
         dropObserver.disconnect();
         dropObserver = null;
@@ -716,7 +721,7 @@
       currentDrop = null;
       hideDrop();
 
-      if (!currentUser || comicCards.length === 0 || pages.length === 0) {
+      if (!currentUser || comicCollectibles.length === 0 || pages.length === 0) {
         return;
       }
 
@@ -735,11 +740,11 @@
       const targetIndex =
         minIndex + Math.floor(Math.random() * (pageElements.length - minIndex));
 
-      const selectedCard =
-        comicCards[Math.floor(Math.random() * comicCards.length)];
+      const selectedCollectible =
+        comicCollectibles[Math.floor(Math.random() * comicCollectibles.length)];
 
       const target = pageElements[targetIndex];
-      if (!target || !selectedCard) return;
+      if (!target || !selectedCollectible) return;
 
       dropObserver = new IntersectionObserver(entries => {
         for (const entry of entries) {
@@ -749,12 +754,12 @@
           dropObserver = null;
 
           currentDrop = {
-            card: selectedCard,
+            collectible: selectedCollectible,
             chapterId: chapter.id,
             dropKey
           };
 
-          showDrop(selectedCard);
+          showDrop(selectedCollectible);
           break;
         }
       }, {
@@ -764,21 +769,33 @@
       dropObserver.observe(target);
     }
 
-    function showDrop(card) {
-      dropCardImage.src = card.image
-        ? getCardImageUrl(card.image)
+    function showDrop(item) {
+      const isFigure = item.type === "figure";
+      const imageUrl = item.image || item.frontImage || "";
+
+      dropCardImage.src = imageUrl
+        ? getCardImageUrl(imageUrl)
         : "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
             '<svg xmlns="http://www.w3.org/2000/svg" width="700" height="980">' +
             '<rect width="100%" height="100%" fill="#101010"/>' +
-            '<text x="50%" y="50%" text-anchor="middle" fill="#666" font-size="48">CARD</text>' +
-            '</svg>'
+            '<text x="50%" y="50%" text-anchor="middle" fill="#666" font-size="48">' +
+            (isFigure ? 'FIGURE' : 'CARD') +
+            '</text></svg>'
           );
 
-      dropCardName.textContent = card.name || "Без назви";
-      dropCardRarity.textContent = card.rarity || "Common";
-      dropPower.textContent = Number(card.power || 0);
-      dropSpeed.textContent = Number(card.speed || 0);
-      dropDefense.textContent = Number(card.defense || 0);
+      dropTitle.textContent = isFigure ? "Ти знайшов фігурку!" : "Ти знайшов картку!";
+      dropCardName.textContent = item.name || "Без назви";
+
+      if (isFigure) {
+        dropCardRarity.textContent = "Колекційна фігурка";
+        dropStats.style.display = "none";
+      } else {
+        dropCardRarity.textContent = item.rarity || "Common";
+        dropStats.style.display = "grid";
+        dropPower.textContent = Number(item.power || 0);
+        dropSpeed.textContent = Number(item.speed || 0);
+        dropDefense.textContent = Number(item.defense || 0);
+      }
 
       dropMessage.textContent = "";
       claimCardBtn.disabled = false;
@@ -801,22 +818,60 @@
 
       claimCardBtn.disabled = true;
       skipCardBtn.disabled = true;
-      dropMessage.textContent = "Зберігаю картку…";
+
+      const item = currentDrop.collectible;
+      const isFigure = item.type === "figure";
+      dropMessage.textContent = isFigure ? "Зберігаю фігурку…" : "Зберігаю картку…";
 
       try {
-        const ownedId = `${currentUser.uid}_${currentDrop.card.id}`;
+        const claimId = `${currentUser.uid}_${item.type}_${item.id}`;
+        const claimRef = doc(db, "collectible_claims", claimId);
+        const existingClaim = await getDoc(claimRef);
 
-        await setDoc(doc(db, "user_cards", ownedId), {
+        if (existingClaim.exists()) {
+          sessionStorage.setItem(currentDrop.dropKey, "1");
+          dropMessage.textContent = "Цю знахідку ти вже отримував.";
+          return;
+        }
+
+        if (isFigure) {
+          const ownedId = `${currentUser.uid}_${item.id}`;
+          await setDoc(doc(db, "user_figures", ownedId), {
+            userId: currentUser.uid,
+            figureId: item.id,
+            comicId,
+            source: "reader_drop",
+            sourceChapterId: currentDrop.chapterId,
+            obtainedAt: serverTimestamp()
+          }, { merge:false });
+        } else {
+          const ownedId = `${currentUser.uid}_${item.id}`;
+          await setDoc(doc(db, "user_cards", ownedId), {
+            userId: currentUser.uid,
+            cardId: item.id,
+            comicId,
+            source: "reader_drop",
+            sourceChapterId: currentDrop.chapterId,
+            obtainedAt: serverTimestamp()
+          }, { merge:false });
+        }
+
+        await setDoc(claimRef, {
           userId: currentUser.uid,
-          cardId: currentDrop.card.id,
+          type: item.type,
+          collectibleId: item.id,
           comicId,
-          source: "reader_drop",
-          sourceChapterId: currentDrop.chapterId,
           obtainedAt: serverTimestamp()
-        }, { merge: false });
+        }, { merge:false });
+
+        comicCollectibles = comicCollectibles.filter(
+          x => !(x.type === item.type && x.id === item.id)
+        );
 
         sessionStorage.setItem(currentDrop.dropKey, "1");
-        dropMessage.textContent = "Картку додано в інвентар 🎒";
+        dropMessage.textContent = isFigure
+          ? "Фігурку додано на твою поличку 🧍"
+          : "Картку додано в інвентар 🎒";
 
         setTimeout(() => {
           currentDrop = null;
@@ -824,7 +879,7 @@
         }, 900);
       } catch (error) {
         console.error(error);
-        dropMessage.textContent = "Не вдалося додати картку.";
+        dropMessage.textContent = "Не вдалося зберегти знахідку.";
         claimCardBtn.disabled = false;
         skipCardBtn.disabled = false;
       }
