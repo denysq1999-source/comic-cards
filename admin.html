@@ -543,6 +543,89 @@
       display: none;
     }
 
+    /* ===== Користувачі ===== */
+    .users-toolbar {
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-bottom:16px;
+    }
+    .users-toolbar input {
+      flex:1;
+      min-width:220px;
+      background:#101010;
+      color:#fff;
+      border:1px solid #343434;
+      border-radius:8px;
+      padding:10px 12px;
+      outline:none;
+    }
+    .users-table-wrap {
+      overflow-x:auto;
+      border:1px solid #2d2d2d;
+      border-radius:12px;
+    }
+    .users-table {
+      width:100%;
+      border-collapse:collapse;
+      min-width:760px;
+    }
+    .users-table th,
+    .users-table td {
+      padding:12px 14px;
+      border-bottom:1px solid #292929;
+      text-align:left;
+      font-size:13px;
+      vertical-align:middle;
+    }
+    .users-table th {
+      color:#999;
+      background:#151515;
+      font-weight:700;
+    }
+    .users-table tr:last-child td { border-bottom:none; }
+    .user-status {
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:5px 9px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:800;
+      background:#173c23;
+      color:#8fe5a6;
+    }
+    .user-status.blocked {
+      background:#482020;
+      color:#ff9c9c;
+    }
+    .user-actions {
+      display:flex;
+      gap:7px;
+      flex-wrap:wrap;
+    }
+    .user-action-btn {
+      border:0;
+      border-radius:8px;
+      padding:8px 10px;
+      cursor:pointer;
+      font-size:12px;
+      font-weight:800;
+      color:#fff;
+      background:#2b2b2b;
+    }
+    .user-action-btn.reset { background:#35516d; }
+    .user-action-btn.block { background:#6b2525; }
+    .user-action-btn.unblock { background:#26723d; }
+    .user-action-btn:disabled { opacity:.45; cursor:not-allowed; }
+    .users-note {
+      margin-top:12px;
+      color:#777;
+      font-size:12px;
+      line-height:1.5;
+    }
+
     @media (max-width: 900px) {
       body {
         display: block;
@@ -783,9 +866,36 @@
 
       <!-- Користувачі -->
       <section class="section" id="users">
-        <div class="placeholder">
-          <h2>Користувачі</h2>
-          <p>Тут буде список користувачів</p>
+        <div class="panel">
+          <h2>👥 Користувачі</h2>
+          <p class="panel-subtitle">
+            Керування доступом користувачів без видалення їхніх карток та інвентарю.
+          </p>
+
+          <div class="users-toolbar">
+            <input id="usersSearch" type="search" placeholder="Пошук за email...">
+            <button class="primary-btn" id="refreshUsersBtn" type="button" style="width:auto;">↻ Оновити</button>
+          </div>
+
+          <div class="users-table-wrap">
+            <table class="users-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Статус</th>
+                  <th>Остання активність</th>
+                  <th>Дії</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <tr><td colspan="4" style="color:#777;">Завантаження...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="users-note">
+            🔒 Блокування не видаляє акаунт, UID, інвентар або оцінки. Скидання пароля надсилає стандартний лист Firebase на email користувача.
+          </div>
         </div>
       </section>
 
@@ -852,7 +962,11 @@
 
   <script type="module">
     import { auth } from './js/firebase.js';
-    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      onAuthStateChanged,
+      signOut,
+      sendPasswordResetEmail
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import {
       getFirestore,
       collection,
@@ -870,6 +984,14 @@
     const db = getFirestore(auth.app);
 
     const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
+
+    const usersSearch = document.getElementById("usersSearch");
+    const refreshUsersBtn = document.getElementById("refreshUsersBtn");
+    const usersTableBody = document.getElementById("usersTableBody");
+
+    let adminUsers = [];
+    let blockedUserIds = new Set();
+
 
     // ===== Захист адмінки — Firebase НЕ змінено =====
     onAuthStateChanged(auth, (user) => {
@@ -889,6 +1011,150 @@
       await signOut(auth);
       window.location.href = "login.html";
     });
+
+
+    // ===== Керування користувачами =====
+    async function loadAdminUsers() {
+      try {
+        usersTableBody.innerHTML = '<tr><td colspan="4" style="color:#777;">Завантаження...</td></tr>';
+
+        const [usersSnap, blockedSnap] = await Promise.all([
+          getDocs(collection(db, "users")),
+          getDocs(collection(db, "blocked_users"))
+        ]);
+
+        adminUsers = usersSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+        blockedUserIds = new Set(blockedSnap.docs.map(d => d.id));
+
+        adminUsers.sort((a,b) =>
+          String(a.email || "").localeCompare(String(b.email || ""), "uk")
+        );
+
+        renderAdminUsers();
+      } catch (error) {
+        console.error("Users load error:", error);
+        usersTableBody.innerHTML =
+          '<tr><td colspan="4" style="color:#ff9292;">Не вдалося завантажити користувачів.</td></tr>';
+      }
+    }
+
+    function formatUserTimestamp(value) {
+      if (!value) return "—";
+      if (value.toDate) return value.toDate().toLocaleString("uk-UA");
+      const d = new Date(value);
+      return isNaN(d) ? "—" : d.toLocaleString("uk-UA");
+    }
+
+    function renderAdminUsers() {
+      const q = (usersSearch?.value || "").trim().toLowerCase();
+
+      const list = adminUsers.filter(user =>
+        !q || String(user.email || "").toLowerCase().includes(q)
+      );
+
+      if (!list.length) {
+        usersTableBody.innerHTML =
+          '<tr><td colspan="4" style="color:#777;">Користувачів не знайдено.</td></tr>';
+        return;
+      }
+
+      usersTableBody.innerHTML = list.map(user => {
+        const blocked = blockedUserIds.has(user.id);
+        const isSelf = user.id === ADMIN_UID;
+
+        return `
+          <tr>
+            <td>${escapeHtml(user.email || "Без email")}</td>
+            <td>
+              <span class="user-status ${blocked ? "blocked" : ""}">
+                ${blocked ? "⛔ Заблоковано" : "✅ Активний"}
+              </span>
+            </td>
+            <td>${escapeHtml(formatUserTimestamp(user.lastSeenAt))}</td>
+            <td>
+              <div class="user-actions">
+                <button
+                  class="user-action-btn reset"
+                  type="button"
+                  data-reset-user="${escapeHtml(user.id)}"
+                  ${!user.email ? "disabled" : ""}
+                >🔑 Скинути пароль</button>
+
+                <button
+                  class="user-action-btn ${blocked ? "unblock" : "block"}"
+                  type="button"
+                  data-toggle-block="${escapeHtml(user.id)}"
+                  ${isSelf ? "disabled" : ""}
+                >
+                  ${blocked ? "✅ Розблокувати" : "⛔ Заблокувати"}
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      document.querySelectorAll("[data-reset-user]").forEach(button => {
+        button.addEventListener("click", async () => {
+          const user = adminUsers.find(u => u.id === button.dataset.resetUser);
+          if (!user?.email) return;
+
+          if (!confirm(`Надіслати лист для скидання пароля на ${user.email}? Інвентар і дані не зміняться.`)) {
+            return;
+          }
+
+          try {
+            await sendPasswordResetEmail(auth, user.email);
+            alert("Лист для скидання пароля надіслано.");
+          } catch (error) {
+            console.error(error);
+            alert("Не вдалося надіслати лист для скидання пароля.");
+          }
+        });
+      });
+
+      document.querySelectorAll("[data-toggle-block]").forEach(button => {
+        button.addEventListener("click", async () => {
+          const uid = button.dataset.toggleBlock;
+          if (uid === ADMIN_UID) return;
+
+          const user = adminUsers.find(u => u.id === uid);
+          if (!user) return;
+
+          const currentlyBlocked = blockedUserIds.has(uid);
+
+          const ok = confirm(
+            currentlyBlocked
+              ? `Розблокувати ${user.email || "користувача"}?`
+              : `Заблокувати ${user.email || "користувача"}? Інвентар та інші дані НЕ будуть видалені.`
+          );
+
+          if (!ok) return;
+
+          try {
+            if (currentlyBlocked) {
+              await deleteDoc(doc(db, "blocked_users", uid));
+            } else {
+              await setDoc(doc(db, "blocked_users", uid), {
+                userId: uid,
+                email: user.email || "",
+                blocked: true,
+                blockedAt: serverTimestamp(),
+                blockedBy: ADMIN_UID
+              });
+            }
+
+            await loadAdminUsers();
+          } catch (error) {
+            console.error(error);
+            alert("Не вдалося змінити статус користувача.");
+          }
+        });
+      });
+    }
+
+    usersSearch?.addEventListener("input", renderAdminUsers);
+    refreshUsersBtn?.addEventListener("click", loadAdminUsers);
 
     // ===== Перемикання меню =====
     const menuItems = document.querySelectorAll(".menu-item");
@@ -918,6 +1184,10 @@
         const id = item.dataset.section;
         document.getElementById(id).classList.add("active");
         pageTitle.textContent = titles[id];
+
+        if (id === "users") {
+          loadAdminUsers();
+        }
       });
     });
 
