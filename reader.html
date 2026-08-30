@@ -853,15 +853,27 @@
 
       currentUser = user;
 
-      initReader().catch(error => {
+      getDoc(doc(db, "blocked_users", user.uid)).then(async blockedSnap => {
+        if (blockedSnap.exists() && blockedSnap.data().blocked === true) {
+          alert("Цей акаунт заблоковано адміністратором.");
+          window.location.href = "index.html";
+          return;
+        }
+
+        initReader().catch(error => {
+          console.error(error);
+          readerContent.innerHTML = `
+            <div class="state">
+              Не вдалося завантажити комікс.<br>
+              Перевір налаштування Firestore.
+            </div>
+          `;
+        });
+      }).catch(error => {
         console.error(error);
-        readerContent.innerHTML = `
-          <div class="state">
-            Не вдалося завантажити комікс.<br>
-            Перевір налаштування Firestore.
-          </div>
-        `;
+        window.location.href = "index.html";
       });
+
     });
   </script>
 </body>
