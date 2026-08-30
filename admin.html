@@ -623,6 +623,21 @@
       pointer-events:none;
       filter:drop-shadow(0 18px 18px rgba(0,0,0,.42));
     }
+    .figure-shine{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      opacity:0;
+      mix-blend-mode:screen;
+      background:
+        radial-gradient(circle at var(--shine-x,50%) var(--shine-y,50%),
+        rgba(255,255,255,.40) 0%,
+        rgba(255,220,150,.16) 18%,
+        rgba(255,255,255,0) 48%);
+      transition:opacity .18s ease;
+    }
+    .figure-flip-stage.dragging .figure-shine{opacity:.62}
+
     .figure-viewer-info{
       min-width:0;
       overflow:auto;
@@ -1145,8 +1160,14 @@
       <button class="figure-viewer-close" id="figureViewerClose" type="button">✕</button>
       <div class="figure-flip-stage" id="figureFlipStage" title="Затисни та переверни фігурку">
         <div class="figure-flip-card" id="figureFlipCard">
-          <div class="figure-flip-face front"><img id="figureViewerFront" alt="Фігурка спереду"></div>
-          <div class="figure-flip-face back"><img id="figureViewerBack" alt="Фігурка ззаду"></div>
+          <div class="figure-flip-face front">
+            <img id="figureViewerFront" alt="Фігурка спереду">
+            <div class="figure-shine" id="figureShineFront"></div>
+          </div>
+          <div class="figure-flip-face back">
+            <img id="figureViewerBack" alt="Фігурка ззаду">
+            <div class="figure-shine" id="figureShineBack"></div>
+          </div>
         </div>
       </div>
       <div class="figure-viewer-info">
@@ -1676,6 +1697,8 @@
     const figureFlipCard=document.getElementById("figureFlipCard");
     const figureViewerFront=document.getElementById("figureViewerFront");
     const figureViewerBack=document.getElementById("figureViewerBack");
+    const figureShineFront=document.getElementById("figureShineFront");
+    const figureShineBack=document.getElementById("figureShineBack");
     const figureViewerName=document.getElementById("figureViewerName");
     const figureViewerComic=document.getElementById("figureViewerComic");
     const figureViewerDescription=document.getElementById("figureViewerDescription");
@@ -1756,7 +1779,12 @@
         figureViewerFront.src=front?getCoverImageUrl(front):"";
         figureViewerBack.src=back?getCoverImageUrl(back):"";
         figureFlipRotation=0;
-        figureFlipCard.style.transform="rotateY(0deg)";
+        figureFlipRotationX=0;
+        figureFlipCard.style.transform="rotateX(0deg) rotateY(0deg)";
+        [figureShineFront,figureShineBack].forEach(shine=>{
+          shine.style.setProperty("--shine-x","50%");
+          shine.style.setProperty("--shine-y","50%");
+        });
         figureViewerName.textContent=figure.name||"Без назви";
         figureViewerComic.textContent=comic?.title||"Невідомий комікс";
         figureViewerDescription.textContent=figure.description||"Без опису";
@@ -1831,43 +1859,78 @@
     let figureFlipDragging=false;
     let figureFlipPointerId=null;
     let figureFlipStartX=0;
+    let figureFlipStartY=0;
     let figureFlipStartRotation=0;
     let figureFlipRotation=0;
+    let figureFlipRotationX=0;
+
+    function applyFigureFlip(){
+      figureFlipCard.style.transform=
+        `rotateX(${figureFlipRotationX.toFixed(2)}deg) rotateY(${figureFlipRotation.toFixed(2)}deg)`;
+    }
+
+    function updateFigureShine(event){
+      const rect=figureFlipStage.getBoundingClientRect();
+      const x=Math.max(0,Math.min(rect.width,event.clientX-rect.left));
+      const y=Math.max(0,Math.min(rect.height,event.clientY-rect.top));
+      const sx=`${(x/rect.width*100).toFixed(1)}%`;
+      const sy=`${(y/rect.height*100).toFixed(1)}%`;
+      [figureShineFront,figureShineBack].forEach(shine=>{
+        shine.style.setProperty("--shine-x",sx);
+        shine.style.setProperty("--shine-y",sy);
+      });
+    }
 
     figureFlipStage.addEventListener("pointerdown",event=>{
       if(!figureViewer.classList.contains("show"))return;
       figureFlipDragging=true;
       figureFlipPointerId=event.pointerId;
       figureFlipStartX=event.clientX;
+      figureFlipStartY=event.clientY;
       figureFlipStartRotation=figureFlipRotation;
       figureFlipStage.classList.add("dragging");
       figureFlipStage.setPointerCapture(event.pointerId);
+      updateFigureShine(event);
     });
+
     figureFlipStage.addEventListener("pointermove",event=>{
       if(!figureFlipDragging||event.pointerId!==figureFlipPointerId)return;
-      const width=Math.max(1,figureFlipStage.getBoundingClientRect().width);
+      const rect=figureFlipStage.getBoundingClientRect();
       const dx=event.clientX-figureFlipStartX;
-      figureFlipRotation=figureFlipStartRotation+(dx/width)*220;
-      figureFlipCard.style.transform=`rotateY(${figureFlipRotation}deg)`;
+      const dy=event.clientY-figureFlipStartY;
+      figureFlipRotation=figureFlipStartRotation+(dx/Math.max(1,rect.width))*220;
+      figureFlipRotationX=Math.max(-14,Math.min(14,-(dy/Math.max(1,rect.height))*28));
+      applyFigureFlip();
+      updateFigureShine(event);
     });
+
     function finishFigureFlip(event){
       if(!figureFlipDragging)return;
       if(event&&figureFlipPointerId!==null&&event.pointerId!==figureFlipPointerId)return;
       figureFlipDragging=false;
       figureFlipPointerId=null;
       figureFlipStage.classList.remove("dragging");
+
       const normalized=((figureFlipRotation%360)+360)%360;
       const showBack=normalized>90&&normalized<270;
       figureFlipRotation=showBack?180:0;
-      figureFlipCard.style.transform=`rotateY(${figureFlipRotation}deg)`;
+      figureFlipRotationX=0;
+      applyFigureFlip();
     }
+
     figureFlipStage.addEventListener("pointerup",finishFigureFlip);
     figureFlipStage.addEventListener("pointercancel",finishFigureFlip);
     figureFlipStage.addEventListener("lostpointercapture",()=>{if(figureFlipDragging)finishFigureFlip();});
+
     function closeFigureViewer(){
       figureFlipDragging=false;
       figureFlipRotation=0;
-      figureFlipCard.style.transform="rotateY(0deg)";
+      figureFlipRotationX=0;
+      applyFigureFlip();
+      [figureShineFront,figureShineBack].forEach(shine=>{
+        shine.style.setProperty("--shine-x","50%");
+        shine.style.setProperty("--shine-y","50%");
+      });
       figureViewer.classList.remove("show");
       figureViewer.setAttribute("aria-hidden","true");
       document.body.style.overflow="";
