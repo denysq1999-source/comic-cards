@@ -78,6 +78,10 @@
     .figure-item-title{font-weight:800}
     .figure-item-comic{color:#999;font-size:12px}
     .figure-item-desc{color:#888;font-size:12px;line-height:1.45}
+    .figure-actions{display:flex;gap:8px;align-items:center;margin-top:2px}
+    .figure-actions .view-btn{flex:1;margin:0}
+    .figure-delete-btn{width:44px;min-width:44px;height:42px;border:1px solid #3a3a3a;border-radius:9px;background:#292929;color:#ddd;cursor:pointer;font-size:17px;display:inline-flex;align-items:center;justify-content:center}
+    .figure-delete-btn:hover{background:#4a2424;border-color:#6b3333;color:#ff8a8a}
     .empty{grid-column:1/-1;border:1px dashed #333;border-radius:12px;padding:45px 20px;text-align:center;color:#777}
     @media(max-width:650px){header{align-items:flex-start;flex-direction:column}.profile-card{grid-template-columns:1fr;text-align:center}.avatar{margin:auto}.stats{grid-template-columns:1fr}}
   </style>
@@ -509,7 +513,10 @@
             <div class="figure-item-comic">${esc(comic?.title || "Невідомий комікс")}</div>
             <div class="figure-item-desc">${esc(figure.description || "Без опису")}</div>
             <div class="item-meta">Отримано: ${formatDate(own.obtainedAt)}</div>
-            <button class="view-btn" type="button" data-view-figure="${esc(own.id)}">🔍 Переглянути</button>
+            <div class="figure-actions">
+              <button class="view-btn" type="button" data-view-figure="${esc(own.id)}">🔍 Переглянути</button>
+              <button class="figure-delete-btn" type="button" data-delete-figure="${esc(own.id)}" title="Видалити фігурку" aria-label="Видалити фігурку">🗑️</button>
+            </div>
           </div>
         </article>
       `;
@@ -517,7 +524,34 @@
   }
 
 
-  figureShelf.addEventListener("click", event => {
+  figureShelf.addEventListener("click", async event => {
+    const deleteButton = event.target.closest("[data-delete-figure]");
+
+    if (deleteButton && figureShelf.contains(deleteButton)) {
+      const ownedId = deleteButton.dataset.deleteFigure;
+      const ownedFigure = ownedFigures.find(item => item.id === ownedId);
+      if (!ownedFigure) return;
+
+      const figure = figures.find(item => item.id === ownedFigure.figureId);
+      const figureName = figure?.name || "цю фігурку";
+
+      const confirmed = confirm(
+        `Фігурку «${figureName}» буде видалено з полички. Ви впевнені?`
+      );
+      if (!confirmed) return;
+
+      try {
+        deleteButton.disabled = true;
+        await deleteDoc(doc(db, "user_figures", ownedId));
+        await loadInventory();
+      } catch (error) {
+        console.error("Figure delete error:", error);
+        alert("Не вдалося видалити фігурку.");
+        deleteButton.disabled = false;
+      }
+      return;
+    }
+
     const button = event.target.closest("[data-view-figure]");
     if (!button || !figureShelf.contains(button)) return;
 
