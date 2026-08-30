@@ -635,6 +635,11 @@
     .figure-face.right{transform:rotateY(90deg) translateZ(16px)}
     .figure-face.back{transform:rotateY(180deg) translateZ(16px)}
     .figure-face.left{transform:rotateY(-90deg) translateZ(16px)}
+    .figure-face.front360{
+      transform:rotateY(360deg) translateZ(17px);
+      opacity:0;
+      transition:opacity .12s linear;
+    }
     .figure-floor-shadow{
       position:absolute;
       left:18%;
@@ -887,45 +892,56 @@
               <div class="figure-sides-grid">
                 <div>
                   <div class="form-group">
-                    <label for="figureImageUrl">Перед</label>
+                    <label for="figureImageUrl">0° — Перед</label>
                     <input id="figureImageUrl" type="url" placeholder="https://drive.google.com/file/d/...">
                   </div>
                   <div class="figure-side-preview" id="figurePreview">
-                    <span>Перед</span>
+                    <span>0° — Перед</span>
                     <img id="figurePreviewImg" alt="Фігурка спереду">
                   </div>
                 </div>
 
                 <div>
                   <div class="form-group">
-                    <label for="figureRightUrl">Правий бік</label>
+                    <label for="figureRightUrl">90° — Правий бік</label>
                     <input id="figureRightUrl" type="url" placeholder="https://drive.google.com/file/d/...">
                   </div>
                   <div class="figure-side-preview" id="figureRightPreview">
-                    <span>Правий бік</span>
+                    <span>90° — Правий бік</span>
                     <img id="figureRightPreviewImg" alt="Фігурка справа">
                   </div>
                 </div>
 
                 <div>
                   <div class="form-group">
-                    <label for="figureBackUrl">Зад</label>
+                    <label for="figureBackUrl">180° — Зад</label>
                     <input id="figureBackUrl" type="url" placeholder="https://drive.google.com/file/d/...">
                   </div>
                   <div class="figure-side-preview" id="figureBackPreview">
-                    <span>Зад</span>
+                    <span>180° — Зад</span>
                     <img id="figureBackPreviewImg" alt="Фігурка ззаду">
                   </div>
                 </div>
 
                 <div>
                   <div class="form-group">
-                    <label for="figureLeftUrl">Лівий бік</label>
+                    <label for="figureLeftUrl">270° — Лівий бік</label>
                     <input id="figureLeftUrl" type="url" placeholder="https://drive.google.com/file/d/...">
                   </div>
                   <div class="figure-side-preview" id="figureLeftPreview">
-                    <span>Лівий бік</span>
+                    <span>270° — Лівий бік</span>
                     <img id="figureLeftPreviewImg" alt="Фігурка зліва">
+                  </div>
+                </div>
+
+                <div>
+                  <div class="form-group">
+                    <label for="figureFront360Url">360° — Перед</label>
+                    <input id="figureFront360Url" type="url" placeholder="https://drive.google.com/file/d/...">
+                  </div>
+                  <div class="figure-side-preview" id="figureFront360Preview">
+                    <span>360° — Перед</span>
+                    <img id="figureFront360PreviewImg" alt="Фігурка спереду 360°">
                   </div>
                 </div>
               </div>
@@ -1163,6 +1179,7 @@
           <div class="figure-face right"><img id="figureViewerRight" alt="Фігурка справа"></div>
           <div class="figure-face back"><img id="figureViewerBack" alt="Фігурка ззаду"></div>
           <div class="figure-face left"><img id="figureViewerLeft" alt="Фігурка зліва"></div>
+          <div class="figure-face front360" id="figureFace360"><img id="figureViewerFront360" alt="Фігурка спереду 360°"></div>
           <div class="figure-floor-shadow"></div>
         </div>
       </div>
@@ -1666,6 +1683,7 @@
     const figureRightUrl=document.getElementById("figureRightUrl");
     const figureBackUrl=document.getElementById("figureBackUrl");
     const figureLeftUrl=document.getElementById("figureLeftUrl");
+    const figureFront360Url=document.getElementById("figureFront360Url");
     const figureDescription=document.getElementById("figureDescription");
 
     const figurePreview=document.getElementById("figurePreview");
@@ -1676,6 +1694,8 @@
     const figureBackPreviewImg=document.getElementById("figureBackPreviewImg");
     const figureLeftPreview=document.getElementById("figureLeftPreview");
     const figureLeftPreviewImg=document.getElementById("figureLeftPreviewImg");
+    const figureFront360Preview=document.getElementById("figureFront360Preview");
+    const figureFront360PreviewImg=document.getElementById("figureFront360PreviewImg");
     const figureSubmitBtn=document.getElementById("figureSubmitBtn");
     const cancelFigureEditBtn=document.getElementById("cancelFigureEditBtn");
     const figureMessage=document.getElementById("figureMessage");
@@ -1689,6 +1709,8 @@
     const figureViewerRight=document.getElementById("figureViewerRight");
     const figureViewerBack=document.getElementById("figureViewerBack");
     const figureViewerLeft=document.getElementById("figureViewerLeft");
+    const figureViewerFront360=document.getElementById("figureViewerFront360");
+    const figureFace360=document.getElementById("figureFace360");
     const figureViewerName=document.getElementById("figureViewerName");
     const figureViewerComic=document.getElementById("figureViewerComic");
     const figureViewerDescription=document.getElementById("figureViewerDescription");
@@ -1717,13 +1739,15 @@
       updateOneFigurePreview(figureRightUrl,figureRightPreview,figureRightPreviewImg);
       updateOneFigurePreview(figureBackUrl,figureBackPreview,figureBackPreviewImg);
       updateOneFigurePreview(figureLeftUrl,figureLeftPreview,figureLeftPreviewImg);
+      updateOneFigurePreview(figureFront360Url,figureFront360Preview,figureFront360PreviewImg);
     }
 
     [
       [figureImageUrl,figurePreview,figurePreviewImg],
       [figureRightUrl,figureRightPreview,figureRightPreviewImg],
       [figureBackUrl,figureBackPreview,figureBackPreviewImg],
-      [figureLeftUrl,figureLeftPreview,figureLeftPreviewImg]
+      [figureLeftUrl,figureLeftPreview,figureLeftPreviewImg],
+      [figureFront360Url,figureFront360Preview,figureFront360PreviewImg]
     ].forEach(([input,box,img])=>{
       input.addEventListener("input",()=>updateOneFigurePreview(input,box,img));
       img.addEventListener("error",()=>{box.classList.remove("has-image");img.removeAttribute("src");});
@@ -1783,11 +1807,13 @@
         const right=figure.rightImage||front;
         const back=figure.backImage||front;
         const left=figure.leftImage||right||front;
+        const front360=figure.front360Image||front;
 
         figureViewerFront.src=front?getCoverImageUrl(front):"";
         figureViewerRight.src=right?getCoverImageUrl(right):"";
         figureViewerBack.src=back?getCoverImageUrl(back):"";
         figureViewerLeft.src=left?getCoverImageUrl(left):"";
+        figureViewerFront360.src=front360?getCoverImageUrl(front360):"";
 
         figureRotationY=0;
         figureRotationX=0;
@@ -1812,6 +1838,7 @@
         figureRightUrl.value=figure.rightImage||"";
         figureBackUrl.value=figure.backImage||"";
         figureLeftUrl.value=figure.leftImage||"";
+        figureFront360Url.value=figure.front360Image||figure.image||figure.frontImage||"";
         figureDescription.value=figure.description||"";
         updateFigurePreview();
         figureFormTitle.textContent="✏️ Редагувати фігурку";
@@ -1840,6 +1867,7 @@
         rightImage:figureRightUrl.value.trim(),
         backImage:figureBackUrl.value.trim(),
         leftImage:figureLeftUrl.value.trim(),
+        front360Image:figureFront360Url.value.trim(),
         description:figureDescription.value.trim()
       };
       if(!data.comicId||!data.name){showFigureMessage("Обери комікс і введи назву фігурки.","error");return;}
@@ -1881,6 +1909,16 @@
     function applyFigure3D(){
       figure3d.style.transform=
         `rotateX(${figureRotationX.toFixed(2)}deg) rotateY(${figureRotationY.toFixed(2)}deg)`;
+
+      const absTurn=Math.abs(figureRotationY);
+      const nearest360=Math.round(absTurn/360)*360;
+      const distance=Math.abs(absTurn-nearest360);
+
+      if(nearest360>=360 && distance<35){
+        figureFace360.style.opacity=String(Math.max(0,1-distance/35));
+      }else{
+        figureFace360.style.opacity="0";
+      }
     }
 
     figure3dStage.addEventListener("pointerdown",event=>{
