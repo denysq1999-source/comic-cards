@@ -752,6 +752,21 @@
       authLoading.classList.add("hidden");
 
       if (user) {
+        const blockedSnap = await getDoc(doc(db, "blocked_users", user.uid));
+
+        if (blockedSnap.exists() && blockedSnap.data().blocked === true) {
+          alert("Цей акаунт заблоковано адміністратором.");
+          await signOut(auth);
+          window.location.reload();
+          return;
+        }
+
+        await setDoc(doc(db, "users", user.uid), {
+          email: user.email || "",
+          role: user.uid === ADMIN_UID ? "admin" : "user",
+          lastSeenAt: serverTimestamp()
+        }, { merge: true });
+
         guestSection.style.display = "none";
         catalogSection.style.display = "block";
 
