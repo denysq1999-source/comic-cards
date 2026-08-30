@@ -158,6 +158,30 @@
       line-height: 1.4;
     }
 
+    .system-screen{
+      display:none;
+      max-width:720px;
+      margin:70px auto 0;
+      padding:44px 28px;
+      background:#1a1a1a;
+      border:1px solid #303030;
+      border-radius:16px;
+      text-align:center;
+    }
+    .system-screen .icon{font-size:54px;margin-bottom:12px}
+    .system-screen h1{margin:0 0 12px;font-size:32px}
+    .system-screen p{color:#aaa;line-height:1.6;margin:0 auto 22px;max-width:560px}
+    .retry-btn{
+      border:0;
+      border-radius:9px;
+      padding:12px 18px;
+      background:#ff9800;
+      color:#fff;
+      font-weight:800;
+      cursor:pointer;
+      font-size:15px;
+    }
+
     .user-info {
       margin-top: 20px;
       color: #aaa;
@@ -493,6 +517,20 @@
   <main>
     <div class="auth-loading" id="authLoading">Завантаження…</div>
 
+    <section class="system-screen" id="maintenanceSection">
+      <div class="icon">🛠️</div>
+      <h1>Технічні роботи</h1>
+      <p id="maintenanceText">Вибачте, технічні роботи. Адмін працює 🛠️</p>
+      <button class="retry-btn" type="button" onclick="location.reload()">↻ Перевірити ще раз</button>
+    </section>
+
+    <section class="system-screen" id="loadErrorSection">
+      <div class="icon">⚠️</div>
+      <h1>Не вдалося завантажити сайт</h1>
+      <p>Перевір з’єднання з інтернетом і спробуй ще раз.</p>
+      <button class="retry-btn" type="button" onclick="location.reload()">↻ Спробувати ще раз</button>
+    </section>
+
     <!-- Для неавторизованих -->
     <section class="guest-box" id="guestSection">
       <div class="guest-banner" id="guestBanner">
@@ -573,8 +611,13 @@
     const guestBannerImg = document.getElementById("guestBannerImg");
     const googleGuestBtn = document.getElementById("googleGuestBtn");
     const googleGuestError = document.getElementById("googleGuestError");
+    const maintenanceSection = document.getElementById("maintenanceSection");
+    const maintenanceText = document.getElementById("maintenanceText");
+    const loadErrorSection = document.getElementById("loadErrorSection");
 
     let currentUser = null;
+    let siteSettings = {};
+    let siteSettingsLoaded = false;
 
     function escapeHtml(value = "") {
       return String(value)
@@ -681,6 +724,8 @@
         if (!snap.exists()) return;
 
         const data = snap.data();
+        siteSettings = data;
+        siteSettingsLoaded = true;
 
         const rawUrl = data.guestBannerUrl || "";
         if (rawUrl) {
@@ -705,6 +750,8 @@
         });
       } catch (error) {
         console.error("Site settings load error:", error);
+        siteSettingsLoaded = false;
+        throw error;
       }
     }
 
@@ -764,7 +811,19 @@
     }
 
     async function renderComics() {
-      const [comics, ratings] = await Promise.all([loadComics(), loadRatings()]);
+      let comics, ratings;
+      try {
+        [comics, ratings] = await Promise.all([loadComics(), loadRatings()]);
+      } catch (error) {
+        console.error("Catalog load error:", error);
+        comicsGrid.innerHTML = `
+          <div class="empty-state">
+            ⚠️ Не вдалося завантажити комікси.<br><br>
+            <button class="retry-btn" type="button" onclick="location.reload()">↻ Спробувати ще раз</button>
+          </div>
+        `;
+        return;
+      }
 
       if (comics.length === 0) {
         comicsGrid.innerHTML = `
@@ -856,11 +915,36 @@
       });
     }
 
-    loadSiteSettings();
+    const settingsPromise = loadSiteSettings().catch(error => {
+      authLoading.classList.add("hidden");
+      loadErrorSection.style.display = "block";
+      return null;
+    });
 
     onAuthStateChanged(auth, async (user) => {
       currentUser = user;
+      await settingsPromise;
       authLoading.classList.add("hidden");
+
+      if (!siteSettingsLoaded) {
+        guestSection.style.display = "none";
+        catalogSection.style.display = "none";
+        return;
+      }
+
+      const isAdminUser = Boolean(user && user.uid === ADMIN_UID);
+      if (siteSettings.maintenanceMode && !isAdminUser) {
+        guestSection.style.display = "none";
+        catalogSection.style.display = "none";
+        loadErrorSection.style.display = "none";
+        maintenanceText.textContent =
+          siteSettings.maintenanceMessage || "Вибачте, технічні роботи. Адмін працює 🛠️";
+        maintenanceSection.style.display = "block";
+        return;
+      }
+
+      maintenanceSection.style.display = "none";
+      loadErrorSection.style.display = "none";
 
       if (user) {
         const blockedSnap = await getDoc(doc(db, "blocked_users", user.uid));

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Технічні роботи | Comic Cards</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:#111;color:#fff;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;padding:20px}
+    .box{width:min(650px,100%);background:#1a1a1a;border:1px solid #303030;border-radius:18px;padding:48px 28px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+    .icon{font-size:62px;margin-bottom:14px}
+    h1{margin:0 0 14px;font-size:34px}
+    p{margin:0 auto 24px;color:#aaa;line-height:1.65;max-width:520px}
+    button,a{display:inline-flex;align-items:center;justify-content:center;padding:12px 18px;border:0;border-radius:9px;background:#ff9800;color:#fff;text-decoration:none;font-weight:800;cursor:pointer;font-size:15px}
+  </style>
+</head>
+<body>
+  <main class="box">
+    <div class="icon">🛠️</div>
+    <h1>Технічні роботи</h1>
+    <p id="message">Вибачте, технічні роботи. Адмін працює 🛠️</p>
+    <a href="index.html">↻ Перевірити сайт</a>
+  </main>
+
+  <script type="module">
+    import { auth } from './js/firebase.js';
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const db = getFirestore(auth.app);
+    const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
+    const message = document.getElementById("message");
+
+    async function check() {
+      try {
+        const snap = await getDoc(doc(db, "site_settings", "home"));
+        const data = snap.exists() ? snap.data() : {};
+
+        if (!data.maintenanceMode) {
+          location.href = "index.html";
+          return;
+        }
+
+        message.textContent =
+          data.maintenanceMessage || "Вибачте, технічні роботи. Адмін працює 🛠️";
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    onAuthStateChanged(auth, user => {
+      if (user?.uid === ADMIN_UID) {
+        location.href = "index.html";
+        return;
+      }
+      check();
+    });
+  </script>
+</body>
+</html>

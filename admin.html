@@ -764,6 +764,39 @@
       line-height:1.5;
     }
 
+    .maintenance-panel{
+      max-width:760px;
+    }
+    .maintenance-state{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin:16px 0;
+      padding:14px 16px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#151515;
+    }
+    .maintenance-dot{
+      width:11px;
+      height:11px;
+      border-radius:50%;
+      background:#3ca65a;
+      box-shadow:0 0 0 4px rgba(60,166,90,.12);
+    }
+    .maintenance-state.on .maintenance-dot{
+      background:#e25555;
+      box-shadow:0 0 0 4px rgba(226,85,85,.12);
+    }
+    .maintenance-toggle{
+      width:auto;
+      min-width:240px;
+      background:#6d2b2b;
+    }
+    .maintenance-toggle.off{
+      background:#2d6b3d;
+    }
+
     @media (max-width: 900px) {
       body {
         display: block;
@@ -853,6 +886,10 @@
 
     <div class="menu-item" data-section="stats">
       <span>📊</span> Статистика
+    </div>
+
+    <div class="menu-item" data-section="maintenance">
+      <span>🛠️</span> Технічні роботи
     </div>
 
     <div class="menu-item" data-section="settings">
@@ -1102,6 +1139,32 @@
         <div class="placeholder">
           <h2>Статистика</h2>
           <p>Тут буде аналітика</p>
+        </div>
+      </section>
+
+      <!-- Технічні роботи -->
+      <section class="section" id="maintenance">
+        <div class="panel maintenance-panel">
+          <h2>🛠️ Технічні роботи</h2>
+          <p class="panel-subtitle">
+            Однією кнопкою можна тимчасово закрити сайт для звичайних користувачів.
+            Адміністратор продовжить мати доступ.
+          </p>
+
+          <div class="maintenance-state" id="maintenanceState">
+            <span class="maintenance-dot"></span>
+            <strong id="maintenanceStatusText">Сайт працює нормально</strong>
+          </div>
+
+          <div class="form-group">
+            <label for="maintenanceMessage">Повідомлення для користувачів</label>
+            <textarea id="maintenanceMessage">Вибачте, технічні роботи. Адмін працює 🛠️</textarea>
+          </div>
+
+          <button class="primary-btn maintenance-toggle" id="maintenanceToggleBtn" type="button">
+            🛠️ Увімкнути технічні роботи
+          </button>
+          <div id="maintenanceMessageBox" class="message"></div>
         </div>
       </section>
 
@@ -1386,6 +1449,7 @@
       users: "Користувачі",
       qr: "QR-коди",
       stats: "Статистика",
+      maintenance: "Технічні роботи",
       settings: "Налаштування"
     };
 
@@ -1406,6 +1470,9 @@
         if (id === "figures") {
           refreshFigureComicSelect();
           renderFigures();
+        }
+        if (id === "maintenance") {
+          loadMaintenanceMode();
         }
       });
     });
@@ -1921,6 +1988,78 @@
     figureViewerClose.addEventListener("click",closeFigureViewer);
     figureViewer.addEventListener("click",e=>{if(e.target===figureViewer)closeFigureViewer();});
     document.addEventListener("keydown",e=>{if(e.key==="Escape"&&figureViewer.classList.contains("show"))closeFigureViewer();});
+
+
+    // ===== Технічні роботи =====
+    const maintenanceState = document.getElementById("maintenanceState");
+    const maintenanceStatusText = document.getElementById("maintenanceStatusText");
+    const maintenanceToggleBtn = document.getElementById("maintenanceToggleBtn");
+    const maintenanceMessage = document.getElementById("maintenanceMessage");
+    const maintenanceMessageBox = document.getElementById("maintenanceMessageBox");
+    let maintenanceEnabled = false;
+
+    function showMaintenanceMessage(text, type) {
+      maintenanceMessageBox.textContent = text;
+      maintenanceMessageBox.className = `message show ${type}`;
+      clearTimeout(showMaintenanceMessage.timeout);
+      showMaintenanceMessage.timeout = setTimeout(() => {
+        maintenanceMessageBox.className = "message";
+      }, 3500);
+    }
+
+    function renderMaintenanceState() {
+      maintenanceState.classList.toggle("on", maintenanceEnabled);
+      maintenanceStatusText.textContent = maintenanceEnabled
+        ? "Сайт закритий на технічні роботи"
+        : "Сайт працює нормально";
+
+      maintenanceToggleBtn.textContent = maintenanceEnabled
+        ? "✅ Завершити технічні роботи"
+        : "🛠️ Увімкнути технічні роботи";
+
+      maintenanceToggleBtn.classList.toggle("off", maintenanceEnabled);
+    }
+
+    async function loadMaintenanceMode() {
+      try {
+        const snap = await getDoc(doc(db, "site_settings", "home"));
+        const data = snap.exists() ? snap.data() : {};
+        maintenanceEnabled = Boolean(data.maintenanceMode);
+        maintenanceMessage.value =
+          data.maintenanceMessage || "Вибачте, технічні роботи. Адмін працює 🛠️";
+        renderMaintenanceState();
+      } catch (error) {
+        console.error("Maintenance load error:", error);
+        showMaintenanceMessage("Не вдалося завантажити стан технічних робіт.", "error");
+      }
+    }
+
+    maintenanceToggleBtn.addEventListener("click", async () => {
+      try {
+        maintenanceToggleBtn.disabled = true;
+        const next = !maintenanceEnabled;
+
+        await setDoc(doc(db, "site_settings", "home"), {
+          maintenanceMode: next,
+          maintenanceMessage:
+            maintenanceMessage.value.trim() || "Вибачте, технічні роботи. Адмін працює 🛠️",
+          maintenanceUpdatedAt: serverTimestamp()
+        }, { merge:true });
+
+        maintenanceEnabled = next;
+        renderMaintenanceState();
+
+        showMaintenanceMessage(
+          next ? "Технічні роботи увімкнено 🛠️" : "Сайт знову відкритий ✅",
+          "success"
+        );
+      } catch (error) {
+        console.error("Maintenance save error:", error);
+        showMaintenanceMessage("Не вдалося змінити режим.", "error");
+      } finally {
+        maintenanceToggleBtn.disabled = false;
+      }
+    });
 
     // ===== Банер головної сторінки =====
     const guestBannerUrl = document.getElementById("guestBannerUrl");
