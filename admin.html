@@ -561,30 +561,15 @@
     .figure-delete-btn{background:#2a2a2a;color:#ddd}
     .figure-viewer{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.84);display:none;align-items:center;justify-content:center;padding:20px}
     .figure-viewer.show{display:flex}
-    .figure-viewer-modal{width:min(980px,96vw);max-height:92vh;overflow:auto;background:#151515;border:1px solid #333;border-radius:16px;padding:20px;display:grid;grid-template-columns:minmax(320px,500px) 1fr;gap:22px;position:relative}
-    .figure-video-stage{min-height:560px;display:flex;align-items:center;justify-content:center;touch-action:none;user-select:none;cursor:grab;background:#0c0c0c;border-radius:14px;overflow:hidden;position:relative}
-    .figure-video-stage.dragging{cursor:grabbing}
-    .figure-video-stage video{width:100%;height:100%;max-height:76vh;object-fit:contain;display:block;pointer-events:none}
-    .figure-video-fallback{position:absolute;inset:0;display:none;align-items:center;justify-content:center}
-    .figure-video-fallback img{width:100%;height:100%;object-fit:contain}
-    .figure-video-stage.no-video .figure-video-fallback{display:flex}
-    .figure-video-stage.no-video video{display:none}
-    .figure-video-status{
-      position:absolute;
-      left:12px;
-      right:12px;
-      bottom:12px;
-      padding:8px 10px;
-      border-radius:8px;
-      background:rgba(0,0,0,.58);
-      color:#ddd;
-      font-size:12px;
-      text-align:center;
-      pointer-events:none;
-      display:none;
-    }
-    .figure-video-stage.loading .figure-video-status{display:block}
-    .figure-video-stage.video-error .figure-video-status{display:block;color:#ff9a9a}
+    .figure-viewer-modal{width:min(940px,96vw);max-height:92vh;overflow:auto;background:#151515;border:1px solid #333;border-radius:16px;padding:20px;display:grid;grid-template-columns:minmax(320px,480px) 1fr;gap:22px;position:relative}
+    .figure-flip-stage{min-height:560px;display:flex;align-items:center;justify-content:center;perspective:1100px;touch-action:none;user-select:none;cursor:grab;background:#0c0c0c;border-radius:14px;overflow:hidden}
+    .figure-flip-stage.dragging{cursor:grabbing}
+    .figure-flip-card{position:relative;width:min(390px,82%);aspect-ratio:3/4;transform-style:preserve-3d;transition:transform .35s cubic-bezier(.2,.8,.2,1);will-change:transform}
+    .figure-flip-stage.dragging .figure-flip-card{transition:none}
+    .figure-flip-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+    .figure-flip-face.front{transform:rotateY(0deg)}
+    .figure-flip-face.back{transform:rotateY(180deg)}
+    .figure-flip-face img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;filter:drop-shadow(0 18px 18px rgba(0,0,0,.42))}
     .figure-viewer-info h3{font-size:28px;margin:0 0 10px}
     .figure-viewer-comic{color:#aaa;margin-bottom:14px}
     .figure-viewer-description{color:#c7c7c7;line-height:1.6;white-space:pre-wrap}
@@ -823,20 +808,24 @@
               </div>
 
               <div class="form-group">
-                <label for="figureImageUrl">Зображення фігурки / обкладинка</label>
+                <label for="figureImageUrl">Передня сторона</label>
                 <input id="figureImageUrl" type="url" placeholder="https://drive.google.com/file/d/...">
-                <div class="hint">Це зображення буде показуватися на поличці.</div>
+                <div class="hint">Передня сторона буде показуватися на поличці.</div>
               </div>
 
               <div class="cover-preview" id="figurePreview">
-                <span class="cover-placeholder">🧍 Тут буде фігурка</span>
-                <img id="figurePreviewImg" alt="Попередній перегляд фігурки">
+                <span class="cover-placeholder">🧍 Передня сторона</span>
+                <img id="figurePreviewImg" alt="Фігурка спереду">
               </div>
 
               <div class="form-group">
-                <label for="figureVideoUrl">360° відео для інтерактивного перегляду</label>
-                <input id="figureVideoUrl" type="url" placeholder="Google Drive: https://drive.google.com/file/d/.../view">
-                <div class="hint">Можна вставити звичайне посилання на сам MP4-файл у Google Drive. Доступ файла: «Усі, хто має посилання». Сайт сам перетворить його для відеоплеєра.</div>
+                <label for="figureBackUrl">Задня сторона</label>
+                <input id="figureBackUrl" type="url" placeholder="https://drive.google.com/file/d/...">
+              </div>
+
+              <div class="cover-preview" id="figureBackPreview">
+                <span class="cover-placeholder">🧍 Задня сторона</span>
+                <img id="figureBackPreviewImg" alt="Фігурка ззаду">
               </div>
 
               <div class="form-group">
@@ -1065,20 +1054,17 @@
   <div class="figure-viewer" id="figureViewer" aria-hidden="true">
     <div class="figure-viewer-modal">
       <button class="figure-viewer-close" id="figureViewerClose" type="button">✕</button>
-
-      <div class="figure-video-stage" id="figureVideoStage" title="Затисни та крути фігурку">
-        <video id="figureViewerVideo" preload="auto" muted playsinline disablepictureinpicture></video>
-        <div class="figure-video-fallback" id="figureVideoFallback">
-          <img id="figureViewerFallbackImg" alt="Фігурка">
+      <div class="figure-flip-stage" id="figureFlipStage" title="Затисни та переверни фігурку">
+        <div class="figure-flip-card" id="figureFlipCard">
+          <div class="figure-flip-face front"><img id="figureViewerFront" alt="Фігурка спереду"></div>
+          <div class="figure-flip-face back"><img id="figureViewerBack" alt="Фігурка ззаду"></div>
         </div>
-        <div class="figure-video-status" id="figureVideoStatus">Завантаження 360° відео…</div>
       </div>
-
       <div class="figure-viewer-info">
         <h3 id="figureViewerName"></h3>
         <div class="figure-viewer-comic" id="figureViewerComic"></div>
         <div class="figure-viewer-description" id="figureViewerDescription"></div>
-        <div class="figure-viewer-hint">🖱️ Затисни фігурку й тягни вліво або вправо для 360° перегляду.</div>
+        <div class="figure-viewer-hint">🖱️ Затисни й потягни вбік, щоб перевернути фігурку.</div>
       </div>
     </div>
   </div>
@@ -1584,10 +1570,12 @@
     const figureComic=document.getElementById("figureComic");
     const figureName=document.getElementById("figureName");
     const figureImageUrl=document.getElementById("figureImageUrl");
-    const figureVideoUrl=document.getElementById("figureVideoUrl");
+    const figureBackUrl=document.getElementById("figureBackUrl");
     const figureDescription=document.getElementById("figureDescription");
     const figurePreview=document.getElementById("figurePreview");
     const figurePreviewImg=document.getElementById("figurePreviewImg");
+    const figureBackPreview=document.getElementById("figureBackPreview");
+    const figureBackPreviewImg=document.getElementById("figureBackPreviewImg");
     const figureSubmitBtn=document.getElementById("figureSubmitBtn");
     const cancelFigureEditBtn=document.getElementById("cancelFigureEditBtn");
     const figureMessage=document.getElementById("figureMessage");
@@ -1595,10 +1583,10 @@
     const figureFormTitle=document.getElementById("figureFormTitle");
     const figureViewer=document.getElementById("figureViewer");
     const figureViewerClose=document.getElementById("figureViewerClose");
-    const figureVideoStage=document.getElementById("figureVideoStage");
-    const figureViewerVideo=document.getElementById("figureViewerVideo");
-    const figureViewerFallbackImg=document.getElementById("figureViewerFallbackImg");
-    const figureVideoStatus=document.getElementById("figureVideoStatus");
+    const figureFlipStage=document.getElementById("figureFlipStage");
+    const figureFlipCard=document.getElementById("figureFlipCard");
+    const figureViewerFront=document.getElementById("figureViewerFront");
+    const figureViewerBack=document.getElementById("figureViewerBack");
     const figureViewerName=document.getElementById("figureViewerName");
     const figureViewerComic=document.getElementById("figureViewerComic");
     const figureViewerDescription=document.getElementById("figureViewerDescription");
@@ -1611,14 +1599,20 @@
       showFigureMessage.timeout=setTimeout(()=>figureMessage.className="message",3500);
     }
 
-    function updateFigurePreview(){
-      const url=figureImageUrl.value.trim();
-      if(!url){figurePreview.classList.remove("has-image");figurePreviewImg.removeAttribute("src");return;}
-      figurePreviewImg.src=getCoverImageUrl(url);
-      figurePreview.classList.add("has-image");
+    function updateOneFigurePreview(input,box,img){
+      const url=input.value.trim();
+      if(!url){box.classList.remove("has-image");img.removeAttribute("src");return;}
+      img.src=getCoverImageUrl(url);
+      box.classList.add("has-image");
     }
-    figureImageUrl.addEventListener("input",updateFigurePreview);
+    function updateFigurePreview(){
+      updateOneFigurePreview(figureImageUrl,figurePreview,figurePreviewImg);
+      updateOneFigurePreview(figureBackUrl,figureBackPreview,figureBackPreviewImg);
+    }
+    figureImageUrl.addEventListener("input",()=>updateOneFigurePreview(figureImageUrl,figurePreview,figurePreviewImg));
+    figureBackUrl.addEventListener("input",()=>updateOneFigurePreview(figureBackUrl,figureBackPreview,figureBackPreviewImg));
     figurePreviewImg.addEventListener("error",()=>{figurePreview.classList.remove("has-image");figurePreviewImg.removeAttribute("src");});
+    figureBackPreviewImg.addEventListener("error",()=>{figureBackPreview.classList.remove("has-image");figureBackPreviewImg.removeAttribute("src");});
 
     async function refreshFigureComicSelect(){
       const comics=await loadComics();
@@ -1668,29 +1662,15 @@
         if(!figure)return;
         const comics=await loadComics();
         const comic=comics.find(c=>c.id===figure.comicId);
-
+        const front=figure.image||figure.frontImage||"";
+        const back=figure.backImage||front;
+        figureViewerFront.src=front?getCoverImageUrl(front):"";
+        figureViewerBack.src=back?getCoverImageUrl(back):"";
+        figureFlipRotation=0;
+        figureFlipCard.style.transform="rotateY(0deg)";
         figureViewerName.textContent=figure.name||"Без назви";
         figureViewerComic.textContent=comic?.title||"Невідомий комікс";
         figureViewerDescription.textContent=figure.description||"Без опису";
-        figureViewerFallbackImg.src=figure.image?getCoverImageUrl(figure.image):"";
-
-        const videoUrl=getFigureVideoUrl(figure.video360||"");
-
-        figureVideoStage.classList.remove("loading","video-error","no-video");
-        figureVideoStatus.textContent="Завантаження 360° відео…";
-
-        if(videoUrl){
-          figureVideoStage.classList.add("loading");
-          figureViewerVideo.controls=false;
-          figureViewerVideo.pause();
-          figureViewerVideo.src=videoUrl;
-          figureViewerVideo.load();
-        }else{
-          figureVideoStage.classList.add("no-video");
-          figureViewerVideo.removeAttribute("src");
-          figureViewerVideo.load();
-        }
-
         figureViewer.classList.add("show");
         figureViewer.setAttribute("aria-hidden","false");
         document.body.style.overflow="hidden";
@@ -1704,7 +1684,7 @@
         figureComic.value=figure.comicId||"";
         figureName.value=figure.name||"";
         figureImageUrl.value=figure.image||figure.frontImage||"";
-        figureVideoUrl.value=figure.video360||"";
+        figureBackUrl.value=figure.backImage||"";
         figureDescription.value=figure.description||"";
         updateFigurePreview();
         figureFormTitle.textContent="✏️ Редагувати фігурку";
@@ -1729,7 +1709,8 @@
         comicId:figureComic.value,
         name:figureName.value.trim(),
         image:figureImageUrl.value.trim(),
-        video360:figureVideoUrl.value.trim(),
+        frontImage:figureImageUrl.value.trim(),
+        backImage:figureBackUrl.value.trim(),
         description:figureDescription.value.trim()
       };
       if(!data.comicId||!data.name){showFigureMessage("Обери комікс і введи назву фігурки.","error");return;}
@@ -1758,72 +1739,46 @@
       cancelFigureEditBtn.style.display="none";
     });
 
-    // Відео завжди стоїть на паузі. Рух мишки/пальця змінює currentTime.
-    let figureScrubbing=false;
-    let figurePointerId=null;
-    let figureStartX=0;
-    let figureStartTime=0;
+    let figureFlipDragging=false;
+    let figureFlipPointerId=null;
+    let figureFlipStartX=0;
+    let figureFlipStartRotation=0;
+    let figureFlipRotation=0;
 
-    figureViewerVideo.addEventListener("play",()=>figureViewerVideo.pause());
-
-    figureViewerVideo.addEventListener("loadedmetadata",()=>{
-      figureVideoStage.classList.remove("loading","video-error");
-      try{
-        figureViewerVideo.currentTime=0.001;
-        figureViewerVideo.pause();
-      }catch(e){}
-    });
-
-    figureViewerVideo.addEventListener("canplay",()=>{
-      figureVideoStage.classList.remove("loading","video-error");
-      figureViewerVideo.pause();
-    });
-
-    figureViewerVideo.addEventListener("error",()=>{
-      figureVideoStage.classList.remove("loading");
-      figureVideoStage.classList.add("video-error");
-      figureVideoStatus.textContent="Не вдалося відкрити відео. Перевір доступ Google Drive: «Усі, хто має посилання».";
-    });
-
-    figureVideoStage.addEventListener("pointerdown",event=>{
+    figureFlipStage.addEventListener("pointerdown",event=>{
       if(!figureViewer.classList.contains("show"))return;
-      if(figureVideoStage.classList.contains("no-video")||figureVideoStage.classList.contains("video-error"))return;
-      if(figureViewerVideo.readyState<1||!Number.isFinite(figureViewerVideo.duration)||figureViewerVideo.duration<=0)return;
-      figureScrubbing=true;
-      figurePointerId=event.pointerId;
-      figureStartX=event.clientX;
-      figureStartTime=figureViewerVideo.currentTime||0;
-      figureVideoStage.classList.add("dragging");
-      figureVideoStage.setPointerCapture(event.pointerId);
+      figureFlipDragging=true;
+      figureFlipPointerId=event.pointerId;
+      figureFlipStartX=event.clientX;
+      figureFlipStartRotation=figureFlipRotation;
+      figureFlipStage.classList.add("dragging");
+      figureFlipStage.setPointerCapture(event.pointerId);
     });
-
-    figureVideoStage.addEventListener("pointermove",event=>{
-      if(!figureScrubbing||event.pointerId!==figurePointerId)return;
-      const duration=figureViewerVideo.duration;
-      if(!Number.isFinite(duration)||duration<=0)return;
-      const width=Math.max(1,figureVideoStage.getBoundingClientRect().width);
-      const delta=((event.clientX-figureStartX)/width)*duration;
-      let next=figureStartTime+delta;
-      next=((next%duration)+duration)%duration;
-      figureViewerVideo.currentTime=next;
-      figureViewerVideo.pause();
+    figureFlipStage.addEventListener("pointermove",event=>{
+      if(!figureFlipDragging||event.pointerId!==figureFlipPointerId)return;
+      const width=Math.max(1,figureFlipStage.getBoundingClientRect().width);
+      const dx=event.clientX-figureFlipStartX;
+      figureFlipRotation=figureFlipStartRotation+(dx/width)*220;
+      figureFlipCard.style.transform=`rotateY(${figureFlipRotation}deg)`;
     });
-
-    function finishFigureScrub(event){
-      if(!figureScrubbing)return;
-      if(event&&figurePointerId!==null&&event.pointerId!==figurePointerId)return;
-      figureScrubbing=false;
-      figurePointerId=null;
-      figureVideoStage.classList.remove("dragging");
-      figureViewerVideo.pause();
+    function finishFigureFlip(event){
+      if(!figureFlipDragging)return;
+      if(event&&figureFlipPointerId!==null&&event.pointerId!==figureFlipPointerId)return;
+      figureFlipDragging=false;
+      figureFlipPointerId=null;
+      figureFlipStage.classList.remove("dragging");
+      const normalized=((figureFlipRotation%360)+360)%360;
+      const showBack=normalized>90&&normalized<270;
+      figureFlipRotation=showBack?180:0;
+      figureFlipCard.style.transform=`rotateY(${figureFlipRotation}deg)`;
     }
-    figureVideoStage.addEventListener("pointerup",finishFigureScrub);
-    figureVideoStage.addEventListener("pointercancel",finishFigureScrub);
-    figureVideoStage.addEventListener("lostpointercapture",()=>{if(figureScrubbing)finishFigureScrub();});
-
+    figureFlipStage.addEventListener("pointerup",finishFigureFlip);
+    figureFlipStage.addEventListener("pointercancel",finishFigureFlip);
+    figureFlipStage.addEventListener("lostpointercapture",()=>{if(figureFlipDragging)finishFigureFlip();});
     function closeFigureViewer(){
-      finishFigureScrub();
-      figureViewerVideo.pause();
+      figureFlipDragging=false;
+      figureFlipRotation=0;
+      figureFlipCard.style.transform="rotateY(0deg)";
       figureViewer.classList.remove("show");
       figureViewer.setAttribute("aria-hidden","true");
       document.body.style.overflow="";
