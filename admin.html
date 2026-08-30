@@ -543,6 +543,31 @@
       display: none;
     }
 
+
+    /* ===== Фігурки і поличка ===== */
+    .figures-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px}
+    .figure-card{background:#151515;border:1px solid #2c2c2c;border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+    .figure-image{aspect-ratio:3/4;background:#0e0e0e;overflow:hidden}
+    .figure-image img{width:100%;height:100%;object-fit:cover;display:block}
+    .figure-info{padding:14px;display:flex;flex-direction:column;gap:9px;flex:1}
+    .figure-title{font-size:16px;font-weight:800}
+    .figure-comic{color:#9a9a9a;font-size:12px}
+    .figure-description{color:#8f8f8f;font-size:13px;line-height:1.45;flex:1}
+    .figure-actions{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+    .figure-view-btn,.figure-edit-btn,.figure-delete-btn{border:none;border-radius:8px;padding:10px 11px;cursor:pointer;font-size:13px;font-weight:800}
+    .figure-view-btn{background:#3b3152;color:#eee2ff}
+    .figure-edit-btn{background:#2b3a4a;color:#dbeeff}
+    .figure-delete-btn{background:#2a2a2a;color:#ddd}
+    .figure-viewer{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.84);display:none;align-items:center;justify-content:center;padding:20px}
+    .figure-viewer.show{display:flex}
+    .figure-viewer-modal{width:min(900px,96vw);max-height:92vh;overflow:auto;background:#151515;border:1px solid #333;border-radius:16px;padding:20px;display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:20px;position:relative}
+    .figure-viewer-image img{width:100%;height:auto;max-height:80vh;object-fit:contain;display:block;border-radius:12px}
+    .figure-viewer-info h3{font-size:28px;margin:0 0 10px}
+    .figure-viewer-comic{color:#aaa;margin-bottom:14px}
+    .figure-viewer-description{color:#c7c7c7;line-height:1.6;white-space:pre-wrap}
+    .figure-viewer-close{position:absolute;top:10px;right:10px;width:38px;height:38px;border:0;border-radius:50%;background:#2a2a2a;color:#fff;cursor:pointer;font-size:20px}
+    @media(max-width:760px){.figure-viewer-modal{grid-template-columns:1fr}}
+
     /* ===== Користувачі ===== */
     .users-toolbar {
       display:flex;
@@ -690,8 +715,8 @@
       <span>🃏</span> Картки
     </a>
 
-    <div class="menu-item" data-section="packs">
-      <span>📦</span> Пакунки
+    <div class="menu-item" data-section="figures">
+      <span>🧍</span> Фігурки і поличка
     </div>
 
     <div class="menu-item" data-section="series">
@@ -749,11 +774,52 @@
         </div>
       </section>
 
-      <!-- Пакунки -->
-      <section class="section" id="packs">
-        <div class="placeholder">
-          <h2>Пакунки</h2>
-          <p>Тут буде управління пакунками</p>
+      <!-- Фігурки і поличка -->
+      <section class="section" id="figures">
+        <div class="comics-layout">
+          <div class="panel">
+            <h2 id="figureFormTitle">➕ Додати фігурку</h2>
+            <p class="panel-subtitle">Створи фігурку та прив’яжи її до конкретного коміксу.</p>
+
+            <form id="figureForm">
+              <div class="form-group">
+                <label for="figureComic">Комікс</label>
+                <select id="figureComic" required>
+                  <option value="">— Обери комікс —</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="figureName">Назва фігурки</label>
+                <input id="figureName" type="text" placeholder="Наприклад: Зевс" required>
+              </div>
+
+              <div class="form-group">
+                <label for="figureImageUrl">Посилання на зображення</label>
+                <input id="figureImageUrl" type="url" placeholder="https://drive.google.com/file/d/...">
+              </div>
+
+              <div class="cover-preview" id="figurePreview">
+                <span class="cover-placeholder">🧍 Тут буде фігурка</span>
+                <img id="figurePreviewImg" alt="Попередній перегляд фігурки">
+              </div>
+
+              <div class="form-group">
+                <label for="figureDescription">Опис</label>
+                <textarea id="figureDescription" placeholder="Короткий опис фігурки..."></textarea>
+              </div>
+
+              <button class="primary-btn" id="figureSubmitBtn" type="submit">💾 Додати фігурку</button>
+              <button class="cancel-edit-btn" id="cancelFigureEditBtn" type="button">Скасувати редагування</button>
+              <div id="figureMessage" class="message"></div>
+            </form>
+          </div>
+
+          <div class="panel">
+            <h2>🪵 Поличка фігурок</h2>
+            <p class="panel-subtitle">Тут зберігається бібліотека фігурок.</p>
+            <div class="figures-grid" id="figuresGrid"></div>
+          </div>
         </div>
       </section>
 
@@ -960,6 +1026,19 @@
     </main>
   </div>
 
+
+  <div class="figure-viewer" id="figureViewer" aria-hidden="true">
+    <div class="figure-viewer-modal">
+      <button class="figure-viewer-close" id="figureViewerClose" type="button">✕</button>
+      <div class="figure-viewer-image"><img id="figureViewerImg" alt="Фігурка"></div>
+      <div class="figure-viewer-info">
+        <h3 id="figureViewerName"></h3>
+        <div class="figure-viewer-comic" id="figureViewerComic"></div>
+        <div class="figure-viewer-description" id="figureViewerDescription"></div>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { auth } from './js/firebase.js';
     import {
@@ -1164,7 +1243,7 @@
     const titles = {
       dashboard: "Головна",
       cards: "Картки",
-      packs: "Пакунки",
+      figures: "Фігурки і поличка",
       series: "Серії",
       comics: "Комікси",
       chapters: "Додати розділ",
@@ -1187,6 +1266,10 @@
 
         if (id === "users") {
           loadAdminUsers();
+        }
+        if (id === "figures") {
+          refreshFigureComicSelect();
+          renderFigures();
         }
       });
     });
@@ -1436,6 +1519,172 @@
       cancelComicEditBtn.style.display = "none";
       showMessage("Редагування скасовано.", "success");
     });
+
+
+    // ===== Фігурки і поличка =====
+    const figureForm=document.getElementById("figureForm");
+    const figureComic=document.getElementById("figureComic");
+    const figureName=document.getElementById("figureName");
+    const figureImageUrl=document.getElementById("figureImageUrl");
+    const figureDescription=document.getElementById("figureDescription");
+    const figurePreview=document.getElementById("figurePreview");
+    const figurePreviewImg=document.getElementById("figurePreviewImg");
+    const figureSubmitBtn=document.getElementById("figureSubmitBtn");
+    const cancelFigureEditBtn=document.getElementById("cancelFigureEditBtn");
+    const figureMessage=document.getElementById("figureMessage");
+    const figuresGrid=document.getElementById("figuresGrid");
+    const figureFormTitle=document.getElementById("figureFormTitle");
+    const figureViewer=document.getElementById("figureViewer");
+    const figureViewerClose=document.getElementById("figureViewerClose");
+    const figureViewerImg=document.getElementById("figureViewerImg");
+    const figureViewerName=document.getElementById("figureViewerName");
+    const figureViewerComic=document.getElementById("figureViewerComic");
+    const figureViewerDescription=document.getElementById("figureViewerDescription");
+    let editingFigureId=null;
+
+    function showFigureMessage(text,type){
+      figureMessage.textContent=text;
+      figureMessage.className=`message show ${type}`;
+      clearTimeout(showFigureMessage.timeout);
+      showFigureMessage.timeout=setTimeout(()=>figureMessage.className="message",3500);
+    }
+
+    function updateFigurePreview(){
+      const url=figureImageUrl.value.trim();
+      if(!url){figurePreview.classList.remove("has-image");figurePreviewImg.removeAttribute("src");return;}
+      figurePreviewImg.src=getCoverImageUrl(url);
+      figurePreview.classList.add("has-image");
+    }
+    figureImageUrl.addEventListener("input",updateFigurePreview);
+    figurePreviewImg.addEventListener("error",()=>{figurePreview.classList.remove("has-image");figurePreviewImg.removeAttribute("src");});
+
+    async function refreshFigureComicSelect(){
+      const comics=await loadComics();
+      const current=figureComic.value;
+      figureComic.innerHTML='<option value="">— Обери комікс —</option>';
+      comics.forEach(comic=>{
+        const option=document.createElement("option");
+        option.value=comic.id;
+        option.textContent=comic.title;
+        figureComic.appendChild(option);
+      });
+      if(comics.some(c=>c.id===current)) figureComic.value=current;
+    }
+
+    async function loadFigures(){
+      const snap=await getDocs(collection(db,"figures"));
+      return snap.docs.map(d=>({id:d.id,...d.data()}));
+    }
+
+    async function renderFigures(){
+      const [figures,comics]=await Promise.all([loadFigures(),loadComics()]);
+      if(!figures.length){
+        figuresGrid.innerHTML='<div class="empty-state">🧍 Фігурок поки що немає.<br>Додай першу через форму зліва.</div>';
+        return;
+      }
+
+      figuresGrid.innerHTML=figures.map(figure=>{
+        const comic=comics.find(c=>c.id===figure.comicId);
+        const image=figure.image?getCoverImageUrl(figure.image):"data:image/svg+xml;charset=UTF-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800"><rect width="100%" height="100%" fill="#101010"/><text x="50%" y="50%" text-anchor="middle" fill="#666" font-size="42">FIGURE</text></svg>');
+        return `
+          <article class="figure-card">
+            <div class="figure-image"><img src="${escapeHtml(image)}" alt="${escapeHtml(figure.name||"Фігурка")}"></div>
+            <div class="figure-info">
+              <div class="figure-title">${escapeHtml(figure.name||"Без назви")}</div>
+              <div class="figure-comic">${escapeHtml(comic?.title||"Невідомий комікс")}</div>
+              <div class="figure-description">${escapeHtml(figure.description||"Без опису")}</div>
+              <div class="figure-actions">
+                <button class="figure-view-btn" type="button" data-figure-view="${escapeHtml(figure.id)}">👁 Перегляд</button>
+                <button class="figure-edit-btn" type="button" data-figure-edit="${escapeHtml(figure.id)}">✏️ Редагувати</button>
+                <button class="figure-delete-btn" type="button" data-figure-delete="${escapeHtml(figure.id)}">🗑️</button>
+              </div>
+            </div>
+          </article>`;
+      }).join("");
+
+      document.querySelectorAll("[data-figure-view]").forEach(button=>button.addEventListener("click",async()=>{
+        const figures=await loadFigures();
+        const figure=figures.find(x=>x.id===button.dataset.figureView);
+        if(!figure)return;
+        const comics=await loadComics();
+        const comic=comics.find(c=>c.id===figure.comicId);
+        figureViewerImg.src=figure.image?getCoverImageUrl(figure.image):"";
+        figureViewerName.textContent=figure.name||"Без назви";
+        figureViewerComic.textContent=comic?.title||"Невідомий комікс";
+        figureViewerDescription.textContent=figure.description||"Без опису";
+        figureViewer.classList.add("show");
+        figureViewer.setAttribute("aria-hidden","false");
+        document.body.style.overflow="hidden";
+      }));
+
+      document.querySelectorAll("[data-figure-edit]").forEach(button=>button.addEventListener("click",async()=>{
+        const figures=await loadFigures();
+        const figure=figures.find(x=>x.id===button.dataset.figureEdit);
+        if(!figure)return;
+        editingFigureId=figure.id;
+        figureComic.value=figure.comicId||"";
+        figureName.value=figure.name||"";
+        figureImageUrl.value=figure.image||"";
+        figureDescription.value=figure.description||"";
+        updateFigurePreview();
+        figureFormTitle.textContent="✏️ Редагувати фігурку";
+        figureSubmitBtn.textContent="💾 Зберегти зміни";
+        cancelFigureEditBtn.style.display="block";
+        window.scrollTo({top:0,behavior:"smooth"});
+      }));
+
+      document.querySelectorAll("[data-figure-delete]").forEach(button=>button.addEventListener("click",async()=>{
+        const figures=await loadFigures();
+        const figure=figures.find(x=>x.id===button.dataset.figureDelete);
+        if(!figure)return;
+        if(!confirm(`Фігурку «${figure.name||"Без назви"}» буде видалено. Ви впевнені?`))return;
+        await deleteDoc(doc(db,"figures",figure.id));
+        await renderFigures();
+      }));
+    }
+
+    figureForm.addEventListener("submit",async event=>{
+      event.preventDefault();
+      const data={
+        comicId:figureComic.value,
+        name:figureName.value.trim(),
+        image:figureImageUrl.value.trim(),
+        description:figureDescription.value.trim()
+      };
+      if(!data.comicId||!data.name){showFigureMessage("Обери комікс і введи назву фігурки.","error");return;}
+      if(editingFigureId){
+        await setDoc(doc(db,"figures",editingFigureId),{...data,updatedAt:serverTimestamp()},{merge:true});
+        showFigureMessage("Фігурку оновлено ✅","success");
+      }else{
+        await addDoc(collection(db,"figures"),{...data,createdAt:serverTimestamp()});
+        showFigureMessage("Фігурку додано ✅","success");
+      }
+      editingFigureId=null;
+      figureForm.reset();
+      updateFigurePreview();
+      figureFormTitle.textContent="➕ Додати фігурку";
+      figureSubmitBtn.textContent="💾 Додати фігурку";
+      cancelFigureEditBtn.style.display="none";
+      await renderFigures();
+    });
+
+    cancelFigureEditBtn.addEventListener("click",()=>{
+      editingFigureId=null;
+      figureForm.reset();
+      updateFigurePreview();
+      figureFormTitle.textContent="➕ Додати фігурку";
+      figureSubmitBtn.textContent="💾 Додати фігурку";
+      cancelFigureEditBtn.style.display="none";
+    });
+
+    function closeFigureViewer(){
+      figureViewer.classList.remove("show");
+      figureViewer.setAttribute("aria-hidden","true");
+      document.body.style.overflow="";
+    }
+    figureViewerClose.addEventListener("click",closeFigureViewer);
+    figureViewer.addEventListener("click",e=>{if(e.target===figureViewer)closeFigureViewer();});
+    document.addEventListener("keydown",e=>{if(e.key==="Escape"&&figureViewer.classList.contains("show"))closeFigureViewer();});
 
     // ===== Банер головної сторінки =====
     const guestBannerUrl = document.getElementById("guestBannerUrl");
@@ -1707,6 +1956,8 @@
       await refreshComicSelect();
       await renderChapters();
       await renderComics();
+      await refreshFigureComicSelect();
+      await renderFigures();
       await loadGuestBanner();
     }
 
