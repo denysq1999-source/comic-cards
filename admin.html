@@ -756,7 +756,131 @@
     .user-action-btn.reset { background:#35516d; }
     .user-action-btn.block { background:#6b2525; }
     .user-action-btn.unblock { background:#26723d; }
+    .user-action-btn.inspect { background:#5b3b79; }
     .user-action-btn:disabled { opacity:.45; cursor:not-allowed; }
+
+    .inventory-mini{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      color:#cfcfcf;
+      font-size:12px;
+    }
+    .inventory-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:5px 8px;
+      border-radius:999px;
+      background:#242424;
+      border:1px solid #343434;
+      white-space:nowrap;
+    }
+    .risk-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:5px 9px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:800;
+      background:#173c23;
+      color:#8fe5a6;
+      white-space:nowrap;
+    }
+    .risk-badge.suspicious{
+      background:#572121;
+      color:#ffabab;
+      border:1px solid #763030;
+    }
+    .risk-badge.warn{
+      background:#4b3719;
+      color:#ffd187;
+      border:1px solid #6b4d20;
+    }
+
+    .inventory-audit-overlay{
+      position:fixed;
+      inset:0;
+      z-index:1500;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      background:rgba(0,0,0,.86);
+    }
+    .inventory-audit-overlay.show{display:flex}
+    .inventory-audit-modal{
+      width:min(920px,96vw);
+      max-height:90vh;
+      overflow:auto;
+      background:#151515;
+      border:1px solid #343434;
+      border-radius:16px;
+      padding:22px;
+      position:relative;
+      box-shadow:0 24px 70px rgba(0,0,0,.55);
+    }
+    .inventory-audit-close{
+      position:absolute;
+      top:12px;
+      right:12px;
+      width:38px;
+      height:38px;
+      border:0;
+      border-radius:50%;
+      background:#292929;
+      color:#fff;
+      cursor:pointer;
+      font-size:19px;
+    }
+    .audit-title{margin:0 48px 6px 0;font-size:24px}
+    .audit-email{color:#8f8f8f;margin-bottom:18px;word-break:break-all}
+    .audit-summary{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(120px,1fr));
+      gap:10px;
+      margin-bottom:18px;
+    }
+    .audit-stat{
+      background:#1d1d1d;
+      border:1px solid #2d2d2d;
+      border-radius:10px;
+      padding:12px;
+    }
+    .audit-stat strong{display:block;font-size:22px;margin-bottom:4px}
+    .audit-stat span{color:#8c8c8c;font-size:12px}
+    .audit-alerts{
+      display:grid;
+      gap:8px;
+      margin:14px 0 20px;
+    }
+    .audit-alert{
+      padding:10px 12px;
+      border-radius:9px;
+      background:#3b1d1d;
+      border:1px solid #612828;
+      color:#ffb0b0;
+      line-height:1.45;
+      font-size:13px;
+    }
+    .audit-ok{
+      padding:10px 12px;
+      border-radius:9px;
+      background:#173c23;
+      border:1px solid #285c39;
+      color:#9ce5ae;
+      font-size:13px;
+    }
+    .audit-section-title{font-size:16px;margin:18px 0 10px}
+    .audit-table-wrap{overflow-x:auto;border:1px solid #2d2d2d;border-radius:10px}
+    .audit-table{width:100%;border-collapse:collapse;min-width:650px}
+    .audit-table th,.audit-table td{padding:9px 11px;border-bottom:1px solid #292929;text-align:left;font-size:12px}
+    .audit-table th{color:#999;background:#191919}
+    .audit-table tr:last-child td{border-bottom:0}
+    @media(max-width:760px){
+      .audit-summary{grid-template-columns:repeat(2,1fr)}
+    }
     .users-note {
       margin-top:12px;
       color:#777;
@@ -1110,12 +1234,14 @@
                 <tr>
                   <th>Email</th>
                   <th>Статус</th>
+                  <th>Інвентар</th>
+                  <th>Ризик</th>
                   <th>Остання активність</th>
                   <th>Дії</th>
                 </tr>
               </thead>
               <tbody id="usersTableBody">
-                <tr><td colspan="4" style="color:#777;">Завантаження...</td></tr>
+                <tr><td colspan="6" style="color:#777;">Завантаження...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1214,6 +1340,43 @@
   </div>
 
 
+  <div class="inventory-audit-overlay" id="inventoryAuditOverlay" aria-hidden="true">
+    <div class="inventory-audit-modal">
+      <button class="inventory-audit-close" id="inventoryAuditClose" type="button">✕</button>
+      <h2 class="audit-title" id="auditTitle">Перевірка інвентарю</h2>
+      <div class="audit-email" id="auditEmail"></div>
+
+      <div class="audit-summary">
+        <div class="audit-stat"><strong id="auditCards">0</strong><span>Карток</span></div>
+        <div class="audit-stat"><strong id="auditFigures">0</strong><span>Фігурок</span></div>
+        <div class="audit-stat"><strong id="auditTenMin">0</strong><span>За 10 хв</span></div>
+        <div class="audit-stat"><strong id="auditHour">0</strong><span>За годину</span></div>
+      </div>
+
+      <div class="audit-alerts" id="auditAlerts"></div>
+
+      <h3 class="audit-section-title">Найчастіші дублікати карток</h3>
+      <div class="audit-table-wrap">
+        <table class="audit-table">
+          <thead>
+            <tr><th>Картка</th><th>Кількість</th><th>Card ID</th></tr>
+          </thead>
+          <tbody id="auditDuplicatesBody"></tbody>
+        </table>
+      </div>
+
+      <h3 class="audit-section-title">Останні отримані предмети</h3>
+      <div class="audit-table-wrap">
+        <table class="audit-table">
+          <thead>
+            <tr><th>Тип</th><th>Назва / ID</th><th>Отримано</th></tr>
+          </thead>
+          <tbody id="auditRecentBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="figure-viewer" id="figureViewer" aria-hidden="true">
     <div class="figure-viewer-modal">
       <button class="figure-viewer-close" id="figureViewerClose" type="button">✕</button>
@@ -1267,8 +1430,24 @@
     const refreshUsersBtn = document.getElementById("refreshUsersBtn");
     const usersTableBody = document.getElementById("usersTableBody");
 
+    const inventoryAuditOverlay = document.getElementById("inventoryAuditOverlay");
+    const inventoryAuditClose = document.getElementById("inventoryAuditClose");
+    const auditTitle = document.getElementById("auditTitle");
+    const auditEmail = document.getElementById("auditEmail");
+    const auditCards = document.getElementById("auditCards");
+    const auditFigures = document.getElementById("auditFigures");
+    const auditTenMin = document.getElementById("auditTenMin");
+    const auditHour = document.getElementById("auditHour");
+    const auditAlerts = document.getElementById("auditAlerts");
+    const auditDuplicatesBody = document.getElementById("auditDuplicatesBody");
+    const auditRecentBody = document.getElementById("auditRecentBody");
+
     let adminUsers = [];
     let blockedUserIds = new Set();
+    let adminUserCards = [];
+    let adminUserFigures = [];
+    let adminCardsCatalog = [];
+    let adminFiguresCatalog = [];
 
 
     // ===== Захист адмінки — Firebase НЕ змінено =====
@@ -1292,17 +1471,108 @@
 
 
     // ===== Керування користувачами =====
+    function toJsDate(value) {
+      if (!value) return null;
+      if (typeof value.toDate === "function") return value.toDate();
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    function formatUserTimestamp(value) {
+      const d = toJsDate(value);
+      return d ? d.toLocaleString("uk-UA") : "—";
+    }
+
+    function getUserInventoryAudit(uid) {
+      const cardsOwned = adminUserCards.filter(item => item.userId === uid);
+      const figuresOwned = adminUserFigures.filter(item => item.userId === uid);
+      const allItems = [
+        ...cardsOwned.map(item => ({...item, itemType:"card"})),
+        ...figuresOwned.map(item => ({...item, itemType:"figure"}))
+      ];
+
+      const now = Date.now();
+      const in10min = allItems.filter(item => {
+        const d = toJsDate(item.obtainedAt);
+        return d && now - d.getTime() <= 10 * 60 * 1000 && now >= d.getTime();
+      }).length;
+
+      const inHour = allItems.filter(item => {
+        const d = toJsDate(item.obtainedAt);
+        return d && now - d.getTime() <= 60 * 60 * 1000 && now >= d.getTime();
+      }).length;
+
+      const duplicates = new Map();
+      cardsOwned.forEach(item => {
+        if (!item.cardId) return;
+        duplicates.set(item.cardId, (duplicates.get(item.cardId) || 0) + 1);
+      });
+
+      const duplicateRows = [...duplicates.entries()]
+        .map(([cardId,count]) => ({cardId,count}))
+        .sort((a,b) => b.count - a.count);
+
+      const maxDuplicate = duplicateRows[0]?.count || 0;
+      const alerts = [];
+
+      // Порогові значення для бети:
+      // 10+ предметів за 10 хв, 50+ за годину, 20+ однакових карток.
+      if (in10min >= 10) alerts.push(`⚠️ ${in10min} предметів отримано за останні 10 хвилин.`);
+      if (inHour >= 50) alerts.push(`⚠️ ${inHour} предметів отримано за останню годину.`);
+      if (maxDuplicate >= 20) alerts.push(`⚠️ Одна картка зустрічається ${maxDuplicate} разів.`);
+
+      let risk = "normal";
+      if (alerts.length >= 2 || in10min >= 20 || inHour >= 100 || maxDuplicate >= 40) {
+        risk = "suspicious";
+      } else if (alerts.length === 1) {
+        risk = "warn";
+      }
+
+      if (uid === ADMIN_UID) {
+        risk = "normal";
+        alerts.length = 0;
+      }
+
+      return {
+        cardsOwned,
+        figuresOwned,
+        allItems,
+        in10min,
+        inHour,
+        duplicateRows,
+        maxDuplicate,
+        alerts,
+        risk
+      };
+    }
+
     async function loadAdminUsers() {
       try {
-        usersTableBody.innerHTML = '<tr><td colspan="4" style="color:#777;">Завантаження...</td></tr>';
+        usersTableBody.innerHTML =
+          '<tr><td colspan="6" style="color:#777;">Завантаження...</td></tr>';
 
-        const [usersSnap, blockedSnap] = await Promise.all([
+        const [
+          usersSnap,
+          blockedSnap,
+          userCardsSnap,
+          userFiguresSnap,
+          cardsSnap,
+          figuresSnap
+        ] = await Promise.all([
           getDocs(collection(db, "users")),
-          getDocs(collection(db, "blocked_users"))
+          getDocs(collection(db, "blocked_users")),
+          getDocs(collection(db, "user_cards")),
+          getDocs(collection(db, "user_figures")),
+          getDocs(collection(db, "cards")),
+          getDocs(collection(db, "figures"))
         ]);
 
         adminUsers = usersSnap.docs.map(d => ({ id:d.id, ...d.data() }));
         blockedUserIds = new Set(blockedSnap.docs.map(d => d.id));
+        adminUserCards = userCardsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+        adminUserFigures = userFiguresSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+        adminCardsCatalog = cardsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+        adminFiguresCatalog = figuresSnap.docs.map(d => ({ id:d.id, ...d.data() }));
 
         adminUsers.sort((a,b) =>
           String(a.email || "").localeCompare(String(b.email || ""), "uk")
@@ -1312,15 +1582,8 @@
       } catch (error) {
         console.error("Users load error:", error);
         usersTableBody.innerHTML =
-          '<tr><td colspan="4" style="color:#ff9292;">Не вдалося завантажити користувачів.</td></tr>';
+          '<tr><td colspan="6" style="color:#ff9292;">Не вдалося завантажити користувачів або інвентарі.</td></tr>';
       }
-    }
-
-    function formatUserTimestamp(value) {
-      if (!value) return "—";
-      if (value.toDate) return value.toDate().toLocaleString("uk-UA");
-      const d = new Date(value);
-      return isNaN(d) ? "—" : d.toLocaleString("uk-UA");
     }
 
     function renderAdminUsers() {
@@ -1332,13 +1595,22 @@
 
       if (!list.length) {
         usersTableBody.innerHTML =
-          '<tr><td colspan="4" style="color:#777;">Користувачів не знайдено.</td></tr>';
+          '<tr><td colspan="6" style="color:#777;">Користувачів не знайдено.</td></tr>';
         return;
       }
 
       usersTableBody.innerHTML = list.map(user => {
         const blocked = blockedUserIds.has(user.id);
         const isSelf = user.id === ADMIN_UID;
+        const audit = getUserInventoryAudit(user.id);
+
+        const riskHtml = isSelf
+          ? '<span class="risk-badge">👑 Адмін</span>'
+          : audit.risk === "suspicious"
+            ? '<span class="risk-badge suspicious">⚠️ Підозрілий</span>'
+            : audit.risk === "warn"
+              ? '<span class="risk-badge warn">👀 Перевірити</span>'
+              : '<span class="risk-badge">✅ Нормально</span>';
 
         return `
           <tr>
@@ -1348,9 +1620,22 @@
                 ${blocked ? "⛔ Заблоковано" : "✅ Активний"}
               </span>
             </td>
+            <td>
+              <div class="inventory-mini">
+                <span class="inventory-pill">🃏 ${audit.cardsOwned.length}</span>
+                <span class="inventory-pill">🧍 ${audit.figuresOwned.length}</span>
+              </div>
+            </td>
+            <td>${riskHtml}</td>
             <td>${escapeHtml(formatUserTimestamp(user.lastSeenAt))}</td>
             <td>
               <div class="user-actions">
+                <button
+                  class="user-action-btn inspect"
+                  type="button"
+                  data-inspect-user="${escapeHtml(user.id)}"
+                >🔎 Інвентар</button>
+
                 <button
                   class="user-action-btn reset"
                   type="button"
@@ -1371,6 +1656,12 @@
           </tr>
         `;
       }).join("");
+
+      document.querySelectorAll("[data-inspect-user]").forEach(button => {
+        button.addEventListener("click", () => {
+          openInventoryAudit(button.dataset.inspectUser);
+        });
+      });
 
       document.querySelectorAll("[data-reset-user]").forEach(button => {
         button.addEventListener("click", async () => {
@@ -1430,6 +1721,100 @@
         });
       });
     }
+
+    function openInventoryAudit(uid) {
+      const user = adminUsers.find(item => item.id === uid);
+      if (!user) return;
+
+      const audit = getUserInventoryAudit(uid);
+
+      auditTitle.textContent =
+        audit.risk === "suspicious"
+          ? "⚠️ Підозрілий інвентар"
+          : audit.risk === "warn"
+            ? "👀 Перевірка інвентарю"
+            : "✅ Інвентар користувача";
+
+      auditEmail.textContent = user.email || uid;
+      auditCards.textContent = audit.cardsOwned.length;
+      auditFigures.textContent = audit.figuresOwned.length;
+      auditTenMin.textContent = audit.in10min;
+      auditHour.textContent = audit.inHour;
+
+      if (audit.alerts.length) {
+        auditAlerts.innerHTML = audit.alerts
+          .map(text => `<div class="audit-alert">${escapeHtml(text)}</div>`)
+          .join("");
+      } else {
+        auditAlerts.innerHTML =
+          '<div class="audit-ok">✅ Автоматичні пороги підозри не спрацювали.</div>';
+      }
+
+      const topDuplicates = audit.duplicateRows.slice(0, 15);
+
+      if (!topDuplicates.length) {
+        auditDuplicatesBody.innerHTML =
+          '<tr><td colspan="3" style="color:#777;">Карток немає.</td></tr>';
+      } else {
+        auditDuplicatesBody.innerHTML = topDuplicates.map(row => {
+          const card = adminCardsCatalog.find(item => item.id === row.cardId);
+          return `
+            <tr>
+              <td>${escapeHtml(card?.name || "Видалена / невідома картка")}</td>
+              <td><strong>${row.count}</strong></td>
+              <td>${escapeHtml(row.cardId)}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      const recent = audit.allItems
+        .map(item => ({...item, _date:toJsDate(item.obtainedAt)}))
+        .sort((a,b) => (b._date?.getTime() || 0) - (a._date?.getTime() || 0))
+        .slice(0, 25);
+
+      if (!recent.length) {
+        auditRecentBody.innerHTML =
+          '<tr><td colspan="3" style="color:#777;">Інвентар порожній.</td></tr>';
+      } else {
+        auditRecentBody.innerHTML = recent.map(item => {
+          const isCard = item.itemType === "card";
+          const catalogItem = isCard
+            ? adminCardsCatalog.find(x => x.id === item.cardId)
+            : adminFiguresCatalog.find(x => x.id === item.figureId);
+
+          const rawId = isCard ? item.cardId : item.figureId;
+
+          return `
+            <tr>
+              <td>${isCard ? "🃏 Картка" : "🧍 Фігурка"}</td>
+              <td>${escapeHtml(catalogItem?.name || rawId || "—")}</td>
+              <td>${escapeHtml(formatUserTimestamp(item.obtainedAt))}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      inventoryAuditOverlay.classList.add("show");
+      inventoryAuditOverlay.setAttribute("aria-hidden","false");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeInventoryAudit() {
+      inventoryAuditOverlay.classList.remove("show");
+      inventoryAuditOverlay.setAttribute("aria-hidden","true");
+      document.body.style.overflow = "";
+    }
+
+    inventoryAuditClose.addEventListener("click", closeInventoryAudit);
+    inventoryAuditOverlay.addEventListener("click", event => {
+      if (event.target === inventoryAuditOverlay) closeInventoryAudit();
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && inventoryAuditOverlay.classList.contains("show")) {
+        closeInventoryAudit();
+      }
+    });
 
     usersSearch?.addEventListener("input", renderAdminUsers);
     refreshUsersBtn?.addEventListener("click", loadAdminUsers);
