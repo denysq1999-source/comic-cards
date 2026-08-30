@@ -314,12 +314,22 @@
   }
 
   function updateStats() {
-    cardsCount.textContent = owned.length;
-    uniqueCount.textContent = new Set(owned.map(o => o.cardId)).size;
+    // Рахуємо тільки ті записи інвентарю, для яких картка ще існує в системі.
+    const existingOwned = owned.filter(o =>
+      cards.some(c => c.id === o.cardId)
+    );
+
+    cardsCount.textContent = existingOwned.length;
+    uniqueCount.textContent = new Set(
+      existingOwned.map(o => o.cardId)
+    ).size;
 
     const comicIds = new Set(
-      owned.map(o => cards.find(c => c.id === o.cardId)?.comicId).filter(Boolean)
+      existingOwned
+        .map(o => cards.find(c => c.id === o.cardId)?.comicId)
+        .filter(Boolean)
     );
+
     comicsCount.textContent = comicIds.size;
   }
 
