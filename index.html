@@ -318,6 +318,36 @@
       line-height: 1.5;
       flex: 1;
     }
+    .comic-content-flags{
+      display:flex;
+      flex-wrap:wrap;
+      gap:7px;
+      margin-top:-1px;
+    }
+    .comic-content-flag{
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:5px 8px;
+      border-radius:999px;
+      background:#4a2323;
+      border:1px solid #6a3030;
+      color:#ffb4b4;
+      font-size:11px;
+      font-weight:800;
+      white-space:nowrap;
+    }
+    .comic-hashtags{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px 9px;
+      color:#ffb347;
+      font-size:12px;
+      line-height:1.4;
+    }
+    .comic-hashtags span{
+      white-space:nowrap;
+    }
 
     .rating-summary {
       display: flex;
@@ -805,6 +835,13 @@
       await renderComics();
     }
 
+    function contentWarningIcon(label) {
+      if (label === "18+") return "🔞";
+      if (label === "Оголеність") return "⚠️";
+      if (label === "Насильство") return "🩸";
+      return "⚠️";
+    }
+
     function starsText(average) {
       const rounded = Math.round(average);
       return "★".repeat(rounded) + "☆".repeat(5 - rounded);
@@ -865,6 +902,22 @@
               <div class="comic-description">
                 ${escapeHtml(comic.description || "Без опису")}
               </div>
+
+              ${Array.isArray(comic.contentWarnings) && comic.contentWarnings.length ? `
+                <div class="comic-content-flags">
+                  ${comic.contentWarnings.map(label => `
+                    <span class="comic-content-flag">
+                      ${contentWarningIcon(label)} ${escapeHtml(label)}
+                    </span>
+                  `).join("")}
+                </div>
+              ` : ""}
+
+              ${Array.isArray(comic.hashtags) && comic.hashtags.length ? `
+                <div class="comic-hashtags">
+                  ${comic.hashtags.map(tag => `<span>#${escapeHtml(tag)}</span>`).join("")}
+                </div>
+              ` : ""}
 
               <div class="rating-summary">
                 <span class="rating-stars">

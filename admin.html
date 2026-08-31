@@ -333,6 +333,54 @@
       flex: 1;
       word-break: break-word;
     }
+    .content-flags-admin{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:2px;
+    }
+    .content-flag-admin{
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:5px 8px;
+      border-radius:999px;
+      background:#4a2323;
+      border:1px solid #6b3030;
+      color:#ffb0b0;
+      font-size:11px;
+      font-weight:800;
+    }
+    .comic-hashtags-admin{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      color:#ffb347;
+      font-size:12px;
+      line-height:1.4;
+    }
+    .content-checks{
+      display:grid;
+      gap:9px;
+      padding:12px;
+      background:#131313;
+      border:1px solid #303030;
+      border-radius:9px;
+    }
+    .content-check{
+      display:flex;
+      align-items:center;
+      gap:9px;
+      color:#ddd;
+      font-size:13px;
+      cursor:pointer;
+    }
+    .content-check input{
+      width:17px;
+      height:17px;
+      accent-color:#ff9800;
+      margin:0;
+    }
 
     .comic-actions {
       display: grid;
@@ -1154,6 +1202,36 @@
                 <textarea id="comicDescription" placeholder="Коротко про комікс..."></textarea>
               </div>
 
+              <div class="form-group">
+                <label>Контентні мітки</label>
+                <div class="content-checks">
+                  <label class="content-check">
+                    <input id="comicAdult18" type="checkbox">
+                    <span>🔞 18+</span>
+                  </label>
+                  <label class="content-check">
+                    <input id="comicNudity" type="checkbox">
+                    <span>⚠️ Оголеність</span>
+                  </label>
+                  <label class="content-check">
+                    <input id="comicViolence" type="checkbox">
+                    <span>🩸 Насильство</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="comicHashtags">Хештеги</label>
+                <input
+                  id="comicHashtags"
+                  type="text"
+                  placeholder="#фентезі #пригоди #вампіри"
+                >
+                <div class="hint">
+                  Можна вводити через пробіл або кому. Символ # можна не ставити.
+                </div>
+              </div>
+
               <button class="primary-btn" id="comicSubmitBtn" type="submit">💾 Додати комікс</button>
               <button class="cancel-edit-btn" id="cancelComicEditBtn" type="button">Скасувати редагування</button>
               <div id="formMessage" class="message"></div>
@@ -1928,6 +2006,10 @@
     const comicTitle = document.getElementById("comicTitle");
     const coverUrl = document.getElementById("coverUrl");
     const comicDescription = document.getElementById("comicDescription");
+    const comicAdult18 = document.getElementById("comicAdult18");
+    const comicNudity = document.getElementById("comicNudity");
+    const comicViolence = document.getElementById("comicViolence");
+    const comicHashtags = document.getElementById("comicHashtags");
     const coverPreview = document.getElementById("coverPreview");
     const coverPreviewImg = document.getElementById("coverPreviewImg");
     const comicsGrid = document.getElementById("comicsGrid");
@@ -2009,6 +2091,31 @@
       coverPreviewImg.removeAttribute("src");
     });
 
+    function normalizeComicHashtags(value) {
+      return String(value || "")
+        .split(/[\s,]+/)
+        .map(tag => tag.trim().replace(/^#+/, ""))
+        .filter(Boolean)
+        .map(tag => tag.toLowerCase())
+        .filter((tag, index, arr) => arr.indexOf(tag) === index)
+        .slice(0, 20);
+    }
+
+    function getComicContentWarnings() {
+      const warnings = [];
+      if (comicAdult18.checked) warnings.push("18+");
+      if (comicNudity.checked) warnings.push("Оголеність");
+      if (comicViolence.checked) warnings.push("Насильство");
+      return warnings;
+    }
+
+    function contentWarningIcon(label) {
+      if (label === "18+") return "🔞";
+      if (label === "Оголеність") return "⚠️";
+      if (label === "Насильство") return "🩸";
+      return "⚠️";
+    }
+
     async function renderComics() {
       const comics = await loadComics();
 
@@ -2047,6 +2154,22 @@
                 ${escapeHtml(comic.description || "Без опису")}
               </div>
 
+              ${Array.isArray(comic.contentWarnings) && comic.contentWarnings.length ? `
+                <div class="content-flags-admin">
+                  ${comic.contentWarnings.map(label => `
+                    <span class="content-flag-admin">
+                      ${contentWarningIcon(label)} ${escapeHtml(label)}
+                    </span>
+                  `).join("")}
+                </div>
+              ` : ""}
+
+              ${Array.isArray(comic.hashtags) && comic.hashtags.length ? `
+                <div class="comic-hashtags-admin">
+                  ${comic.hashtags.map(tag => `<span>#${escapeHtml(tag)}</span>`).join("")}
+                </div>
+              ` : ""}
+
               <div class="comic-actions">
                 <a
                   class="read-btn"
@@ -2082,6 +2205,19 @@
           comicTitle.value = comic.title || "";
           coverUrl.value = comic.cover || "";
           comicDescription.value = comic.description || "";
+
+          const warnings = Array.isArray(comic.contentWarnings)
+            ? comic.contentWarnings
+            : [];
+
+          comicAdult18.checked = warnings.includes("18+");
+          comicNudity.checked = warnings.includes("Оголеність");
+          comicViolence.checked = warnings.includes("Насильство");
+
+          comicHashtags.value = Array.isArray(comic.hashtags)
+            ? comic.hashtags.map(tag => `#${tag}`).join(" ")
+            : "";
+
           updateCoverPreview();
 
           comicSubmitBtn.textContent = "💾 Зберегти зміни";
@@ -2121,6 +2257,8 @@
       const title = comicTitle.value.trim();
       const cover = coverUrl.value.trim();
       const description = comicDescription.value.trim();
+      const contentWarnings = getComicContentWarnings();
+      const hashtags = normalizeComicHashtags(comicHashtags.value);
 
       if (!title) {
         showMessage("Заповни назву коміксу.", "error");
@@ -2132,6 +2270,8 @@
           title,
           cover,
           description,
+          contentWarnings,
+          hashtags,
           updatedAt: serverTimestamp()
         }, { merge: true });
 
@@ -2141,6 +2281,8 @@
           title,
           cover,
           description,
+          contentWarnings,
+          hashtags,
           createdAt: serverTimestamp()
         });
 
@@ -2155,6 +2297,10 @@
       await refreshComicSelect();
 
       comicForm.reset();
+      comicAdult18.checked = false;
+      comicNudity.checked = false;
+      comicViolence.checked = false;
+      comicHashtags.value = "";
       updateCoverPreview();
     });
 
@@ -2163,6 +2309,10 @@
     cancelComicEditBtn.addEventListener("click", () => {
       editingComicId = null;
       comicForm.reset();
+      comicAdult18.checked = false;
+      comicNudity.checked = false;
+      comicViolence.checked = false;
+      comicHashtags.value = "";
       updateCoverPreview();
       comicSubmitBtn.textContent = "💾 Додати комікс";
       cancelComicEditBtn.style.display = "none";
