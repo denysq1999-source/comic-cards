@@ -561,6 +561,87 @@
       max-width: 760px;
     }
 
+    .ads-settings {
+      max-width: 980px;
+      margin-top: 24px;
+    }
+
+    .ads-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .ad-admin-card {
+      background: #151515;
+      border: 1px solid #303030;
+      border-radius: 12px;
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .ad-admin-card h3 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      color: #ffb347;
+    }
+
+    .ad-toggle {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 12px;
+      color: #ddd;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .ad-toggle input {
+      width: 17px;
+      height: 17px;
+      margin: 0;
+      accent-color: #ff9800;
+    }
+
+    .ad-admin-preview {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      margin: 10px 0 12px;
+      border: 1px dashed #3a3a3a;
+      border-radius: 9px;
+      overflow: hidden;
+      background: #0f0f0f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #777;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .ad-admin-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    .ad-admin-preview.has-image img {
+      display: block;
+    }
+
+    .ad-admin-preview.has-image span {
+      display: none;
+    }
+
+    @media (max-width: 900px) {
+      .ads-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .banner-preview {
       width: 100%;
       min-height: 180px;
@@ -1417,6 +1498,81 @@
 
           <button class="primary-btn" id="saveGuestBannerBtn" type="button">💾 Зберегти налаштування</button>
           <div id="bannerMessage" class="message"></div>
+        </div>
+
+        <div class="panel ads-settings">
+          <h2>📢 Рекламні банери</h2>
+          <p class="panel-subtitle">
+            Три рекламні місця на головній сторінці. Якщо слот увімкнений без зображення,
+            користувач побачить тестовий банер «Тут може бути ваша реклама».
+          </p>
+
+          <div class="ads-grid">
+            <div class="ad-admin-card">
+              <h3>Рекламний слот 1</h3>
+              <label class="ad-toggle">
+                <input id="ad1Enabled" type="checkbox">
+                <span>Показувати</span>
+              </label>
+              <div class="form-group">
+                <label for="ad1Image">Зображення банера</label>
+                <input id="ad1Image" type="url" placeholder="Google Drive або пряме посилання">
+              </div>
+              <div class="ad-admin-preview" id="ad1Preview">
+                <span>📢 Тут може бути ваша реклама</span>
+                <img id="ad1PreviewImg" alt="Рекламний банер 1">
+              </div>
+              <div class="form-group">
+                <label for="ad1Link">Посилання при кліку</label>
+                <input id="ad1Link" type="url" placeholder="https://...">
+              </div>
+            </div>
+
+            <div class="ad-admin-card">
+              <h3>Рекламний слот 2</h3>
+              <label class="ad-toggle">
+                <input id="ad2Enabled" type="checkbox">
+                <span>Показувати</span>
+              </label>
+              <div class="form-group">
+                <label for="ad2Image">Зображення банера</label>
+                <input id="ad2Image" type="url" placeholder="Google Drive або пряме посилання">
+              </div>
+              <div class="ad-admin-preview" id="ad2Preview">
+                <span>📢 Тут може бути ваша реклама</span>
+                <img id="ad2PreviewImg" alt="Рекламний банер 2">
+              </div>
+              <div class="form-group">
+                <label for="ad2Link">Посилання при кліку</label>
+                <input id="ad2Link" type="url" placeholder="https://...">
+              </div>
+            </div>
+
+            <div class="ad-admin-card">
+              <h3>Рекламний слот 3</h3>
+              <label class="ad-toggle">
+                <input id="ad3Enabled" type="checkbox">
+                <span>Показувати</span>
+              </label>
+              <div class="form-group">
+                <label for="ad3Image">Зображення банера</label>
+                <input id="ad3Image" type="url" placeholder="Google Drive або пряме посилання">
+              </div>
+              <div class="ad-admin-preview" id="ad3Preview">
+                <span>📢 Тут може бути ваша реклама</span>
+                <img id="ad3PreviewImg" alt="Рекламний банер 3">
+              </div>
+              <div class="form-group">
+                <label for="ad3Link">Посилання при кліку</label>
+                <input id="ad3Link" type="url" placeholder="https://...">
+              </div>
+            </div>
+          </div>
+
+          <button class="primary-btn" id="saveAdsBtn" type="button" style="margin-top:16px;">
+            💾 Зберегти рекламу
+          </button>
+          <div id="adsMessage" class="message"></div>
         </div>
       </section>
     </main>
@@ -2667,6 +2823,27 @@
     const youtubeUrl = document.getElementById("youtubeUrl");
     const supportUrl = document.getElementById("supportUrl");
 
+    const ad1Enabled = document.getElementById("ad1Enabled");
+    const ad1Image = document.getElementById("ad1Image");
+    const ad1Link = document.getElementById("ad1Link");
+    const ad1Preview = document.getElementById("ad1Preview");
+    const ad1PreviewImg = document.getElementById("ad1PreviewImg");
+
+    const ad2Enabled = document.getElementById("ad2Enabled");
+    const ad2Image = document.getElementById("ad2Image");
+    const ad2Link = document.getElementById("ad2Link");
+    const ad2Preview = document.getElementById("ad2Preview");
+    const ad2PreviewImg = document.getElementById("ad2PreviewImg");
+
+    const ad3Enabled = document.getElementById("ad3Enabled");
+    const ad3Image = document.getElementById("ad3Image");
+    const ad3Link = document.getElementById("ad3Link");
+    const ad3Preview = document.getElementById("ad3Preview");
+    const ad3PreviewImg = document.getElementById("ad3PreviewImg");
+
+    const saveAdsBtn = document.getElementById("saveAdsBtn");
+    const adsMessage = document.getElementById("adsMessage");
+
     function updateGuestBannerPreview() {
       const url = guestBannerUrl.value.trim();
 
@@ -2706,7 +2883,21 @@
         threadsUrl.value = data.threadsUrl || "";
         youtubeUrl.value = data.youtubeUrl || "";
         supportUrl.value = data.supportUrl || "";
+
+        ad1Enabled.checked = Boolean(data.ad1Enabled);
+        ad1Image.value = data.ad1Image || "";
+        ad1Link.value = data.ad1Link || "";
+
+        ad2Enabled.checked = Boolean(data.ad2Enabled);
+        ad2Image.value = data.ad2Image || "";
+        ad2Link.value = data.ad2Link || "";
+
+        ad3Enabled.checked = Boolean(data.ad3Enabled);
+        ad3Image.value = data.ad3Image || "";
+        ad3Link.value = data.ad3Link || "";
+
         updateGuestBannerPreview();
+        updateAdPreviews();
       }
     }
 
@@ -2721,6 +2912,79 @@
       }, { merge: true });
 
       showBannerMessage("Налаштування збережено ✅", "success");
+    });
+
+    function updateSingleAdPreview(input, preview, image) {
+      const url = input.value.trim();
+
+      if (!url) {
+        preview.classList.remove("has-image");
+        image.removeAttribute("src");
+        return;
+      }
+
+      image.src = getCoverImageUrl(url);
+      preview.classList.add("has-image");
+    }
+
+    function updateAdPreviews() {
+      updateSingleAdPreview(ad1Image, ad1Preview, ad1PreviewImg);
+      updateSingleAdPreview(ad2Image, ad2Preview, ad2PreviewImg);
+      updateSingleAdPreview(ad3Image, ad3Preview, ad3PreviewImg);
+    }
+
+    [ad1Image, ad2Image, ad3Image].forEach(input => {
+      input.addEventListener("input", updateAdPreviews);
+    });
+
+    [
+      [ad1Preview, ad1PreviewImg],
+      [ad2Preview, ad2PreviewImg],
+      [ad3Preview, ad3PreviewImg]
+    ].forEach(([preview, image]) => {
+      image.addEventListener("error", () => {
+        preview.classList.remove("has-image");
+        image.removeAttribute("src");
+      });
+    });
+
+    function showAdsMessage(text, type) {
+      adsMessage.textContent = text;
+      adsMessage.className = `message show ${type}`;
+
+      clearTimeout(showAdsMessage.timeout);
+      showAdsMessage.timeout = setTimeout(() => {
+        adsMessage.className = "message";
+      }, 3500);
+    }
+
+    saveAdsBtn.addEventListener("click", async () => {
+      try {
+        saveAdsBtn.disabled = true;
+
+        await setDoc(doc(db, "site_settings", "home"), {
+          ad1Enabled: ad1Enabled.checked,
+          ad1Image: ad1Image.value.trim(),
+          ad1Link: ad1Link.value.trim(),
+
+          ad2Enabled: ad2Enabled.checked,
+          ad2Image: ad2Image.value.trim(),
+          ad2Link: ad2Link.value.trim(),
+
+          ad3Enabled: ad3Enabled.checked,
+          ad3Image: ad3Image.value.trim(),
+          ad3Link: ad3Link.value.trim(),
+
+          adsUpdatedAt: serverTimestamp()
+        }, { merge: true });
+
+        showAdsMessage("Рекламні банери збережено ✅", "success");
+      } catch (error) {
+        console.error("Ads save error:", error);
+        showAdsMessage("Не вдалося зберегти рекламу.", "error");
+      } finally {
+        saveAdsBtn.disabled = false;
+      }
     });
 
     // ===== Розділи коміксів =====
