@@ -4,7 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Реєстрація | Comic Cards</title>
+
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       background: #121212;
@@ -13,24 +18,90 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
+      padding: 24px 16px;
     }
+
     .login-box {
-      width: 350px;
+      width: min(460px, 100%);
       background: #1f1f1f;
       padding: 30px;
       border-radius: 15px;
       text-align: center;
+      border: 1px solid #2d2d2d;
+      box-shadow: 0 20px 60px rgba(0,0,0,.35);
     }
-    input {
+
+    h1 {
+      margin-top: 0;
+    }
+
+    input[type="email"],
+    input[type="password"] {
       width: 100%;
       padding: 12px;
       margin-top: 15px;
-      border: none;
+      border: 1px solid #343434;
+      background: #111;
+      color: #fff;
       border-radius: 8px;
-      box-sizing: border-box;
       font-size: 16px;
+      outline: none;
     }
+
+    input[type="email"]:focus,
+    input[type="password"]:focus {
+      border-color: #ff9800;
+    }
+
+    .legal-box {
+      margin-top: 20px;
+      background: #151515;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 14px;
+      text-align: left;
+      max-height: 270px;
+      overflow-y: auto;
+      color: #cfcfcf;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .legal-box h3 {
+      margin: 0 0 10px;
+      color: #ffb347;
+      font-size: 15px;
+    }
+
+    .legal-box p {
+      margin: 0 0 10px;
+    }
+
+    .legal-box strong {
+      color: #fff;
+    }
+
+    .consent {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 16px;
+      text-align: left;
+      color: #ddd;
+      font-size: 13px;
+      line-height: 1.45;
+      cursor: pointer;
+    }
+
+    .consent input {
+      margin-top: 3px;
+      width: 18px;
+      height: 18px;
+      accent-color: #ff9800;
+      flex: 0 0 auto;
+    }
+
     button {
       width: 100%;
       padding: 14px;
@@ -42,45 +113,182 @@
       font-size: 18px;
       cursor: pointer;
     }
+
     button:hover {
       background: #e68a00;
     }
+
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
     .link {
       margin-top: 20px;
       font-size: 14px;
     }
+
     .link a {
       color: #ff9800;
       text-decoration: none;
     }
+
     #error {
       color: #ff5252;
       margin-top: 15px;
       font-size: 14px;
       min-height: 20px;
+      line-height: 1.4;
     }
+
     #success {
       color: #4caf50;
       margin-top: 15px;
       font-size: 14px;
       min-height: 20px;
+      line-height: 1.4;
+    }
+
+    .legal-note {
+      margin-top: 10px;
+      color: #777;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 520px) {
+      .login-box {
+        padding: 24px 18px;
+      }
+
+      .legal-box {
+        max-height: 230px;
+      }
     }
   </style>
 </head>
+
 <body>
 
   <div class="login-box">
     <h1>🃏 Comic Cards</h1>
     <h2>Реєстрація</h2>
 
-    <input type="email" id="email" placeholder="Email" required>
-    <input type="password" id="password" placeholder="Пароль (мінімум 6 символів)" required>
-    <input type="password" id="password2" placeholder="Повторіть пароль" required>
+    <input
+      type="email"
+      id="email"
+      placeholder="Email"
+      autocomplete="email"
+      required
+    >
 
-    <button id="registerBtn">Зареєструватися</button>
+    <input
+      type="password"
+      id="password"
+      placeholder="Пароль (мінімум 6 символів)"
+      autocomplete="new-password"
+      required
+    >
+
+    <input
+      type="password"
+      id="password2"
+      placeholder="Повторіть пароль"
+      autocomplete="new-password"
+      required
+    >
+
+    <div class="legal-box" id="legalBox">
+      <h3>📜 Основні правила та політика приватності</h3>
+
+      <p>
+        <strong>🔞 Вік.</strong>
+        Реєструючись на Comic Cards, користувач підтверджує, що йому виповнилося 18 років.
+      </p>
+
+      <p>
+        <strong>© Авторські права.</strong>
+        Безкоштовний доступ до коміксів, карток, фігурок та інших матеріалів сайту
+        не означає відмову автора або іншого правовласника від авторських прав.
+        Заборонено видавати чужі матеріали за власні.
+      </p>
+
+      <p>
+        <strong>📢 Поширення.</strong>
+        Якщо користувач поширює матеріали Comic Cards або їхні фрагменти там, де таке
+        використання дозволене, потрібно коректно зазначати автора та джерело.
+        Саме зазначення автора не скасовує інші обмеження авторського права і не дає
+        автоматичного дозволу на будь-яке комерційне використання.
+      </p>
+
+      <p>
+        <strong>🃏 Картки та фігурки.</strong>
+        Отримані на сайті зображення карток і фігурок можна використовувати як референс
+        для особистих некомерційних цілей — наприклад, щоб зробити для себе фізичну картку
+        або замовити фігурку за власний рахунок.
+      </p>
+
+      <p>
+        Якщо ви публічно показуєте результат, створений на основі авторських матеріалів
+        Comic Cards, будь ласка, не забувайте вказувати автора оригінальної роботи.
+        Це важлива форма підтримки автора та проєкту.
+      </p>
+
+      <p>
+        <strong>🔐 Які дані зберігаються.</strong>
+        Для роботи акаунта сайт може зберігати email, технічний ідентифікатор користувача,
+        інвентар карток і фігурок, рейтинги, час активності, статус блокування та інші
+        технічні дані, необхідні для функцій сайту.
+      </p>
+
+      <p>
+        <strong>🔑 Паролі.</strong>
+        Сайт не зберігає пароль у відкритому вигляді. Авторизація здійснюється через
+        Firebase Authentication. Дані функцій сайту зберігаються у Firebase/Firestore.
+      </p>
+
+      <p>
+        <strong>🛡️ Безпека та модерація.</strong>
+        Адміністратор може блокувати акаунти у випадку зловживань, спроб обходу правил,
+        маніпуляцій з інвентарем або інших дій, що шкодять роботі сайту.
+      </p>
+
+      <p>
+        <strong>🧹 Видалення предметів.</strong>
+        Користувач може видаляти предмети зі свого інвентарю. Адміністратор може
+        видаляти технічно некоректні або сирітські записи, не видаляючи сам акаунт.
+      </p>
+
+      <p>
+        <strong>⚠️ Відповідальність.</strong>
+        Comic Cards надається без гарантії безперервної роботи. Під час технічних робіт
+        окремі функції можуть бути тимчасово недоступні.
+      </p>
+
+      <p>
+        <strong>📄 Згода.</strong>
+        Проставляючи галочку нижче, користувач підтверджує, що прочитав ці правила,
+        погоджується з ними, підтверджує вік 18+ та погоджується на обробку необхідних
+        персональних і технічних даних для роботи акаунта та функцій сайту.
+      </p>
+    </div>
+
+    <label class="consent">
+      <input type="checkbox" id="legalConsent">
+      <span>
+        Мені виповнилося 18 років. Я прочитав(ла) та погоджуюся з правилами сайту,
+        умовами використання і політикою приватності.
+      </span>
+    </label>
+
+    <button id="registerBtn" disabled>Зареєструватися</button>
 
     <div id="error"></div>
     <div id="success"></div>
+
+    <div class="legal-note">
+      Версія правил: 1.0
+    </div>
 
     <div class="link">
       Вже є акаунт? <a href="login.html">Увійти</a>
@@ -89,14 +297,34 @@
 
   <script type="module">
     import { auth } from './js/firebase.js';
-    import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    import {
+      createUserWithEmailAndPassword,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const db = getFirestore(auth.app);
 
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const password2Input = document.getElementById('password2');
+    const legalConsent = document.getElementById('legalConsent');
     const registerBtn = document.getElementById('registerBtn');
     const errorDiv = document.getElementById('error');
     const successDiv = document.getElementById('success');
+
+    const LEGAL_VERSION = '1.0';
+
+    legalConsent.addEventListener('change', () => {
+      registerBtn.disabled = !legalConsent.checked;
+    });
 
     registerBtn.addEventListener('click', async () => {
       const email = emailInput.value.trim();
@@ -105,6 +333,12 @@
 
       errorDiv.textContent = '';
       successDiv.textContent = '';
+
+      if (!legalConsent.checked) {
+        errorDiv.textContent =
+          'Потрібно підтвердити 18+ і погодитися з правилами та політикою приватності.';
+        return;
+      }
 
       if (!email || !password || !password2) {
         errorDiv.textContent = 'Заповніть усі поля';
@@ -125,27 +359,59 @@
         registerBtn.disabled = true;
         registerBtn.textContent = 'Реєстрація...';
 
-        await createUserWithEmailAndPassword(auth, email, password);
+        const credential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
 
-        successDiv.textContent = 'Акаунт створено! Зараз перенаправимо...';
-        
+        const user = credential.user;
+
+        // Фіксуємо факт прийняття правил та підтвердження 18+.
+        await setDoc(
+          doc(db, 'users', user.uid),
+          {
+            email: user.email || email,
+            role: 'user',
+            age18Confirmed: true,
+            termsAccepted: true,
+            privacyAccepted: true,
+            legalVersion: LEGAL_VERSION,
+            legalAcceptedAt: serverTimestamp(),
+            createdAt: serverTimestamp()
+          },
+          { merge: true }
+        );
+
+        successDiv.textContent =
+          'Акаунт створено. Правила прийнято ✅';
+
+        // Після реєстрації повертаємо користувача на сторінку входу.
+        await signOut(auth);
+
         setTimeout(() => {
           window.location.href = 'login.html';
-        }, 1500);
+        }, 1200);
 
       } catch (error) {
         console.error(error);
+
         if (error.code === 'auth/email-already-in-use') {
           errorDiv.textContent = 'Цей email вже зареєстрований';
         } else if (error.code === 'auth/invalid-email') {
           errorDiv.textContent = 'Невірний формат email';
         } else if (error.code === 'auth/weak-password') {
           errorDiv.textContent = 'Пароль занадто слабкий';
+        } else if (error.code === 'permission-denied') {
+          errorDiv.textContent =
+            'Акаунт створено, але не вдалося зберегти підтвердження правил. Зверніться до адміністратора.';
         } else {
-          errorDiv.textContent = 'Помилка реєстрації. Спробуйте ще раз.';
+          errorDiv.textContent =
+            'Помилка реєстрації. Спробуйте ще раз.';
         }
+
       } finally {
-        registerBtn.disabled = false;
+        registerBtn.disabled = !legalConsent.checked;
         registerBtn.textContent = 'Зареєструватися';
       }
     });
