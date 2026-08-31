@@ -2545,6 +2545,16 @@
       return snap.docs.map(d=>({id:d.id,...d.data()}));
     }
 
+    async function getFigureOwnershipCount(figureId){
+      const ownedSnap = await getDocs(
+        query(
+          collection(db,"user_figures"),
+          where("figureId","==",figureId)
+        )
+      );
+      return ownedSnap.size;
+    }
+
     async function renderFigures(){
       const [figures,comics]=await Promise.all([loadFigures(),loadComics()]);
       if(!figures.length){
@@ -2598,16 +2608,33 @@
         const figures=await loadFigures();
         const figure=figures.find(x=>x.id===button.dataset.figureEdit);
         if(!figure)return;
+
         editingFigureId=figure.id;
+
         figureComic.value=figure.comicId||"";
         figureName.value=figure.name||"";
         figureImageUrl.value=figure.image||figure.frontImage||"";
         figureBackUrl.value=figure.backImage||"";
         figureDescription.value=figure.description||"";
+
+        const ownerCount = await getFigureOwnershipCount(figure.id);
+
+        // Якщо фігурку вже хтось отримав — не дозволяємо змінити її comicId.
+        // Назву, перед/зад, опис можна коригувати без втрати фігурки у користувача.
+        figureComic.disabled = ownerCount > 0;
+
         updateFigurePreview();
         figureFormTitle.textContent="✏️ Редагувати фігурку";
         figureSubmitBtn.textContent="💾 Зберегти зміни";
         cancelFigureEditBtn.style.display="block";
+
+        if(ownerCount > 0){
+          showFigureMessage(
+            `🔒 Ця фігурка вже є у ${ownerCount} користувач(ів). ID і прив’язка до коміксу збережуться; можна безпечно змінювати назву, зображення та опис.`,
+            "success"
+          );
+        }
+
         window.scrollTo({top:0,behavior:"smooth"});
       }));
 
@@ -2615,7 +2642,20 @@
         const figures=await loadFigures();
         const figure=figures.find(x=>x.id===button.dataset.figureDelete);
         if(!figure)return;
+
+        const ownerCount = await getFigureOwnershipCount(figure.id);
+
+        if(ownerCount > 0){
+          alert(
+            `Не можна видалити «${figure.name||"Без назви"}».\n\n` +
+            `Ця фігурка вже є у ${ownerCount} користувач(ів). ` +
+            `Використай «Редагувати» — так корекція збереже фігурку в їхніх інвентарях.`
+          );
+          return;
+        }
+
         if(!confirm(`Фігурку «${figure.name||"Без назви"}» буде видалено. Ви впевнені?`))return;
+
         await deleteDoc(doc(db,"figures",figure.id));
         await renderFigures();
       }));
@@ -2641,6 +2681,7 @@
       }
       editingFigureId=null;
       figureForm.reset();
+      figureComic.disabled=false;
       updateFigurePreview();
       figureFormTitle.textContent="➕ Додати фігурку";
       figureSubmitBtn.textContent="💾 Додати фігурку";
@@ -2651,6 +2692,7 @@
     cancelFigureEditBtn.addEventListener("click",()=>{
       editingFigureId=null;
       figureForm.reset();
+      figureComic.disabled=false;
       updateFigurePreview();
       figureFormTitle.textContent="➕ Додати фігурку";
       figureSubmitBtn.textContent="💾 Додати фігурку";
