@@ -821,6 +821,11 @@
       position:relative;
       box-shadow:0 24px 70px rgba(0,0,0,.55);
     }
+    .audit-danger-zone{margin-top:20px;padding:14px;border:1px solid #5a2727;border-radius:10px;background:#241515}
+    .audit-clear-btn{border:1px solid #8a3434;border-radius:8px;background:#6b2525;color:#fff;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:800}
+    .audit-clear-btn:hover{background:#842f2f}
+    .audit-clear-btn:disabled{opacity:.45;cursor:not-allowed}
+
     .inventory-audit-close{
       position:absolute;
       top:12px;
@@ -1374,6 +1379,10 @@
           <tbody id="auditRecentBody"></tbody>
         </table>
       </div>
+
+      <div class="audit-danger-zone">
+        <button class="audit-clear-btn" id="auditClearInventoryBtn" type="button">🗑️ Очистити весь інвентар</button>
+      </div>
     </div>
   </div>
 
@@ -1441,6 +1450,8 @@
     const auditAlerts = document.getElementById("auditAlerts");
     const auditDuplicatesBody = document.getElementById("auditDuplicatesBody");
     const auditRecentBody = document.getElementById("auditRecentBody");
+    const auditClearInventoryBtn = document.getElementById("auditClearInventoryBtn");
+    let auditCurrentUserId = null;
 
     let adminUsers = [];
     let blockedUserIds = new Set();
@@ -1725,6 +1736,7 @@
     function openInventoryAudit(uid) {
       const user = adminUsers.find(item => item.id === uid);
       if (!user) return;
+      auditCurrentUserId = uid;
 
       const audit = getUserInventoryAudit(uid);
 
@@ -1799,6 +1811,54 @@
       inventoryAuditOverlay.setAttribute("aria-hidden","false");
       document.body.style.overflow = "hidden";
     }
+
+    async function clearCurrentUserInventory() {
+      const uid = auditCurrentUserId;
+      if (!uid) return;
+
+      const user = adminUsers.find(item => item.id === uid);
+      if (!user) return;
+
+      const audit = getUserInventoryAudit(uid);
+      const total = audit.cardsOwned.length + audit.figuresOwned.length;
+
+      if (!total) {
+        alert("Інвентар уже порожній.");
+        return;
+      }
+
+      const firstConfirm = confirm(
+        `Очистити ВЕСЬ інвентар ${user.email || uid}?\n\nБуде видалено: ${audit.cardsOwned.length} карток і ${audit.figuresOwned.length} фігурок.`
+      );
+      if (!firstConfirm) return;
+
+      const secondConfirm = confirm(
+        "Останнє підтвердження: видалені предмети відновити цією кнопкою не можна. Продовжити?"
+      );
+      if (!secondConfirm) return;
+
+      try {
+        auditClearInventoryBtn.disabled = true;
+        auditClearInventoryBtn.textContent = "Видалення...";
+
+        const docsToDelete = [...audit.cardsOwned, ...audit.figuresOwned];
+        await Promise.all(docsToDelete.map(item =>
+          deleteDoc(doc(db, item.itemType === "card" ? "user_cards" : "user_figures", item.id))
+        ));
+
+        await loadAdminUsers();
+        openInventoryAudit(uid);
+        alert("Інвентар користувача очищено.");
+      } catch (error) {
+        console.error(error);
+        alert("Не вдалося повністю очистити інвентар.");
+      } finally {
+        auditClearInventoryBtn.disabled = false;
+        auditClearInventoryBtn.textContent = "🗑️ Очистити весь інвентар";
+      }
+    }
+
+    auditClearInventoryBtn.addEventListener("click", clearCurrentUserInventory);
 
     function closeInventoryAudit() {
       inventoryAuditOverlay.classList.remove("show");
