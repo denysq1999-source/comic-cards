@@ -656,7 +656,68 @@
     .pack-message{margin-top:18px;min-height:20px;color:#aaa;font-size:14px}.pack-message.success{color:#7fda94}.pack-message.error{color:#ff8f8f}
     @media(max-width:760px){.pack-cards{grid-template-columns:1fr}.pack-card{display:grid;grid-template-columns:120px 1fr}.pack-card img{height:168px;aspect-ratio:auto}}
 
-  </style>
+  
+    /* ===== Компактна рекламна колонка =====
+       Реклама лишається помітною, але більше не забирає пів екрана. */
+    @media (min-width: 1101px) {
+      .catalog-layout {
+        grid-template-columns: 170px minmax(0, 1fr);
+        gap: 28px;
+        max-width: 1220px;
+        margin: 0 auto;
+      }
+
+      .ad-rail {
+        width: 170px;
+        gap: 12px;
+        margin-left: 0 !important;
+      }
+
+      .ad-slot {
+        width: 170px;
+        aspect-ratio: 16 / 9;
+        border-radius: 10px;
+      }
+
+      .ad-placeholder {
+        padding: 10px 8px;
+        font-size: 11px;
+        line-height: 1.25;
+      }
+
+      .ad-placeholder strong {
+        font-size: 12px;
+        margin-top: 3px;
+      }
+
+      .ad-label {
+        top: 5px;
+        left: 5px;
+        font-size: 8px;
+        padding: 2px 5px;
+      }
+
+      .comics-grid {
+        grid-template-columns: repeat(auto-fill, minmax(230px, 280px));
+        justify-content: center;
+        gap: 22px;
+      }
+    }
+
+    /* На середніх екранах рекламу прибираємо раніше,
+       щоб каталог не стискався. */
+    @media (max-width: 1100px) {
+      .catalog-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .ad-rail,
+      .ad-rail.show {
+        display: none;
+      }
+    }
+
+</style>
 </head>
 
 <body>
