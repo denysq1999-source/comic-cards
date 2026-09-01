@@ -638,6 +638,24 @@
     }
 
 
+
+    /* ===== Щоденний пакунок ===== */
+    .pack-btn.ready{background:#7b4bd1;border-color:#8c5ee0;color:#fff;font-weight:800}
+    .pack-btn.ready:hover{background:#8b58e5}
+    .pack-btn:disabled{opacity:.65;cursor:not-allowed}
+    .pack-overlay{position:fixed;inset:0;z-index:1800;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.88)}
+    .pack-overlay.show{display:flex}
+    .pack-modal{width:min(980px,96vw);max-height:92vh;overflow:auto;background:#151515;border:1px solid #353535;border-radius:18px;padding:24px;position:relative;box-shadow:0 26px 80px rgba(0,0,0,.58);text-align:center}
+    .pack-close{position:absolute;top:12px;right:12px;width:40px;height:40px;border:0;border-radius:50%;background:#292929;color:#fff;font-size:20px;cursor:pointer}
+    .pack-modal h2{margin:0 48px 8px;font-size:28px}.pack-sub{color:#999;margin-bottom:20px;line-height:1.5}
+    .pack-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;text-align:left}
+    .pack-card{background:#101010;border:1px solid #303030;border-radius:13px;overflow:hidden}
+    .pack-card img{width:100%;aspect-ratio:5/7;object-fit:cover;display:block;background:#0b0b0b}
+    .pack-card-info{padding:12px}.pack-card-name{font-weight:800;font-size:16px;margin-bottom:6px}
+    .pack-card-rarity{display:inline-block;padding:4px 8px;border-radius:999px;background:#282828;color:#ffb347;font-size:11px;font-weight:800}
+    .pack-message{margin-top:18px;min-height:20px;color:#aaa;font-size:14px}.pack-message.success{color:#7fda94}.pack-message.error{color:#ff8f8f}
+    @media(max-width:760px){.pack-cards{grid-template-columns:1fr}.pack-card{display:grid;grid-template-columns:120px 1fr}.pack-card img{height:168px;aspect-ratio:auto}}
+
   </style>
 </head>
 
@@ -662,6 +680,7 @@
       <a class="nav-link social" id="youtubeLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">▶️ YouTube</a>
       <a class="nav-link support" id="supportLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">☕ Підтримати автора</a>
 
+      <button class="nav-button nav-auth pack-btn" id="packBtnTop" type="button" style="display:none;">🎁 Пакунок</button>
       <a class="nav-link nav-auth" id="profileBtnTop" href="profile.html">👤 Особистий кабінет</a>
       <a class="nav-link nav-admin" id="adminBtnTop" href="admin.html">⚙️ Адмін-панель</a>
       <button class="nav-button nav-auth" id="logoutBtnTop" type="button">Вийти</button>
@@ -748,6 +767,17 @@
     <div class="user-info" id="userInfo"></div>
   </main>
 
+
+  <div class="pack-overlay" id="packOverlay" aria-hidden="true">
+    <div class="pack-modal">
+      <button class="pack-close" id="packCloseBtn" type="button">✕</button>
+      <h2>🎁 Щоденний пакунок</h2>
+      <p class="pack-sub">Раз на 24 години ти можеш отримати 3 випадкові опубліковані картки.</p>
+      <div class="pack-cards" id="packCards"></div>
+      <div class="pack-message" id="packMessage"></div>
+    </div>
+  </div>
+
   <script type="module">
     import { auth } from './js/firebase.js';
     import {
@@ -764,7 +794,9 @@
       getDoc,
       setDoc,
       doc,
-      serverTimestamp
+      serverTimestamp,
+      runTransaction,
+      Timestamp
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const db = getFirestore(auth.app);
@@ -792,6 +824,11 @@
     const maintenanceSection = document.getElementById("maintenanceSection");
     const maintenanceText = document.getElementById("maintenanceText");
     const loadErrorSection = document.getElementById("loadErrorSection");
+    const packBtnTop = document.getElementById("packBtnTop");
+    const packOverlay = document.getElementById("packOverlay");
+    const packCloseBtn = document.getElementById("packCloseBtn");
+    const packCards = document.getElementById("packCards");
+    const packMessage = document.getElementById("packMessage");
 
     const adRail = document.getElementById("adRail");
     const adSlot1 = document.getElementById("adSlot1");
@@ -1159,6 +1196,145 @@
       });
     }
 
+
+    // ===== Щоденний пакунок: 3 картки раз на 24 години =====
+    const PACK_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+    let packTimer = null;
+    let packNextAvailableMs = 0;
+
+    function shuffleArray(items){
+      const arr=[...items];
+      for(let i=arr.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [arr[i],arr[j]]=[arr[j],arr[i]];
+      }
+      return arr;
+    }
+
+    function formatPackCountdown(ms){
+      const total=Math.max(0,Math.ceil(ms/1000));
+      const h=Math.floor(total/3600),m=Math.floor((total%3600)/60),sec=total%60;
+      return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+    }
+
+    function updatePackButtonState(){
+      if(!packBtnTop||!currentUser)return;
+      const remaining=packNextAvailableMs-Date.now();
+      if(remaining>0){
+        packBtnTop.disabled=true;
+        packBtnTop.classList.remove("ready");
+        packBtnTop.textContent=`🎁 ${formatPackCountdown(remaining)}`;
+      }else{
+        packBtnTop.disabled=false;
+        packBtnTop.classList.add("ready");
+        packBtnTop.textContent="🎁 Пакунок";
+      }
+    }
+
+    async function loadPackStatus(){
+      if(!currentUser)return;
+      const snap=await getDoc(doc(db,"daily_packs",currentUser.uid));
+      const data=snap.exists()?snap.data():null;
+      packNextAvailableMs=data?.nextAvailableAt?.toMillis?data.nextAvailableAt.toMillis():0;
+      if(packTimer)clearInterval(packTimer);
+      updatePackButtonState();
+      packTimer=setInterval(updatePackButtonState,1000);
+    }
+
+    function showPackCards(items){
+      const blank="data:image/svg+xml;charset=UTF-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="500" height="700"><rect width="100%" height="100%" fill="#111"/><text x="50%" y="50%" text-anchor="middle" fill="#666" font-size="40">CARD</text></svg>');
+      packCards.innerHTML=items.map(card=>`
+        <article class="pack-card">
+          <img src="${escapeHtml(card.image?getCoverImageUrl(card.image):blank)}" alt="${escapeHtml(card.name||"Картка")}">
+          <div class="pack-card-info">
+            <div class="pack-card-name">${escapeHtml(card.name||"Без назви")}</div>
+            <span class="pack-card-rarity">${escapeHtml(card.rarity||"Common")}</span>
+          </div>
+        </article>`).join("");
+    }
+
+    async function openDailyPack(){
+      if(!currentUser||packBtnTop.disabled)return;
+      packOverlay.classList.add("show");
+      packOverlay.setAttribute("aria-hidden","false");
+      document.body.style.overflow="hidden";
+      packCards.innerHTML="";
+      packMessage.className="pack-message";
+      packMessage.textContent="Відкриваємо пакунок... 🎁";
+
+      try{
+        packBtnTop.disabled=true;
+        const cardsSnap=await getDocs(collection(db,"cards"));
+        const available=cardsSnap.docs.map(d=>({id:d.id,...d.data()})).filter(card=>card.published===true&&card.comicId);
+        if(available.length<3)throw new Error("PACK_NOT_ENOUGH_CARDS");
+
+        const selected=shuffleArray(available).slice(0,3);
+        const packRef=doc(db,"daily_packs",currentUser.uid);
+        const nextAt=Timestamp.fromMillis(Date.now()+PACK_COOLDOWN_MS);
+
+        await runTransaction(db,async transaction=>{
+          const current=await transaction.get(packRef);
+          if(current.exists()){
+            const oldNext=current.data()?.nextAvailableAt;
+            const oldMs=oldNext?.toMillis?oldNext.toMillis():0;
+            if(oldMs>Date.now()){
+              const e=new Error("PACK_COOLDOWN");e.nextAvailableMs=oldMs;throw e;
+            }
+          }
+
+          selected.forEach(card=>{
+            const ownedRef=doc(collection(db,"user_cards"));
+            transaction.set(ownedRef,{
+              userId:currentUser.uid,
+              cardId:card.id,
+              comicId:card.comicId,
+              obtainedAt:serverTimestamp(),
+              source:"daily_pack"
+            });
+          });
+
+          transaction.set(packRef,{
+            userId:currentUser.uid,
+            lastOpenedAt:serverTimestamp(),
+            nextAvailableAt:nextAt,
+            cardIds:selected.map(card=>card.id)
+          },{merge:true});
+        });
+
+        packNextAvailableMs=nextAt.toMillis();
+        updatePackButtonState();
+        showPackCards(selected);
+        packMessage.className="pack-message success";
+        packMessage.textContent="Три картки вже додано у твій інвентар 🃏🃏🃏";
+      }catch(error){
+        console.error("Daily pack error:",error);
+        if(error?.message==="PACK_COOLDOWN"){
+          packNextAvailableMs=Number(error.nextAvailableMs||0);
+          updatePackButtonState();
+          packMessage.textContent="Пакунок уже відкрито. Чекай завершення таймера.";
+        }else if(error?.message==="PACK_NOT_ENOUGH_CARDS"){
+          packMessage.textContent="Для пакунка потрібно щонайменше 3 опубліковані картки.";
+        }else if(String(error?.code||"").includes("permission-denied")){
+          packMessage.textContent="Firestore не дозволив відкрити пакунок. Додай правила daily_packs.";
+        }else{
+          packMessage.textContent="Не вдалося відкрити пакунок. Спробуй ще раз.";
+        }
+        packMessage.className="pack-message error";
+        await loadPackStatus().catch(console.error);
+      }
+    }
+
+    function closePackOverlay(){
+      packOverlay.classList.remove("show");
+      packOverlay.setAttribute("aria-hidden","true");
+      document.body.style.overflow="";
+    }
+
+    packBtnTop.addEventListener("click",openDailyPack);
+    packCloseBtn.addEventListener("click",closePackOverlay);
+    packOverlay.addEventListener("click",e=>{if(e.target===packOverlay)closePackOverlay()});
+
+
     const settingsPromise = loadSiteSettings().catch(error => {
       authLoading.classList.add("hidden");
       loadErrorSection.style.display = "block";
@@ -1212,6 +1388,8 @@
         userInfo.textContent = `Ви увійшли як: ${user.email}`;
         logoutBtnTop.style.display = "inline-flex";
         profileBtnTop.style.display = "inline-flex";
+        packBtnTop.style.display = "inline-flex";
+        await loadPackStatus();
 
         if (user.uid === ADMIN_UID) {
           adminBtnTop.style.display = "inline-flex";
@@ -1227,7 +1405,9 @@
         userInfo.textContent = "";
         logoutBtnTop.style.display = "none";
         profileBtnTop.style.display = "none";
+        packBtnTop.style.display = "none";
         adminBtnTop.style.display = "none";
+        if(packTimer)clearInterval(packTimer);
       }
     });
 
