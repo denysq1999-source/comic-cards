@@ -1176,6 +1176,45 @@
       font-weight:800;
     }
 
+
+    .chapter-filter-bar{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:16px;
+    }
+
+    .chapter-filter-bar label{
+      color:#aaa;
+      font-size:13px;
+      font-weight:700;
+    }
+
+    .chapter-filter-bar select{
+      min-width:280px;
+      max-width:520px;
+      border:1px solid #343434;
+      background:#101010;
+      color:#fff;
+      padding:10px 12px;
+      border-radius:8px;
+      outline:none;
+      font-size:14px;
+    }
+
+    .chapter-filter-count{
+      color:#777;
+      font-size:12px;
+    }
+
+    @media(max-width:650px){
+      .chapter-filter-bar select{
+        min-width:0;
+        width:100%;
+      }
+    }
+
 </style>
 </head>
 <body>
@@ -1570,7 +1609,16 @@
 
         <div class="panel" style="margin-top:24px;">
           <h2>📚 Збережені розділи</h2>
-          <p class="panel-subtitle">Тут видно, які розділи вже додані та скільки в них сторінок.</p>
+          <p class="panel-subtitle">Обери комікс — і побачиш тільки його розділи, без довжелезного списку.</p>
+
+          <div class="chapter-filter-bar">
+            <label for="chaptersComicFilter">Комікс:</label>
+            <select id="chaptersComicFilter">
+              <option value="">Усі комікси</option>
+            </select>
+            <span class="chapter-filter-count" id="chaptersFilterCount"></span>
+          </div>
+
           <div id="chaptersList" class="chapter-list"></div>
         </div>
       </section>
@@ -3449,6 +3497,8 @@
     const chapterTitle = document.getElementById("chapterTitle");
     const pagesGrid = document.getElementById("pagesGrid");
     const chaptersList = document.getElementById("chaptersList");
+    const chaptersComicFilter = document.getElementById("chaptersComicFilter");
+    const chaptersFilterCount = document.getElementById("chaptersFilterCount");
     const chapterMessage = document.getElementById("chapterMessage");
 
     async function loadChapters() {
@@ -3503,20 +3553,52 @@
       }, 3500);
     }
 
+    async function fillChaptersComicFilter(comics) {
+      const currentValue = chaptersComicFilter.value;
+
+      chaptersComicFilter.innerHTML =
+        '<option value="">Усі комікси</option>' +
+        [...comics]
+          .sort((a,b) => String(a.title || "").localeCompare(String(b.title || ""), "uk"))
+          .map(comic =>
+            `<option value="${escapeHtml(comic.id)}">${escapeHtml(comic.title || "Без назви")}</option>`
+          )
+          .join("");
+
+      if ([...chaptersComicFilter.options].some(option => option.value === currentValue)) {
+        chaptersComicFilter.value = currentValue;
+      }
+    }
+
     async function renderChapters() {
       const chapters = await loadChapters();
       const comics = await loadComics();
 
-      if (chapters.length === 0) {
+      await fillChaptersComicFilter(comics);
+
+      const selectedComicId = chaptersComicFilter.value;
+
+      const filtered = selectedComicId
+        ? chapters.filter(chapter => chapter.comicId === selectedComicId)
+        : chapters;
+
+      chaptersFilterCount.textContent =
+        selectedComicId
+          ? `Показано: ${filtered.length}`
+          : `Усього: ${chapters.length}`;
+
+      if (filtered.length === 0) {
         chaptersList.innerHTML = `
           <div class="empty-state">
-            📭 Розділів поки що немає.
+            ${selectedComicId
+              ? "📭 Для цього коміксу розділів поки немає."
+              : "📭 Розділів поки що немає."}
           </div>
         `;
         return;
       }
 
-      const sorted = [...chapters].sort((a, b) => {
+      const sorted = [...filtered].sort((a, b) => {
         const comicA = comics.find(c => c.id === a.comicId)?.title || "";
         const comicB = comics.find(c => c.id === b.comicId)?.title || "";
 
@@ -3564,6 +3646,10 @@
         });
       });
     }
+
+    chaptersComicFilter.addEventListener("change", () => {
+      renderChapters().catch(console.error);
+    });
 
     chapterForm.addEventListener("submit", async (event) => {
       event.preventDefault();
