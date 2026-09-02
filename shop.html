@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Магазин | Comic Cards</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,sans-serif;background:#0f0f0f;color:#fff}
+    header{position:sticky;top:0;z-index:20;background:#1a1a1a;border-bottom:1px solid #2a2a2a;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+    .brand{font-size:22px;font-weight:900;color:#ff9800}
+    .actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;border:0;border-radius:8px;padding:10px 14px;background:#2b2b2b;color:#fff;font-weight:800;cursor:pointer}
+    .btn:hover{background:#3a3a3a}
+    .balance{padding:9px 13px;border-radius:999px;background:#3a2f18;color:#ffd166;font-weight:900;border:1px solid #5d4a1c}
+    .balance.frozen{background:#482020;color:#ff9a9a;border-color:#6c3030}
+    main{width:min(1200px,calc(100% - 28px));margin:32px auto 70px}
+    .hero{background:#171717;border:1px solid #2b2b2b;border-radius:16px;padding:26px;margin-bottom:24px}
+    .hero h1{margin:0 0 8px;font-size:32px}
+    .hero p{margin:0;color:#999;line-height:1.55}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px}
+    .item{background:#151515;border:1px solid #2d2d2d;border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+    .item img{width:100%;aspect-ratio:3/4;object-fit:contain;background:#0b0b0b;display:block}
+    .body{padding:15px;display:flex;flex-direction:column;gap:9px;flex:1}
+    .name{font-size:18px;font-weight:900}
+    .desc{color:#929292;font-size:13px;line-height:1.5;flex:1}
+    .price{font-size:18px;font-weight:900;color:#ffd166}
+    .buy{border:0;border-radius:9px;padding:12px 14px;background:#ff9800;color:#fff;font-weight:900;cursor:pointer}
+    .buy:hover{background:#e68900}
+    .buy:disabled{opacity:.5;cursor:not-allowed}
+    .owned{padding:12px;border-radius:9px;background:#173c23;color:#8fe5a6;text-align:center;font-weight:800}
+    .state{grid-column:1/-1;padding:50px 20px;border:1px dashed #333;border-radius:14px;text-align:center;color:#777}
+    .notice{margin:0 0 18px;color:#ff9a9a;display:none}
+    @media(max-width:650px){.hero h1{font-size:27px}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand">🛒 Магазин фігурок</div>
+  <div class="actions">
+    <span class="balance" id="balance">💰 0</span>
+    <a class="btn" href="index.html">← На головну</a>
+    <a class="btn" href="profile.html">👤 Кабінет</a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Унікальні фігурки</h1>
+    <p>Продавай зайві картки в особистому кабінеті, накопичуй монети й обмінюй їх на спеціальні фігурки.</p>
+  </section>
+  <p class="notice" id="notice">🔒 Баланс заморожений адміністратором. Покупки тимчасово недоступні.</p>
+  <div class="grid" id="grid"><div class="state">Завантаження...</div></div>
+</main>
+
+<script type="module">
+  import { auth } from './js/firebase.js';
+  import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore, collection, getDocs, getDoc, doc, query, where,
+    runTransaction, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const db=getFirestore(auth.app);
+  const ADMIN_UID="pSMXTD18TYYLLA3CnBb8shBzHII3";
+  const balanceEl=document.getElementById("balance");
+  const grid=document.getElementById("grid");
+  const notice=document.getElementById("notice");
+  let user=null,wallet={balance:0,frozen:false},shopFigures=[],ownedShop=[];
+
+  function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
+  function driveImage(url=""){
+    const m=url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)||url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    return m?`https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`:url;
+  }
+  function placeholder(){return "data:image/svg+xml;charset=UTF-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="700" height="900"><rect width="100%" height="100%" fill="#101010"/><text x="50%" y="50%" text-anchor="middle" fill="#666" font-size="48">FIGURE</text></svg>')}
+
+  async function maintenanceCheck(currentUser){
+    if(!currentUser||currentUser.uid===ADMIN_UID)return false;
+    const snap=await getDoc(doc(db,"site_settings","home"));
+    if(snap.exists()&&snap.data().maintenanceMode===true){
+      location.href="maintenance.html";
+      return true;
+    }
+    return false;
+  }
+
+  async function loadData(){
+    const [walletSnap,shopSnap,ownedSnap]=await Promise.all([
+      getDoc(doc(db,"wallets",user.uid)),
+      getDocs(collection(db,"shop_figures")),
+      getDocs(query(collection(db,"user_shop_figures"),where("userId","==",user.uid)))
+    ]);
+    wallet=walletSnap.exists()?{balance:0,frozen:false,...walletSnap.data()}:{balance:0,frozen:false};
+    shopFigures=shopSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled!==false);
+    ownedShop=ownedSnap.docs.map(d=>({id:d.id,...d.data()}));
+    render();
+  }
+
+  function render(){
+    balanceEl.textContent=`💰 ${Number(wallet.balance||0)}`;
+    balanceEl.classList.toggle("frozen",Boolean(wallet.frozen));
+    notice.style.display=wallet.frozen?"block":"none";
+
+    if(!shopFigures.length){
+      grid.innerHTML='<div class="state">Магазин поки що порожній.</div>';
+      return;
+    }
+
+    grid.innerHTML=shopFigures.map(item=>{
+      const owned=ownedShop.some(x=>x.shopFigureId===item.id);
+      const canAfford=Number(wallet.balance||0)>=Number(item.price||0);
+      return `
+        <article class="item">
+          <img src="${esc(item.image?driveImage(item.image):placeholder())}" alt="${esc(item.name||"Фігурка")}">
+          <div class="body">
+            <div class="name">${esc(item.name||"Без назви")}</div>
+            <div class="desc">${esc(item.description||"Без опису")}</div>
+            <div class="price">💰 ${Number(item.price||0)}</div>
+            ${owned
+              ? '<div class="owned">✅ Уже на твоїй поличці</div>'
+              : `<button class="buy" type="button" data-buy="${esc(item.id)}" ${wallet.frozen||!canAfford?"disabled":""}>${wallet.frozen?"🔒 Баланс заморожений":canAfford?"Купити":"Недостатньо монет"}</button>`
+            }
+          </div>
+        </article>`;
+    }).join("");
+
+    document.querySelectorAll("[data-buy]").forEach(btn=>btn.addEventListener("click",()=>buyFigure(btn.dataset.buy,btn)));
+  }
+
+  async function buyFigure(id,button){
+    const item=shopFigures.find(x=>x.id===id);
+    if(!item||wallet.frozen)return;
+    const price=Number(item.price||0);
+    if(!confirm(`Купити «${item.name||"фігурку"}» за ${price} монет?`))return;
+
+    try{
+      button.disabled=true;
+      const walletRef=doc(db,"wallets",user.uid);
+      const ownedRef=doc(db,"user_shop_figures",`${user.uid}_${item.id}`);
+      const actionRef=doc(db,"economy_actions",`buy_${user.uid}_${item.id}`);
+      const shopRef=doc(db,"shop_figures",item.id);
+
+      await runTransaction(db,async tx=>{
+        const [walletSnap,ownedSnap,shopSnap]=await Promise.all([
+          tx.get(walletRef),tx.get(ownedRef),tx.get(shopRef)
+        ]);
+        if(ownedSnap.exists())throw new Error("ALREADY_OWNED");
+        if(!shopSnap.exists()||shopSnap.data().enabled===false)throw new Error("NOT_AVAILABLE");
+        const freshWallet=walletSnap.exists()?walletSnap.data():{balance:0,frozen:false};
+        if(freshWallet.frozen===true)throw new Error("WALLET_FROZEN");
+        const freshPrice=Number(shopSnap.data().price||0);
+        if(Number(freshWallet.balance||0)<freshPrice)throw new Error("NO_MONEY");
+
+        tx.set(actionRef,{
+          userId:user.uid,
+          type:"buy_shop_figure",
+          shopFigureId:item.id,
+          amount:freshPrice,
+          createdAt:serverTimestamp()
+        });
+        tx.set(ownedRef,{
+          userId:user.uid,
+          shopFigureId:item.id,
+          purchasePrice:freshPrice,
+          actionId:actionRef.id,
+          obtainedAt:serverTimestamp()
+        });
+        tx.set(walletRef,{
+          userId:user.uid,
+          balance:Number(freshWallet.balance||0)-freshPrice,
+          frozen:false,
+          lastActionId:actionRef.id,
+          updatedAt:serverTimestamp()
+        },{merge:true});
+      });
+
+      await loadData();
+    }catch(error){
+      console.error(error);
+      const msg={
+        ALREADY_OWNED:"Ця фігурка вже є у тебе.",
+        NOT_AVAILABLE:"Товар уже недоступний.",
+        WALLET_FROZEN:"Баланс заморожений адміністратором.",
+        NO_MONEY:"Недостатньо монет."
+      }[error?.message]||"Не вдалося купити фігурку.";
+      alert(msg);
+      button.disabled=false;
+    }
+  }
+
+  onAuthStateChanged(auth,async currentUser=>{
+    if(await maintenanceCheck(currentUser))return;
+    if(!currentUser){location.href="login.html";return;}
+    const blocked=await getDoc(doc(db,"blocked_users",currentUser.uid));
+    if(blocked.exists()&&blocked.data().blocked===true){
+      alert("Цей акаунт заблоковано адміністратором.");
+      await signOut(auth);
+      location.href="login.html";
+      return;
+    }
+    user=currentUser;
+    await loadData();
+  });
+</script>
+</body>
+</html>

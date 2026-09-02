@@ -17,7 +17,7 @@
     .profile-card{display:grid;grid-template-columns:110px 1fr;gap:18px;align-items:center;background:#1a1a1a;border:1px solid #2c2c2c;border-radius:16px;padding:22px;margin-bottom:24px}
     .avatar{width:110px;height:110px;border-radius:50%;background:#292929;border:2px solid #3b3b3b;display:flex;align-items:center;justify-content:center;font-size:42px}
     .profile-info h1{font-size:28px;margin-bottom:8px}.profile-info p{color:#aaa;margin:4px 0}.badge{display:inline-block;margin-top:8px;padding:5px 9px;border-radius:999px;background:#2b2b2b;color:#ffb347;font-size:12px;font-weight:800}
-    .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:24px}
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:24px}
     .stat{background:#1a1a1a;border:1px solid #2c2c2c;border-radius:12px;padding:18px;text-align:center}
     .stat strong{display:block;font-size:28px;color:#ff9800}.stat span{color:#8d8d8d;font-size:13px}
     .panel{background:#1a1a1a;border:1px solid #2c2c2c;border-radius:14px;padding:20px}
@@ -28,7 +28,7 @@
     .item-img{aspect-ratio:5/7;background:#0b0b0b}.item-img img{width:100%;height:100%;object-fit:cover;display:block}
     .item-body{padding:14px}.item-name{font-size:17px;font-weight:800;margin-bottom:6px}.item-comic{color:#8f8f8f;font-size:13px;margin-bottom:7px}.rarity{display:inline-block;background:#272727;border:1px solid #353535;border-radius:999px;padding:5px 9px;color:#ffb347;font-size:12px;font-weight:800;margin-bottom:10px}
     .item-meta{color:#777;font-size:12px}
-    .item-actions{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .item-actions{margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
     .view-btn,.trash-btn{width:100%;border:0;border-radius:8px;padding:10px 12px;cursor:pointer;font-weight:800}
     .view-btn{background:#2b3a4a;color:#dbeeff}
     .view-btn:hover{background:#35516d}
@@ -101,6 +101,15 @@
     .pack-message{margin-top:18px;min-height:20px;color:#aaa;font-size:14px}.pack-message.success{color:#7fda94}.pack-message.error{color:#ff8f8f}
     @media(max-width:760px){.pack-cards{grid-template-columns:1fr}.pack-card{display:grid;grid-template-columns:120px 1fr}.pack-card img{height:168px;aspect-ratio:auto}}
 
+
+    .coin-balance{color:#ffd166!important}
+    .sell-btn{width:100%;border:0;border-radius:8px;padding:10px 12px;cursor:pointer;font-weight:800;background:#5a4216;color:#ffe4a3}
+    .sell-btn:hover{background:#74571c}
+    .sell-btn:disabled{opacity:.45;cursor:not-allowed}
+    .wallet-note{margin:0 0 18px;color:#999;font-size:13px}
+    .wallet-note.frozen{color:#ff9a9a}
+    .shop-figure-badge{display:inline-block;background:#3a2c55;color:#d9c4ff;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800}
+
   </style>
 </head>
 <body>
@@ -110,6 +119,7 @@
   <div class="top-actions">
     <a class="btn" href="index.html">← На головну</a>
     <button class="btn pack-btn" id="packBtnTop" type="button">🎁 Пакунок</button>
+    <a class="btn" href="shop.html">🛒 Магазин</a>
     <a class="btn" id="adminLink" href="admin.html" style="display:none;">⚙️ Адмін-панель</a>
     <button class="btn orange" id="logoutBtn">Вийти</button>
   </div>
@@ -138,10 +148,15 @@
       <strong id="comicsCount">0</strong>
       <span>Коміксів у колекції</span>
     </div>
+    <div class="stat">
+      <strong id="coinBalance" class="coin-balance">0</strong>
+      <span>Монет</span>
+    </div>
   </section>
 
   <section class="panel">
     <h2>🎒 Інвентар карток</h2>
+    <div class="wallet-note" id="walletNote">💰 Дублікати можна продавати за монети.</div>
     <p class="panel-sub">Тут зберігатимуться картки, які користувач отримав під час читання коміксів.</p>
 
     <div class="toolbar">
@@ -235,6 +250,8 @@
   const cardsCount = document.getElementById("cardsCount");
   const uniqueCount = document.getElementById("uniqueCount");
   const comicsCount = document.getElementById("comicsCount");
+  const coinBalance = document.getElementById("coinBalance");
+  const walletNote = document.getElementById("walletNote");
   const inventory = document.getElementById("inventory");
   const figureShelf = document.getElementById("figureShelf");
   const comicFilter = document.getElementById("comicFilter");
@@ -267,6 +284,9 @@
   let ownedFigures = [];
   let figures = [];
   let comics = [];
+  let wallet = { balance:0, frozen:false };
+  let ownedShopFigures = [];
+  let shopFigures = [];
 
 
   async function redirectIfMaintenance(user) {
@@ -468,20 +488,47 @@
     location.href = "login.html";
   });
 
+
+  function cardSellPrice(card){
+    const rarity=String(card?.rarity||"Common").toLowerCase();
+    if(rarity==="legendary") return 75;
+    if(rarity==="epic") return 30;
+    if(rarity==="rare") return 12;
+    if(rarity==="uncommon") return 8;
+    return 5;
+  }
+
+  async function loadWallet(){
+    const snap=await getDoc(doc(db,"wallets",user.uid));
+    wallet=snap.exists()?{balance:0,frozen:false,...snap.data()}:{balance:0,frozen:false};
+    coinBalance.textContent=Number(wallet.balance||0);
+    walletNote.classList.toggle("frozen",Boolean(wallet.frozen));
+    walletNote.textContent=wallet.frozen
+      ?"🔒 Баланс заморожений адміністратором. Продаж і покупки тимчасово недоступні."
+      :"💰 Дублікати можна продавати за монети.";
+  }
+
   async function loadInventory() {
-    const [ownedSnap, cardSnap, ownedFiguresSnap, figureSnap, comicSnap] = await Promise.all([
+    const [ownedSnap, cardSnap, ownedFiguresSnap, figureSnap, comicSnap, ownedShopSnap, shopFigureSnap] = await Promise.all([
       getDocs(query(collection(db, "user_cards"), where("userId", "==", user.uid))),
       getDocs(collection(db, "cards")),
       getDocs(query(collection(db, "user_figures"), where("userId", "==", user.uid))),
       getDocs(collection(db, "figures")),
-      getDocs(collection(db, "comics"))
+      getDocs(collection(db, "comics")),
+      getDocs(query(collection(db, "user_shop_figures"), where("userId", "==", user.uid))),
+      getDocs(collection(db, "shop_figures"))
     ]);
 
-    owned = ownedSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    owned = ownedSnap.docs
+      .map(d => ({ id:d.id, ...d.data() }))
+      .filter(item => item.sold !== true);
     cards = cardSnap.docs.map(d => ({ id:d.id, ...d.data() }));
     ownedFigures = ownedFiguresSnap.docs.map(d => ({ id:d.id, ...d.data() }));
     figures = figureSnap.docs.map(d => ({ id:d.id, ...d.data() }));
     comics = comicSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    ownedShopFigures = ownedShopSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    shopFigures = shopFigureSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    await loadWallet();
 
     fillComicFilter();
     updateStats();
@@ -581,6 +628,12 @@
               type="button"
               data-delete-owned="${esc(own.id)}"
             >🗑️ Видалити</button>
+            <button
+              class="sell-btn"
+              type="button"
+              data-sell-owned="${esc(own.id)}"
+              ${wallet.frozen ? "disabled" : ""}
+            >💰 +${cardSellPrice(card)}</button>
           </div>
         </div>
       </article>
@@ -624,6 +677,66 @@
       });
     });
 
+
+    document.querySelectorAll("[data-sell-owned]").forEach(button => {
+      button.addEventListener("click", async () => {
+        const ownedId=button.dataset.sellOwned;
+        const ownedCard=owned.find(item=>item.id===ownedId);
+        if(!ownedCard)return;
+        const card=cards.find(item=>item.id===ownedCard.cardId);
+        if(!card)return;
+        const price=cardSellPrice(card);
+
+        if(wallet.frozen){
+          alert("Баланс заморожений адміністратором.");
+          return;
+        }
+
+        if(!confirm(`Продати «${card.name||"картку"}» за ${price} монет? Картка зникне з інвентарю.`))return;
+
+        try{
+          button.disabled=true;
+          const walletRef=doc(db,"wallets",user.uid);
+          const ownedRef=doc(db,"user_cards",ownedId);
+          const actionRef=doc(db,"economy_actions",`sell_${user.uid}_${ownedId}`);
+
+          await runTransaction(db,async tx=>{
+            const [walletSnap,ownedSnap]=await Promise.all([tx.get(walletRef),tx.get(ownedRef)]);
+            if(!ownedSnap.exists())throw new Error("CARD_GONE");
+            const currentWallet=walletSnap.exists()?walletSnap.data():{balance:0,frozen:false};
+            if(currentWallet.frozen===true)throw new Error("WALLET_FROZEN");
+
+            tx.update(ownedRef,{
+              sold:true,
+              soldAt:serverTimestamp(),
+              soldActionId:actionRef.id
+            });
+            tx.set(actionRef,{
+              userId:user.uid,
+              type:"sell_card",
+              ownedCardId:ownedId,
+              cardId:card.id,
+              amount:price,
+              createdAt:serverTimestamp()
+            });
+            tx.set(walletRef,{
+              userId:user.uid,
+              balance:Number(currentWallet.balance||0)+price,
+              frozen:false,
+              lastActionId:actionRef.id,
+              updatedAt:serverTimestamp()
+            },{merge:true});
+          });
+
+          await loadInventory();
+        }catch(error){
+          console.error("Sell error:",error);
+          alert(error?.message==="WALLET_FROZEN"?"Баланс заморожений адміністратором.":"Не вдалося продати картку.");
+          button.disabled=false;
+        }
+      });
+    });
+
     document.querySelectorAll("[data-delete-owned]").forEach(button => {
       button.addEventListener("click", async () => {
         const ownedId = button.dataset.deleteOwned;
@@ -663,7 +776,8 @@
   function resetCard3D(){cardDragging=false;activePointerId=null;cardRotationY=0;cardRotationX=0;viewerImageWrap.classList.remove("dragging");applyCardTransform();[cardShineFront,cardShineBack].forEach(sh=>{sh.style.setProperty("--shine-x","50%");sh.style.setProperty("--shine-y","50%")})}
 
   function renderFigureShelf() {
-    if (!ownedFigures.length) {
+    const hasAnyFigures = ownedFigures.length || ownedShopFigures.length;
+    if (!hasAnyFigures) {
       figureShelf.innerHTML = `
         <div class="empty">
           Поличка поки що порожня. 👀<br>
@@ -673,7 +787,7 @@
       return;
     }
 
-    figureShelf.innerHTML = ownedFigures.map(own => {
+    const normalHtml = ownedFigures.map(own => {
       const figure = figures.find(item => item.id === own.figureId);
       if (!figure) return "";
 
@@ -696,6 +810,24 @@
         </article>
       `;
     }).join("");
+
+    const shopHtml = ownedShopFigures.map(own => {
+      const figure=shopFigures.find(item=>item.id===own.shopFigureId);
+      if(!figure)return "";
+      const image=figure.image?driveImage(figure.image):placeholder();
+      return `
+        <article class="figure-item">
+          <img src="${image}" alt="${esc(figure.name||"Фігурка")}">
+          <div class="figure-item-info">
+            <div class="figure-item-title">${esc(figure.name||"Без назви")}</div>
+            <span class="shop-figure-badge">🛒 Магазин</span>
+            <div class="figure-item-desc">${esc(figure.description||"Без опису")}</div>
+            <div class="item-meta">Придбано: ${formatDate(own.obtainedAt)}</div>
+          </div>
+        </article>`;
+    }).join("");
+
+    figureShelf.innerHTML = normalHtml + shopHtml;
   }
 
 

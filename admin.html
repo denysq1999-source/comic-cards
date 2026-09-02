@@ -1104,6 +1104,19 @@
         max-width: 320px;
       }
     }
+
+    .shop-admin-grid{display:grid;grid-template-columns:minmax(280px,390px) minmax(0,1fr);gap:24px;align-items:start}
+    .shop-figures-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px}
+    .shop-figure-card{background:#151515;border:1px solid #2c2c2c;border-radius:12px;overflow:hidden}
+    .shop-figure-card img{width:100%;aspect-ratio:3/4;object-fit:contain;background:#0d0d0d;display:block}
+    .shop-figure-body{padding:14px;display:flex;flex-direction:column;gap:8px}
+    .shop-price{color:#ffd166;font-weight:900}
+    .wallet-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;background:#3a2f18;color:#ffd166;font-size:12px;font-weight:800}
+    .wallet-pill.frozen{background:#482020;color:#ff9a9a}
+    .user-action-btn.wallet{background:#5b4518}
+    .user-action-btn.freeze{background:#5a315f}
+    @media(max-width:900px){.shop-admin-grid{grid-template-columns:1fr}}
+
   </style>
 </head>
 <body>
@@ -1121,6 +1134,9 @@
 
     <div class="menu-item" data-section="figures">
       <span>🧍</span> Фігурки і поличка
+    </div>
+    <div class="menu-item" data-section="shop">
+      <span>🛒</span> Магазин фігурок
     </div>
 
     <div class="menu-item" data-section="series">
@@ -1238,6 +1254,32 @@
             <h2>🪵 Поличка фігурок</h2>
             <p class="panel-subtitle">Тут зберігається бібліотека фігурок.</p>
             <div class="figures-grid" id="figuresGrid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Магазин унікальних фігурок -->
+      <section class="section" id="shop">
+        <div class="shop-admin-grid">
+          <div class="panel">
+            <h2 id="shopFigureFormTitle">➕ Товар у магазин</h2>
+            <p class="panel-subtitle">Унікальні фігурки, які можна придбати тільки за монети.</p>
+            <form id="shopFigureForm">
+              <div class="form-group"><label for="shopFigureName">Назва</label><input id="shopFigureName" type="text" required></div>
+              <div class="form-group"><label for="shopFigureImage">Передня сторона</label><input id="shopFigureImage" type="url" placeholder="Google Drive або пряме посилання"></div>
+              <div class="form-group"><label for="shopFigureBack">Задня сторона</label><input id="shopFigureBack" type="url" placeholder="Google Drive або пряме посилання"></div>
+              <div class="form-group"><label for="shopFigureDescription">Опис</label><textarea id="shopFigureDescription"></textarea></div>
+              <div class="form-group"><label for="shopFigurePrice">Ціна в монетах</label><input id="shopFigurePrice" type="number" min="1" step="1" value="100" required></div>
+              <label class="ad-toggle"><input id="shopFigureEnabled" type="checkbox" checked><span>Показувати в магазині</span></label>
+              <button class="primary-btn" type="submit" id="shopFigureSubmitBtn">💾 Додати товар</button>
+              <button class="cancel-edit-btn" type="button" id="cancelShopFigureEditBtn">Скасувати редагування</button>
+              <div class="message" id="shopFigureMessage"></div>
+            </form>
+          </div>
+          <div class="panel">
+            <h2>🛒 Товари</h2>
+            <p class="panel-subtitle">Ціну можна змінювати редагуванням товару.</p>
+            <div class="shop-figures-grid" id="shopFiguresGrid"></div>
           </div>
         </div>
       </section>
@@ -1399,13 +1441,14 @@
                   <th>Email</th>
                   <th>Статус</th>
                   <th>Інвентар</th>
+                  <th>Баланс</th>
                   <th>Ризик</th>
                   <th>Остання активність</th>
                   <th>Дії</th>
                 </tr>
               </thead>
               <tbody id="usersTableBody">
-                <tr><td colspan="6" style="color:#777;">Завантаження...</td></tr>
+                <tr><td colspan="7" style="color:#777;">Завантаження...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1693,6 +1736,7 @@
     let adminUserFigures = [];
     let adminCardsCatalog = [];
     let adminFiguresCatalog = [];
+    let adminWallets = [];
 
 
     // ===== Захист адмінки — Firebase НЕ змінено =====
@@ -1802,22 +1846,27 @@
           userCardsSnap,
           userFiguresSnap,
           cardsSnap,
-          figuresSnap
+          figuresSnap,
+          walletsSnap
         ] = await Promise.all([
           getDocs(collection(db, "users")),
           getDocs(collection(db, "blocked_users")),
           getDocs(collection(db, "user_cards")),
           getDocs(collection(db, "user_figures")),
           getDocs(collection(db, "cards")),
-          getDocs(collection(db, "figures"))
+          getDocs(collection(db, "figures")),
+          getDocs(collection(db, "wallets"))
         ]);
 
         adminUsers = usersSnap.docs.map(d => ({ id:d.id, ...d.data() }));
         blockedUserIds = new Set(blockedSnap.docs.map(d => d.id));
-        adminUserCards = userCardsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+        adminUserCards = userCardsSnap.docs
+          .map(d => ({ id:d.id, ...d.data() }))
+          .filter(item => item.sold !== true);
         adminUserFigures = userFiguresSnap.docs.map(d => ({ id:d.id, ...d.data() }));
         adminCardsCatalog = cardsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
         adminFiguresCatalog = figuresSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+        adminWallets = walletsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
 
         adminUsers.sort((a,b) =>
           String(a.email || "").localeCompare(String(b.email || ""), "uk")
@@ -1871,6 +1920,14 @@
                 <span class="inventory-pill">🧍 ${audit.figuresOwned.length}</span>
               </div>
             </td>
+            <td>
+              ${(() => {
+                const w=adminWallets.find(x=>x.id===user.id);
+                const balance=Number(w?.balance||0);
+                const frozen=Boolean(w?.frozen);
+                return `<span class="wallet-pill ${frozen?"frozen":""}">${frozen?"🔒":"💰"} ${balance}</span>`;
+              })()}
+            </td>
             <td>${riskHtml}</td>
             <td>${escapeHtml(formatUserTimestamp(user.lastSeenAt))}</td>
             <td>
@@ -1880,6 +1937,10 @@
                   type="button"
                   data-inspect-user="${escapeHtml(user.id)}"
                 >🔎 Інвентар</button>
+
+                <button class="user-action-btn wallet" type="button" data-wallet-add="${escapeHtml(user.id)}">💰 + монети</button>
+                <button class="user-action-btn freeze" type="button" data-wallet-freeze="${escapeHtml(user.id)}">❄️ Баланс</button>
+                <button class="user-action-btn block" type="button" data-wallet-reset="${escapeHtml(user.id)}">0️⃣ Обнулити</button>
 
                 <button
                   class="user-action-btn reset"
@@ -1905,6 +1966,60 @@
       document.querySelectorAll("[data-inspect-user]").forEach(button => {
         button.addEventListener("click", () => {
           openInventoryAudit(button.dataset.inspectUser);
+        });
+      });
+
+
+      document.querySelectorAll("[data-wallet-add]").forEach(button=>{
+        button.addEventListener("click",async()=>{
+          const uid=button.dataset.walletAdd;
+          const user=adminUsers.find(x=>x.id===uid);
+          const raw=prompt(`Скільки монет додати ${user?.email||uid}?`,"100");
+          if(raw===null)return;
+          const amount=Math.floor(Number(raw));
+          if(!Number.isFinite(amount)||amount<=0){alert("Введи число більше 0.");return;}
+          const current=adminWallets.find(x=>x.id===uid);
+          await setDoc(doc(db,"wallets",uid),{
+            userId:uid,
+            balance:Number(current?.balance||0)+amount,
+            frozen:Boolean(current?.frozen),
+            updatedAt:serverTimestamp(),
+            updatedBy:ADMIN_UID
+          },{merge:true});
+          await loadAdminUsers();
+        });
+      });
+
+      document.querySelectorAll("[data-wallet-freeze]").forEach(button=>{
+        button.addEventListener("click",async()=>{
+          const uid=button.dataset.walletFreeze;
+          const current=adminWallets.find(x=>x.id===uid);
+          const next=!Boolean(current?.frozen);
+          await setDoc(doc(db,"wallets",uid),{
+            userId:uid,
+            balance:Number(current?.balance||0),
+            frozen:next,
+            updatedAt:serverTimestamp(),
+            updatedBy:ADMIN_UID
+          },{merge:true});
+          await loadAdminUsers();
+        });
+      });
+
+      document.querySelectorAll("[data-wallet-reset]").forEach(button=>{
+        button.addEventListener("click",async()=>{
+          const uid=button.dataset.walletReset;
+          const user=adminUsers.find(x=>x.id===uid);
+          if(!confirm(`Обнулити баланс ${user?.email||uid}?`))return;
+          const current=adminWallets.find(x=>x.id===uid);
+          await setDoc(doc(db,"wallets",uid),{
+            userId:uid,
+            balance:0,
+            frozen:Boolean(current?.frozen),
+            updatedAt:serverTimestamp(),
+            updatedBy:ADMIN_UID
+          },{merge:true});
+          await loadAdminUsers();
         });
       });
 
@@ -2122,6 +2237,7 @@
       dashboard: "Головна",
       cards: "Картки",
       figures: "Фігурки і поличка",
+      shop: "Магазин фігурок",
       series: "Серії",
       comics: "Комікси",
       chapters: "Додати розділ",
@@ -2149,6 +2265,9 @@
         if (id === "figures") {
           refreshFigureComicSelect();
           renderFigures();
+        }
+        if (id === "shop") {
+          renderShopFigures();
         }
         if (id === "maintenance") {
           loadMaintenanceMode();
@@ -2783,6 +2902,117 @@
     document.addEventListener("keydown",e=>{if(e.key==="Escape"&&figureViewer.classList.contains("show"))closeFigureViewer();});
 
 
+
+    // ===== Магазин унікальних фігурок =====
+    const shopFigureForm=document.getElementById("shopFigureForm");
+    const shopFigureName=document.getElementById("shopFigureName");
+    const shopFigureImage=document.getElementById("shopFigureImage");
+    const shopFigureBack=document.getElementById("shopFigureBack");
+    const shopFigureDescription=document.getElementById("shopFigureDescription");
+    const shopFigurePrice=document.getElementById("shopFigurePrice");
+    const shopFigureEnabled=document.getElementById("shopFigureEnabled");
+    const shopFigureSubmitBtn=document.getElementById("shopFigureSubmitBtn");
+    const cancelShopFigureEditBtn=document.getElementById("cancelShopFigureEditBtn");
+    const shopFigureMessage=document.getElementById("shopFigureMessage");
+    const shopFiguresGrid=document.getElementById("shopFiguresGrid");
+    const shopFigureFormTitle=document.getElementById("shopFigureFormTitle");
+    let editingShopFigureId=null;
+
+    function showShopFigureMessage(text,type){
+      shopFigureMessage.textContent=text;
+      shopFigureMessage.className=`message show ${type}`;
+      setTimeout(()=>shopFigureMessage.className="message",3000);
+    }
+
+    async function loadShopFigures(){
+      const snap=await getDocs(collection(db,"shop_figures"));
+      return snap.docs.map(d=>({id:d.id,...d.data()}));
+    }
+
+    async function renderShopFigures(){
+      const items=await loadShopFigures();
+      if(!items.length){
+        shopFiguresGrid.innerHTML='<div class="empty-state">🛒 Магазин поки порожній.</div>';
+        return;
+      }
+      shopFiguresGrid.innerHTML=items.map(item=>`
+        <article class="shop-figure-card">
+          <img src="${escapeHtml(item.image?getCoverImageUrl(item.image):"")}" alt="${escapeHtml(item.name||"Фігурка")}">
+          <div class="shop-figure-body">
+            <strong>${escapeHtml(item.name||"Без назви")}</strong>
+            <span class="shop-price">💰 ${Number(item.price||0)}</span>
+            <span>${item.enabled===false?"⛔ Приховано":"✅ У магазині"}</span>
+            <div class="figure-actions">
+              <button class="figure-edit-btn" type="button" data-shop-edit="${escapeHtml(item.id)}">✏️ Редагувати</button>
+              <button class="figure-delete-btn" type="button" data-shop-delete="${escapeHtml(item.id)}">🗑️</button>
+            </div>
+          </div>
+        </article>`).join("");
+
+      document.querySelectorAll("[data-shop-edit]").forEach(btn=>btn.addEventListener("click",async()=>{
+        const item=(await loadShopFigures()).find(x=>x.id===btn.dataset.shopEdit);
+        if(!item)return;
+        editingShopFigureId=item.id;
+        shopFigureName.value=item.name||"";
+        shopFigureImage.value=item.image||"";
+        shopFigureBack.value=item.backImage||"";
+        shopFigureDescription.value=item.description||"";
+        shopFigurePrice.value=Number(item.price||100);
+        shopFigureEnabled.checked=item.enabled!==false;
+        shopFigureFormTitle.textContent="✏️ Редагувати товар";
+        shopFigureSubmitBtn.textContent="💾 Зберегти зміни";
+        cancelShopFigureEditBtn.style.display="block";
+      }));
+
+      document.querySelectorAll("[data-shop-delete]").forEach(btn=>btn.addEventListener("click",async()=>{
+        const id=btn.dataset.shopDelete;
+        const owners=await getDocs(query(collection(db,"user_shop_figures"),where("shopFigureId","==",id)));
+        if(!owners.empty){alert(`Не можна видалити: фігурка вже є у ${owners.size} користувач(ів). Приховай товар або відредагуй його.`);return;}
+        if(!confirm("Видалити товар?"))return;
+        await deleteDoc(doc(db,"shop_figures",id));
+        await renderShopFigures();
+      }));
+    }
+
+    shopFigureForm.addEventListener("submit",async e=>{
+      e.preventDefault();
+      const data={
+        name:shopFigureName.value.trim(),
+        image:shopFigureImage.value.trim(),
+        backImage:shopFigureBack.value.trim(),
+        description:shopFigureDescription.value.trim(),
+        price:Math.max(1,Math.floor(Number(shopFigurePrice.value||0))),
+        enabled:shopFigureEnabled.checked
+      };
+      if(!data.name||!data.price){showShopFigureMessage("Введи назву і ціну.","error");return;}
+      if(editingShopFigureId){
+        await setDoc(doc(db,"shop_figures",editingShopFigureId),{...data,updatedAt:serverTimestamp()},{merge:true});
+        showShopFigureMessage("Товар оновлено ✅","success");
+      }else{
+        await addDoc(collection(db,"shop_figures"),{...data,createdAt:serverTimestamp()});
+        showShopFigureMessage("Товар додано ✅","success");
+      }
+      editingShopFigureId=null;
+      shopFigureForm.reset();
+      shopFigurePrice.value=100;
+      shopFigureEnabled.checked=true;
+      shopFigureFormTitle.textContent="➕ Товар у магазин";
+      shopFigureSubmitBtn.textContent="💾 Додати товар";
+      cancelShopFigureEditBtn.style.display="none";
+      await renderShopFigures();
+    });
+
+    cancelShopFigureEditBtn.addEventListener("click",()=>{
+      editingShopFigureId=null;
+      shopFigureForm.reset();
+      shopFigurePrice.value=100;
+      shopFigureEnabled.checked=true;
+      shopFigureFormTitle.textContent="➕ Товар у магазин";
+      shopFigureSubmitBtn.textContent="💾 Додати товар";
+      cancelShopFigureEditBtn.style.display="none";
+    });
+
+
     // ===== Технічні роботи =====
     const maintenanceState = document.getElementById("maintenanceState");
     const maintenanceStatusText = document.getElementById("maintenanceStatusText");
@@ -3234,6 +3464,7 @@
       await renderComics();
       await refreshFigureComicSelect();
       await renderFigures();
+      await renderShopFigures();
       await loadGuestBanner();
     }
 

@@ -742,6 +742,7 @@
       <a class="nav-link support" id="supportLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">☕ Підтримати автора</a>
 
       <button class="nav-button nav-auth pack-btn" id="packBtnTop" type="button" style="display:none;">🎁 Пакунок</button>
+      <a class="nav-link nav-auth" id="shopBtnTop" href="shop.html" style="display:none;">🛒 Магазин</a>
       <a class="nav-link nav-auth" id="profileBtnTop" href="profile.html">👤 Особистий кабінет</a>
       <a class="nav-link nav-admin" id="adminBtnTop" href="admin.html">⚙️ Адмін-панель</a>
       <button class="nav-button nav-auth" id="logoutBtnTop" type="button">Вийти</button>
@@ -867,6 +868,7 @@
 
     const adminBtnTop = document.getElementById("adminBtnTop");
     const profileBtnTop = document.getElementById("profileBtnTop");
+    const shopBtnTop = document.getElementById("shopBtnTop");
     const logoutBtnTop = document.getElementById("logoutBtnTop");
     const userInfo = document.getElementById("userInfo");
 
@@ -1449,6 +1451,7 @@
         userInfo.textContent = `Ви увійшли як: ${user.email}`;
         logoutBtnTop.style.display = "inline-flex";
         profileBtnTop.style.display = "inline-flex";
+        shopBtnTop.style.display = "inline-flex";
         packBtnTop.style.display = "inline-flex";
         await loadPackStatus();
 
@@ -1466,6 +1469,7 @@
         userInfo.textContent = "";
         logoutBtnTop.style.display = "none";
         profileBtnTop.style.display = "none";
+        shopBtnTop.style.display = "none";
         packBtnTop.style.display = "none";
         adminBtnTop.style.display = "none";
         if(packTimer)clearInterval(packTimer);
