@@ -1215,6 +1215,21 @@
       }
     }
 
+
+    /* ===== Дуелі / турніри ===== */
+    .duel-admin-grid{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:22px;align-items:start}
+    .duel-admin-list{display:grid;gap:12px}
+    .duel-admin-card{background:#141414;border:1px solid #303030;border-radius:11px;padding:14px}
+    .duel-admin-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .duel-admin-meta{color:#969696;font-size:12px;line-height:1.5;margin-top:6px}
+    .duel-admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .duel-danger{border:0;border-radius:8px;background:#5a2828;color:#ffc2c2;padding:9px 11px;font-weight:800;cursor:pointer}
+    .duel-safe{border:0;border-radius:8px;background:#28513a;color:#c8f6d7;padding:9px 11px;font-weight:800;cursor:pointer}
+    .arena-preview{width:100%;aspect-ratio:16/7;background:#101010;border:1px dashed #383838;border-radius:10px;overflow:hidden;margin:8px 0 14px;display:flex;align-items:center;justify-content:center;color:#666}
+    .arena-preview img{width:100%;height:100%;object-fit:cover;display:none}.arena-preview.has img{display:block}.arena-preview.has span{display:none}
+    .tournament-row{display:grid;grid-template-columns:1fr 140px;gap:12px}
+    @media(max-width:900px){.duel-admin-grid{grid-template-columns:1fr}.tournament-row{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
@@ -1229,6 +1244,9 @@
     <a class="menu-item" href="cards.html" style="text-decoration:none;">
       <span>🃏</span> Картки
     </a>
+    <div class="menu-item" data-section="grantcards">
+      <span>🎁</span> Видати собі картки
+    </div>
 
     <div class="menu-item" data-section="figures">
       <span>🧍</span> Фігурки і поличка
@@ -1250,6 +1268,9 @@
 
     <div class="menu-item" data-section="users">
       <span>👥</span> Користувачі
+    </div>
+    <div class="menu-item" data-section="duels">
+      <span>⚔️</span> Дуелі й турніри
     </div>
 
     <div class="menu-item" data-section="qr">
@@ -1293,6 +1314,18 @@
         <div class="placeholder">
           <h2>Картки</h2>
           <p>Тут буде таблиця карток + кнопка «Додати картку»</p>
+        </div>
+      </section>
+
+      <section class="section" id="grantcards">
+        <div class="panel" style="max-width:720px">
+          <h2>🎁 Видати собі картки</h2>
+          <p class="panel-subtitle">Обери картку та кількість або видай собі по одному екземпляру кожної.</p>
+          <div class="form-group"><label for="grantCardSelect">Картка</label><select id="grantCardSelect"><option value="">Оберіть картку...</option></select></div>
+          <div class="form-group"><label for="grantCardQty">Кількість</label><input id="grantCardQty" type="number" min="1" max="100" value="1"></div>
+          <button class="primary-btn" id="grantSelectedCardBtn" type="button">🃏 Видати вибрану</button>
+          <button class="cancel-edit-btn" id="grantAllCardsBtn" type="button" style="display:block">🎁 Видати всі по 1</button>
+          <div class="message" id="grantCardMessage"></div>
         </div>
       </section>
 
@@ -1661,6 +1694,59 @@
         </div>
       </section>
 
+      <!-- Дуелі й турніри -->
+      <section class="section" id="duels">
+        <div class="duel-admin-grid">
+          <div>
+            <div class="panel">
+              <h2>🎨 Арени</h2>
+              <p class="panel-subtitle">Окремий фон для звичайних PvP-матчів і турнірних боїв.</p>
+
+              <div class="form-group">
+                <label for="normalBattleBackground">⚔️ Фон звичайної дуелі</label>
+                <input id="normalBattleBackground" type="url" placeholder="Google Drive або пряме посилання">
+              </div>
+              <div class="arena-preview" id="normalArenaPreview"><span>⚔️ Звичайна арена</span><img id="normalArenaImg" alt="Звичайна арена"></div>
+
+              <div class="form-group">
+                <label for="tournamentBattleBackground">🏆 Фон турнірної арени</label>
+                <input id="tournamentBattleBackground" type="url" placeholder="Google Drive або пряме посилання">
+              </div>
+              <div class="arena-preview" id="tournamentArenaPreview"><span>🏆 Турнірна арена</span><img id="tournamentArenaImg" alt="Турнірна арена"></div>
+
+              <button class="primary-btn" id="saveDuelSettingsBtn" type="button">💾 Зберегти арени</button>
+              <div class="message" id="duelSettingsMessage"></div>
+            </div>
+
+            <div class="panel" style="margin-top:22px;">
+              <h2>🏟️ Створити турнір</h2>
+              <div class="form-group"><label for="tournamentName">Назва</label><input id="tournamentName" placeholder="Наприклад: Кубок Beta 1.0"></div>
+              <div class="form-group"><label for="tournamentDescription">Опис</label><textarea id="tournamentDescription" placeholder="Короткий опис події"></textarea></div>
+              <div class="tournament-row">
+                <div class="form-group"><label for="tournamentPrize">Приз Топ-1, 💰</label><input id="tournamentPrize" type="number" min="0" value="1000"></div>
+                <div class="form-group"><label for="tournamentMinPlayers">Мін. гравців</label><input id="tournamentMinPlayers" type="number" min="2" max="64" value="2"></div>
+              </div>
+              <button class="primary-btn" id="createTournamentBtn" type="button">🏟️ Створити турнір</button>
+              <div class="message" id="tournamentMessage"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="panel">
+              <h2>⚔️ Активні матчі</h2>
+              <p class="panel-subtitle">Якщо матч завис — адміністратор може скасувати його, повернути ставки й розблокувати обох гравців.</p>
+              <div class="duel-admin-list" id="activeDuelsAdmin"></div>
+            </div>
+
+            <div class="panel" style="margin-top:22px;">
+              <h2>🏆 Турніри</h2>
+              <p class="panel-subtitle">Запусти перший раунд. Коли всі матчі раунду завершаться — натисни «Наступний раунд». Коли залишиться один переможець, йому буде нараховано приз.</p>
+              <div class="duel-admin-list" id="tournamentsAdmin"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- QR-коди -->
       <section class="section" id="qr">
         <div class="placeholder">
@@ -1907,7 +1993,8 @@
       deleteDoc,
       query,
       where,
-      serverTimestamp
+      serverTimestamp,
+      runTransaction
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const db = getFirestore(auth.app);
@@ -2439,11 +2526,13 @@
       dashboard: "Головна",
       cards: "Картки",
       figures: "Фігурки і поличка",
+      grantcards: "Видати собі картки",
       shop: "Магазин фігурок",
       series: "Серії",
       comics: "Комікси",
       chapters: "Додати розділ",
       users: "Користувачі",
+      duels: "Дуелі й турніри",
       qr: "QR-коди",
       stats: "Статистика",
       maintenance: "Технічні роботи",
@@ -2468,8 +2557,16 @@
           refreshFigureComicSelect();
           renderFigures();
         }
+        if (id === "grantcards") {
+          refreshGrantCardSelect();
+        }
         if (id === "shop") {
           renderShopFigures();
+        }
+        if (id === "duels") {
+          loadDuelAdmin();
+          loadDuelSettings();
+          renderTournamentsAdmin();
         }
         if (id === "maintenance") {
           loadMaintenanceMode();
@@ -3007,6 +3104,7 @@
 
         await deleteDoc(doc(db,"figures",figure.id));
         await renderFigures();
+      await refreshGrantCardSelect();
       }));
     }
 
@@ -3241,6 +3339,277 @@
       shopFigureSubmitBtn.textContent="💾 Додати товар";
       cancelShopFigureEditBtn.style.display="none";
     });
+
+
+
+
+    // ===== Видати картки адміну =====
+    const grantCardSelect=document.getElementById("grantCardSelect");
+    const grantCardQty=document.getElementById("grantCardQty");
+    const grantSelectedCardBtn=document.getElementById("grantSelectedCardBtn");
+    const grantAllCardsBtn=document.getElementById("grantAllCardsBtn");
+    const grantCardMessage=document.getElementById("grantCardMessage");
+    async function refreshGrantCardSelect(){
+      if(!grantCardSelect)return;
+      const [cs,coms]=await Promise.all([getDocs(collection(db,"cards")),getDocs(collection(db,"comics"))]);
+      const comics=coms.docs.map(d=>({id:d.id,...d.data()}));
+      grantCardSelect.innerHTML='<option value="">Оберіть картку...</option>'+cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"uk")).map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name||"Картка")} — ${escapeHtml(comics.find(x=>x.id===c.comicId)?.title||"Комікс")}</option>`).join("");
+    }
+    async function grantAdminCards(ids,qty){
+      const snap=await getDocs(collection(db,"cards")),cards=snap.docs.map(d=>({id:d.id,...d.data()})).filter(c=>ids.includes(c.id));
+      const writes=[];for(const c of cards)for(let i=0;i<qty;i++)writes.push(addDoc(collection(db,"user_cards"),{userId:ADMIN_UID,cardId:c.id,comicId:c.comicId,obtainedAt:serverTimestamp(),source:"admin_grant"}));
+      await Promise.all(writes);return writes.length;
+    }
+    grantSelectedCardBtn?.addEventListener("click",async()=>{if(!grantCardSelect.value)return;const n=await grantAdminCards([grantCardSelect.value],Math.max(1,Math.min(100,Number(grantCardQty.value||1))));grantCardMessage.textContent=`Видано: ${n} ✅`;grantCardMessage.className="message show success"});
+    grantAllCardsBtn?.addEventListener("click",async()=>{if(!confirm("Видати по 1 кожної картки?"))return;const cs=await getDocs(collection(db,"cards"));const n=await grantAdminCards(cs.docs.map(d=>d.id),1);grantCardMessage.textContent=`Видано: ${n} ✅`;grantCardMessage.className="message show success"});
+
+    // ===== Дуелі / турніри =====
+    const normalBattleBackground=document.getElementById("normalBattleBackground");
+    const tournamentBattleBackground=document.getElementById("tournamentBattleBackground");
+    const normalArenaPreview=document.getElementById("normalArenaPreview");
+    const tournamentArenaPreview=document.getElementById("tournamentArenaPreview");
+    const normalArenaImg=document.getElementById("normalArenaImg");
+    const tournamentArenaImg=document.getElementById("tournamentArenaImg");
+    const saveDuelSettingsBtn=document.getElementById("saveDuelSettingsBtn");
+    const duelSettingsMessage=document.getElementById("duelSettingsMessage");
+    const activeDuelsAdmin=document.getElementById("activeDuelsAdmin");
+    const tournamentsAdmin=document.getElementById("tournamentsAdmin");
+    const tournamentName=document.getElementById("tournamentName");
+    const tournamentDescription=document.getElementById("tournamentDescription");
+    const tournamentPrize=document.getElementById("tournamentPrize");
+    const tournamentMinPlayers=document.getElementById("tournamentMinPlayers");
+    const createTournamentBtn=document.getElementById("createTournamentBtn");
+    const tournamentMessage=document.getElementById("tournamentMessage");
+
+    function duelAdminMessage(el,text,type){
+      el.textContent=text;
+      el.className=`message show ${type}`;
+      setTimeout(()=>el.className="message",3500);
+    }
+
+    function updateArenaPreview(input,wrap,img){
+      const raw=input.value.trim();
+      if(!raw){wrap.classList.remove("has");img.removeAttribute("src");return;}
+      img.src=getCoverImageUrl(raw);
+      wrap.classList.add("has");
+    }
+
+    normalBattleBackground.addEventListener("input",()=>updateArenaPreview(normalBattleBackground,normalArenaPreview,normalArenaImg));
+    tournamentBattleBackground.addEventListener("input",()=>updateArenaPreview(tournamentBattleBackground,tournamentArenaPreview,tournamentArenaImg));
+
+    async function loadDuelSettings(){
+      const snap=await getDoc(doc(db,"site_settings","duels"));
+      const d=snap.exists()?snap.data():{};
+      normalBattleBackground.value=d.normalBattleBackground||"";
+      tournamentBattleBackground.value=d.tournamentBattleBackground||"";
+      updateArenaPreview(normalBattleBackground,normalArenaPreview,normalArenaImg);
+      updateArenaPreview(tournamentBattleBackground,tournamentArenaPreview,tournamentArenaImg);
+    }
+
+    saveDuelSettingsBtn.addEventListener("click",async()=>{
+      try{
+        await setDoc(doc(db,"site_settings","duels"),{
+          normalBattleBackground:normalBattleBackground.value.trim(),
+          tournamentBattleBackground:tournamentBattleBackground.value.trim(),
+          updatedAt:serverTimestamp()
+        },{merge:true});
+        duelAdminMessage(duelSettingsMessage,"Арени збережено ✅","success");
+      }catch(e){console.error(e);duelAdminMessage(duelSettingsMessage,"Не вдалося зберегти арени.","error")}
+    });
+
+    async function loadDuelAdmin(){
+      const [duelSnap,profileSnap]=await Promise.all([
+        getDocs(collection(db,"duels")),
+        getDocs(collection(db,"player_profiles"))
+      ]);
+      const profiles=profileSnap.docs.map(d=>({id:d.id,...d.data()}));
+      const nameFor=uid=>profiles.find(p=>p.id===uid)?.displayName||uid.slice(0,8);
+      const active=duelSnap.docs.map(d=>({id:d.id,...d.data()})).filter(d=>["active","resolving"].includes(d.status));
+
+      if(!active.length){
+        activeDuelsAdmin.innerHTML='<div class="empty-state">Активних матчів немає.</div>';
+        return;
+      }
+
+      activeDuelsAdmin.innerHTML=active.map(d=>`
+        <div class="duel-admin-card">
+          <div class="duel-admin-top">
+            <strong>${escapeHtml(nameFor(d.player1Id))} ⚔️ ${escapeHtml(nameFor(d.player2Id))}</strong>
+            <span class="status-badge">${escapeHtml(d.status)}</span>
+          </div>
+          <div class="duel-admin-meta">
+            Раунд: ${Number(d.round||1)} · Рахунок: ${Number(d.score1||0)}:${Number(d.score2||0)}
+            · ${d.matchType==="tournament"?"🏟️ Турнір":`💰 Банк ${Number(d.pot||0)}`}
+          </div>
+          <div class="duel-admin-actions">
+            <a class="figure-view-btn" href="battle.html?duel=${encodeURIComponent(d.id)}" style="text-decoration:none;">👁️ Відкрити</a>
+            <button class="duel-danger" type="button" data-force-cancel-duel="${escapeHtml(d.id)}">🧯 Скасувати й розблокувати</button>
+          </div>
+        </div>`).join("");
+
+      document.querySelectorAll("[data-force-cancel-duel]").forEach(btn=>btn.addEventListener("click",()=>forceCancelDuel(btn.dataset.forceCancelDuel)));
+    }
+
+    async function forceCancelDuel(duelId){
+      if(!confirm("Скасувати матч, повернути ставки та розблокувати обох гравців?"))return;
+      try{
+        await runTransaction(db,async tx=>{
+          const dRef=doc(db,"duels",duelId),dSnap=await tx.get(dRef);
+          if(!dSnap.exists())return;
+          const d=dSnap.data();
+          if(!["active","resolving"].includes(d.status))return;
+          const stake=d.matchType==="tournament"?0:Number(d.stake||0);
+          const w1Ref=doc(db,"wallets",d.player1Id);
+          const w2Ref=doc(db,"wallets",d.player2Id);
+          const [w1Snap,w2Snap]=await Promise.all([tx.get(w1Ref),tx.get(w2Ref)]);
+          const w1=w1Snap.exists()?w1Snap.data():{balance:0};
+          const w2=w2Snap.exists()?w2Snap.data():{balance:0};
+
+          tx.set(w1Ref,{userId:d.player1Id,balance:Number(w1.balance||0)+stake,duelEscrow:0,updatedAt:serverTimestamp()},{merge:true});
+          tx.set(w2Ref,{userId:d.player2Id,balance:Number(w2.balance||0)+stake,duelEscrow:0,updatedAt:serverTimestamp()},{merge:true});
+          tx.delete(doc(db,"duel_locks",d.player1Id));
+          tx.delete(doc(db,"duel_locks",d.player2Id));
+          tx.update(dRef,{status:"cancelled",cancelledByAdmin:true,cancelledAt:serverTimestamp()});
+        });
+        await loadDuelAdmin();
+      }catch(e){console.error(e);alert("Не вдалося аварійно скасувати матч.")}
+    }
+
+    createTournamentBtn.addEventListener("click",async()=>{
+      const name=tournamentName.value.trim();
+      const prize=Math.max(0,Math.floor(Number(tournamentPrize.value||0)));
+      const minPlayers=Math.max(2,Math.min(64,Math.floor(Number(tournamentMinPlayers.value||2))));
+      if(!name){duelAdminMessage(tournamentMessage,"Введи назву турніру.","error");return;}
+      try{
+        await addDoc(collection(db,"tournaments"),{
+          name,
+          description:tournamentDescription.value.trim(),
+          prizeCoins:prize,
+          minPlayers,
+          status:"registration",
+          enabled:true,
+          currentRound:0,
+          createdAt:serverTimestamp()
+        });
+        tournamentName.value="";tournamentDescription.value="";
+        duelAdminMessage(tournamentMessage,"Турнір створено ✅","success");
+        await renderTournamentsAdmin();
+      }catch(e){console.error(e);duelAdminMessage(tournamentMessage,"Не вдалося створити турнір.","error")}
+    });
+
+    async function renderTournamentsAdmin(){
+      const [tSnap,eSnap,dSnap,pSnap]=await Promise.all([
+        getDocs(collection(db,"tournaments")),
+        getDocs(collection(db,"tournament_entries")),
+        getDocs(collection(db,"duels")),
+        getDocs(collection(db,"player_profiles"))
+      ]);
+      const tournaments=tSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+      const entries=eSnap.docs.map(d=>({id:d.id,...d.data()}));
+      const duels=dSnap.docs.map(d=>({id:d.id,...d.data()}));
+      const profiles=pSnap.docs.map(d=>({id:d.id,...d.data()}));
+      const nameFor=uid=>profiles.find(p=>p.id===uid)?.displayName||uid.slice(0,8);
+
+      if(!tournaments.length){tournamentsAdmin.innerHTML='<div class="empty-state">Турнірів ще немає.</div>';return;}
+
+      tournamentsAdmin.innerHTML=tournaments.map(t=>{
+        const members=entries.filter(e=>e.tournamentId===t.id);
+        const matches=duels.filter(d=>d.tournamentId===t.id);
+        return `<div class="duel-admin-card">
+          <div class="duel-admin-top"><strong>🏟️ ${escapeHtml(t.name||"Турнір")}</strong><span class="status-badge">${escapeHtml(t.status||"registration")}</span></div>
+          <div class="duel-admin-meta">Учасників: ${members.length} · Раунд: ${Number(t.currentRound||0)} · Матчів: ${matches.length} · Приз Топ-1: ${Number(t.prizeCoins||0)} 💰
+          ${t.championId?`<br>👑 Чемпіон: ${escapeHtml(nameFor(t.championId))}`:""}</div>
+          <div class="duel-admin-actions">
+            ${t.status==="registration"?`<button class="duel-safe" data-start-tournament="${t.id}">▶️ Старт / перший раунд</button>`:""}
+            ${t.status==="active"?`<button class="duel-safe" data-advance-tournament="${t.id}">⏭️ Наступний раунд</button>`:""}
+            ${t.status!=="finished"?`<button class="duel-danger" data-close-tournament="${t.id}">⛔ Закрити</button>`:""}
+          </div>
+        </div>`;
+      }).join("");
+
+      document.querySelectorAll("[data-start-tournament]").forEach(b=>b.addEventListener("click",()=>startTournament(b.dataset.startTournament)));
+      document.querySelectorAll("[data-advance-tournament]").forEach(b=>b.addEventListener("click",()=>advanceTournament(b.dataset.advanceTournament)));
+      document.querySelectorAll("[data-close-tournament]").forEach(b=>b.addEventListener("click",async()=>{await setDoc(doc(db,"tournaments",b.dataset.closeTournament),{status:"closed",enabled:false,updatedAt:serverTimestamp()},{merge:true});await renderTournamentsAdmin()}));
+    }
+
+    async function createTournamentRound(tournamentId,round,players){
+      if(players.length<2)throw new Error("NOT_ENOUGH_PLAYERS");
+      // Перевіряємо, чи ніхто вже не заблокований іншою дуеллю.
+      for(const uid of players){
+        const lock=await getDoc(doc(db,"duel_locks",uid));
+        if(lock.exists()&&lock.data().active===true)throw new Error("PLAYER_LOCKED");
+      }
+
+      const shuffled=[...players].sort((a,b)=>String(a).localeCompare(String(b)));
+      const pairs=[];
+      for(let i=0;i<shuffled.length;i+=2){
+        if(i+1>=shuffled.length){
+          // BYE — автоматично проходить далі.
+          await addDoc(collection(db,"duels"),{
+            player1Id:shuffled[i],player2Id:shuffled[i],status:"finished",matchType:"tournament",
+            tournamentId,tournamentRound:round,winnerId:shuffled[i],score1:3,score2:0,pot:0,stake:0,bye:true,createdAt:serverTimestamp(),completedAt:serverTimestamp()
+          });
+          continue;
+        }
+        pairs.push([shuffled[i],shuffled[i+1]]);
+      }
+
+      for(const [a,b] of pairs){
+        const duelRef=await addDoc(collection(db,"duels"),{
+          player1Id:a,player2Id:b,status:"active",matchType:"tournament",
+          tournamentId,tournamentRound:round,round:1,score1:0,score2:0,pot:0,stake:0,createdAt:serverTimestamp(),acceptedAt:serverTimestamp()
+        });
+        await Promise.all([
+          setDoc(doc(db,"duel_locks",a),{userId:a,active:true,duelId:duelRef.id,lockedAt:serverTimestamp()}),
+          setDoc(doc(db,"duel_locks",b),{userId:b,active:true,duelId:duelRef.id,lockedAt:serverTimestamp()})
+        ]);
+      }
+    }
+
+    async function startTournament(id){
+      try{
+        const [tSnap,eSnap]=await Promise.all([
+          getDoc(doc(db,"tournaments",id)),
+          getDocs(query(collection(db,"tournament_entries"),where("tournamentId","==",id)))
+        ]);
+        if(!tSnap.exists())return;
+        const t=tSnap.data(),players=eSnap.docs.map(d=>d.data().userId);
+        if(players.length<Number(t.minPlayers||2)){alert(`Потрібно мінімум ${Number(t.minPlayers||2)} гравців.`);return;}
+        await createTournamentRound(id,1,players);
+        await setDoc(doc(db,"tournaments",id),{status:"active",currentRound:1,startedAt:serverTimestamp()},{merge:true});
+        await renderTournamentsAdmin();await loadDuelAdmin();
+      }catch(e){console.error(e);alert(e.message==="PLAYER_LOCKED"?"Один з учасників уже в активній дуелі.":"Не вдалося запустити турнір.")}
+    }
+
+    async function advanceTournament(id){
+      try{
+        const [tSnap,dSnap]=await Promise.all([
+          getDoc(doc(db,"tournaments",id)),
+          getDocs(query(collection(db,"duels"),where("tournamentId","==",id)))
+        ]);
+        if(!tSnap.exists())return;
+        const t=tSnap.data(),round=Number(t.currentRound||1);
+        const roundMatches=dSnap.docs.map(d=>({id:d.id,...d.data()})).filter(d=>Number(d.tournamentRound||0)===round);
+        if(!roundMatches.length){alert("Матчів поточного раунду немає.");return;}
+        if(roundMatches.some(m=>m.status!=="finished")){alert("Не всі матчі поточного раунду завершені.");return;}
+        const winners=[...new Set(roundMatches.map(m=>m.winnerId).filter(Boolean))];
+        if(winners.length===1){
+          const champion=winners[0],prize=Number(t.prizeCoins||0);
+          await runTransaction(db,async tx=>{
+            const wRef=doc(db,"wallets",champion),wSnap=await tx.get(wRef);
+            const wd=wSnap.exists()?wSnap.data():{balance:0};
+            tx.set(wRef,{userId:champion,balance:Number(wd.balance||0)+prize,updatedAt:serverTimestamp()},{merge:true});
+            tx.set(doc(db,"tournaments",id),{status:"finished",enabled:false,championId:champion,prizePaid:prize,finishedAt:serverTimestamp()},{merge:true});
+          });
+          alert("🏆 Турнір завершено. Приз нараховано чемпіону.");
+        }else{
+          const next=round+1;
+          await createTournamentRound(id,next,winners);
+          await setDoc(doc(db,"tournaments",id),{currentRound:next,updatedAt:serverTimestamp()},{merge:true});
+        }
+        await renderTournamentsAdmin();await loadDuelAdmin();
+      }catch(e){console.error(e);alert(e.message==="PLAYER_LOCKED"?"Переможець ще заблокований іншим матчем.":"Не вдалося перейти до наступного раунду.")}
+    }
 
 
     // ===== Технічні роботи =====
@@ -3733,6 +4102,9 @@
       await refreshFigureComicSelect();
       await renderFigures();
       await renderShopFigures();
+      await loadDuelSettings();
+      await loadDuelAdmin();
+      await renderTournamentsAdmin();
       await loadGuestBanner();
     }
 

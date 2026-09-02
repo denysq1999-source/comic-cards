@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Рейтинг | Comic Cards</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0f0f0f;color:#fff;font-family:Arial,sans-serif}header{background:#1a1a1a;border-bottom:1px solid #2d2d2d;padding:14px 20px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.brand{color:#ff9800;font-size:23px;font-weight:900}.btn{background:#2b2b2b;color:#fff;text-decoration:none;border-radius:8px;padding:10px 13px;font-weight:800}main{width:min(950px,calc(100% - 28px));margin:30px auto 70px}.hero{background:#171717;border:1px solid #2c2c2c;border-radius:15px;padding:24px;margin-bottom:20px}.hero h1{margin:0 0 8px}.hero p{margin:0;color:#999}.table{background:#171717;border:1px solid #2c2c2c;border-radius:14px;overflow:hidden}.row{display:grid;grid-template-columns:70px minmax(180px,1fr) 120px 100px 100px;gap:8px;padding:13px 16px;border-bottom:1px solid #292929;align-items:center}.row.head{background:#202020;color:#aaa;font-size:12px;font-weight:900}.row.top{background:linear-gradient(90deg,rgba(255,152,0,.12),transparent)}.rank{font-size:19px;font-weight:900}.rating{color:#ffd166;font-weight:900}.empty{padding:40px;text-align:center;color:#777}@media(max-width:650px){.row{grid-template-columns:50px 1fr 80px}.hide-mobile{display:none}}
+</style></head>
+<body><header><div class="brand">🏆 Рейтинг гравців</div><div><a class="btn" href="duels.html">⚔️ Дуелі</a> <a class="btn" href="index.html">← Головна</a></div></header>
+<main><section class="hero"><h1>🏆 Топ гравців</h1><p>Перемога: +25 рейтингу. Поразка: −10. Топ-1 автоматично виділяється.</p></section>
+<div class="table"><div class="row head"><div>#</div><div>Гравець</div><div>Рейтинг</div><div class="hide-mobile">Перемог</div><div class="hide-mobile">Поразок</div></div><div id="rows"><div class="empty">Завантаження...</div></div></div></main>
+<script type="module">
+import { auth } from './js/firebase.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore,collection,getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const db=getFirestore(auth.app),rows=document.getElementById("rows");
+function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")}
+onAuthStateChanged(auth,async u=>{
+ if(!u){location.href="login.html";return}
+ const [r,p]=await Promise.all([getDocs(collection(db,"duel_ratings")),getDocs(collection(db,"player_profiles"))]);
+ const profiles=p.docs.map(d=>({id:d.id,...d.data()}));
+ const ratings=r.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>Number(b.rating||1000)-Number(a.rating||1000));
+ if(!ratings.length){rows.innerHTML='<div class="empty">Ще не було рейтингових матчів.</div>';return}
+ rows.innerHTML=ratings.map((x,i)=>{const pr=profiles.find(p=>p.id===x.id);return `<div class="row ${i===0?"top":""}"><div class="rank">${i===0?"👑":"#"+(i+1)}</div><div>${esc(pr?.displayName||"Гравець")}</div><div class="rating">${Number(x.rating||1000)}</div><div class="hide-mobile">${Number(x.wins||0)}</div><div class="hide-mobile">${Number(x.losses||0)}</div></div>`}).join("");
+});
+</script></body></html>

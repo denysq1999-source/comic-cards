@@ -41,6 +41,7 @@
     <span class="balance" id="balance">💰 0</span>
     <a class="btn" href="index.html">← На головну</a>
     <a class="btn" href="profile.html">👤 Кабінет</a>
+    <a class="btn" href="duels.html">⚔️ Дуелі</a>
   </div>
 </header>
 
@@ -50,6 +51,7 @@
     <p>Продавай зайві картки в особистому кабінеті, накопичуй монети й обмінюй їх на спеціальні фігурки.</p>
   </section>
   <p class="notice" id="notice">🔒 Баланс заморожений адміністратором. Покупки тимчасово недоступні.</p>
+  <p class="notice" id="duelNotice">⚔️ Під час активної дуелі покупки заблоковані до завершення матчу.</p>
   <div class="grid" id="grid"><div class="state">Завантаження...</div></div>
 </main>
 
@@ -66,7 +68,8 @@
   const balanceEl=document.getElementById("balance");
   const grid=document.getElementById("grid");
   const notice=document.getElementById("notice");
-  let user=null,wallet={balance:0,frozen:false},shopFigures=[],ownedShop=[];
+  const duelNotice=document.getElementById("duelNotice");
+  let user=null,wallet={balance:0,frozen:false},shopFigures=[],ownedShop=[],duelLocked=false;
 
   function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
   function driveImage(url=""){
@@ -86,14 +89,16 @@
   }
 
   async function loadData(){
-    const [walletSnap,shopSnap,ownedSnap]=await Promise.all([
+    const [walletSnap,shopSnap,ownedSnap,duelLockSnap]=await Promise.all([
       getDoc(doc(db,"wallets",user.uid)),
       getDocs(collection(db,"shop_figures")),
-      getDocs(query(collection(db,"user_shop_figures"),where("userId","==",user.uid)))
+      getDocs(query(collection(db,"user_shop_figures"),where("userId","==",user.uid))),
+      getDoc(doc(db,"duel_locks",user.uid))
     ]);
     wallet=walletSnap.exists()?{balance:0,frozen:false,...walletSnap.data()}:{balance:0,frozen:false};
     shopFigures=shopSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled!==false);
     ownedShop=ownedSnap.docs.map(d=>({id:d.id,...d.data()}));
+    duelLocked=duelLockSnap.exists()&&duelLockSnap.data().active===true;
     render();
   }
 
@@ -101,6 +106,7 @@
     balanceEl.textContent=`💰 ${Number(wallet.balance||0)}`;
     balanceEl.classList.toggle("frozen",Boolean(wallet.frozen));
     notice.style.display=wallet.frozen?"block":"none";
+    duelNotice.style.display=duelLocked?"block":"none";
 
     if(!shopFigures.length){
       grid.innerHTML='<div class="state">Магазин поки що порожній.</div>';
@@ -119,7 +125,7 @@
             <div class="price">💰 ${Number(item.price||0)}</div>
             ${owned
               ? '<div class="owned">✅ Уже на твоїй поличці</div>'
-              : `<button class="buy" type="button" data-buy="${esc(item.id)}" ${wallet.frozen||!canAfford?"disabled":""}>${wallet.frozen?"🔒 Баланс заморожений":canAfford?"Купити":"Недостатньо монет"}</button>`
+              : `<button class="buy" type="button" data-buy="${esc(item.id)}" ${wallet.frozen||duelLocked||!canAfford?"disabled":""}>${wallet.frozen?"🔒 Баланс заморожений":duelLocked?"⚔️ Активна дуель":canAfford?"Купити":"Недостатньо монет"}</button>`
             }
           </div>
         </article>`;
@@ -130,7 +136,7 @@
 
   async function buyFigure(id,button){
     const item=shopFigures.find(x=>x.id===id);
-    if(!item||wallet.frozen)return;
+    if(!item||wallet.frozen||duelLocked)return;
     const price=Number(item.price||0);
     if(!confirm(`Купити «${item.name||"фігурку"}» за ${price} монет?`))return;
 

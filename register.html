@@ -383,6 +383,18 @@
           { merge: true }
         );
 
+        // Публічний мінімальний профіль для дуелей і рейтингу.
+        await setDoc(
+          doc(db, 'player_profiles', user.uid),
+          {
+            userId: user.uid,
+            displayName: email.split("@")[0] || "Гравець",
+            emailMasked: email.replace(/^(.{1,2}).*(@.*)$/, "$1***$2"),
+            createdAt: serverTimestamp()
+          },
+          { merge: true }
+        );
+
         successDiv.textContent =
           'Акаунт створено. Правила прийнято ✅';
 

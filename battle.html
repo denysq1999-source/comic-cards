@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Поле бою | Comic Cards</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#080808;color:#fff;min-height:100vh}
+header{background:rgba(18,18,18,.94);border-bottom:1px solid #333;padding:12px 18px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.brand{font-weight:900;color:#ff9800;font-size:21px}.btn{background:#292929;color:#fff;text-decoration:none;border:0;border-radius:8px;padding:9px 12px;cursor:pointer;font-weight:800}
+main{min-height:calc(100vh - 62px);padding:20px;background-size:cover;background-position:center;background-attachment:fixed;position:relative}
+main:before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.56);pointer-events:none}main>*{position:relative;z-index:1}
+.board{width:min(1180px,100%);margin:auto}.scorebar{background:rgba(15,15,15,.88);border:1px solid #383838;border-radius:14px;padding:14px 18px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}
+.player{text-align:center}.player strong{display:block;font-size:18px}.score{font-size:34px;font-weight:900;color:#ffb347}.round{text-align:center;color:#bbb}
+.arena{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}.side{background:rgba(15,15,15,.88);border:1px solid #383838;border-radius:14px;padding:16px}
+.side h2{margin:0 0 12px}.pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.pick{background:#121212;border:1px solid #333;border-radius:11px;padding:12px}
+label{display:block;font-weight:800;margin-bottom:7px}select{width:100%;background:#0b0b0b;color:#fff;border:1px solid #3b3b3b;border-radius:8px;padding:10px}
+.card-preview{margin-top:10px;color:#aaa;font-size:12px;line-height:1.5}.submit{margin-top:14px;width:100%;border:0;border-radius:9px;padding:12px;background:#ff9800;color:#fff;font-weight:900;cursor:pointer}
+.submit:disabled{opacity:.5}.battle-log{margin-top:18px;background:rgba(15,15,15,.9);border:1px solid #383838;border-radius:14px;padding:16px}
+.log{display:grid;gap:8px;max-height:300px;overflow:auto}.entry{background:#111;border-radius:8px;padding:10px;color:#ccc;font-size:13px;line-height:1.5}
+.wait{padding:14px;background:#2c2413;color:#ffd27a;border-radius:10px;margin-top:12px;display:none}.finished{padding:18px;background:#14341d;color:#9ff1b5;border-radius:12px;text-align:center;font-size:20px;font-weight:900;margin-top:18px;display:none}
+@media(max-width:800px){.arena{grid-template-columns:1fr}.scorebar{grid-template-columns:1fr}.pick-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="brand">⚔️ Поле бою</div><div><a class="btn" href="duels.html">← Дуелі</a> <a class="btn" href="leaderboard.html">🏆 Рейтинг</a></div></header>
+<main id="battleMain">
+  <div class="board">
+    <div class="scorebar">
+      <div class="player"><strong id="p1Name">Гравець 1</strong><span id="p1Score" class="score">0</span></div>
+      <div class="round">Раунд <strong id="roundNum">1</strong><br><span id="stakeInfo">💰</span></div>
+      <div class="player"><strong id="p2Name">Гравець 2</strong><span id="p2Score" class="score">0</span></div>
+    </div>
+
+    <div class="arena">
+      <section class="side">
+        <h2>🎴 Твій хід</h2>
+        <div class="pick-grid">
+          <div class="pick">
+            <label for="attackCard">⚔️ Карта в атаку</label>
+            <select id="attackCard"><option value="">Оберіть...</option></select>
+            <div class="card-preview" id="attackPreview"></div>
+          </div>
+          <div class="pick">
+            <label for="defenseCard">🛡️ Карта в захист</label>
+            <select id="defenseCard"><option value="">Оберіть...</option></select>
+            <div class="card-preview" id="defensePreview"></div>
+          </div>
+        </div>
+        <button class="submit" id="submitMove">✅ Підтвердити хід</button>
+        <div class="wait" id="waitBox">⏳ Хід зафіксовано. Чекаємо суперника...</div>
+      </section>
+
+      <section class="side">
+        <h2>📜 Правила ходу</h2>
+        <div style="color:#bbb;line-height:1.65">
+          <b>Power</b> формує атаку.<br>
+          <b>Defense</b> зрізає удар суперника.<br>
+          <b>Speed</b> визначає ініціативу; швидша атака отримує невеликий бонус.<br>
+          <b>Рідкість</b> додає лише невеликий детермінований «кидок».<br><br>
+          Переможець раунду отримує 1 очко. <b>Перший до 3</b> виграє матч і весь банк.
+        </div>
+      </section>
+    </div>
+
+    <div class="finished" id="finishedBox"></div>
+    <section class="battle-log"><h2 style="margin-top:0">🧾 Журнал матчу</h2><div class="log" id="log"></div></section>
+  </div>
+</main>
+
+<script type="module">
+import { auth } from './js/firebase.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore,collection,getDocs,getDoc,doc,query,where,setDoc,runTransaction,serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const db=getFirestore(auth.app);
+const params=new URLSearchParams(location.search),duelId=params.get("duel");
+const battleMain=document.getElementById("battleMain"),attackCard=document.getElementById("attackCard"),defenseCard=document.getElementById("defenseCard"),submitMove=document.getElementById("submitMove"),waitBox=document.getElementById("waitBox"),log=document.getElementById("log");
+let user=null,duel=null,cards=[],owned=[],profiles=[],myMoveSubmitted=false;
+
+function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;")}
+function nameFor(uid){const p=profiles.find(x=>x.id===uid);return p?.displayName||`Гравець ${uid.slice(0,6)}`}
+function hash32(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function rarityMax(r){return ({Common:2,Rare:4,Epic:6,Legendary:8}[r]||2)}
+function cardByOwned(id){const o=owned.find(x=>x.id===id);return o?cards.find(c=>c.id===o.cardId):null}
+function roll(uid,card,round){const max=rarityMax(card?.rarity);return hash32(`${duelId}|${round}|${uid}|${card?.id}`)%(max+1)}
+function cardText(c){return c?`Power ${Number(c.power||0)} · Speed ${Number(c.speed||0)} · Defense ${Number(c.defense||0)} · ${c.rarity||"Common"}`:""}
+
+async function loadAll(){
+  const [dSnap,cSnap,oSnap,pSnap,settingsSnap]=await Promise.all([
+    getDoc(doc(db,"duels",duelId)),getDocs(collection(db,"cards")),
+    getDocs(query(collection(db,"user_cards"),where("userId","==",user.uid))),
+    getDocs(collection(db,"player_profiles")),getDoc(doc(db,"site_settings","duels"))
+  ]);
+  if(!dSnap.exists()){alert("Дуель не знайдена.");location.href="duels.html";return}
+  duel={id:dSnap.id,...dSnap.data()};
+  if(duel.player1Id!==user.uid&&duel.player2Id!==user.uid){alert("Це не твоя дуель.");location.href="duels.html";return}
+  cards=cSnap.docs.map(d=>({id:d.id,...d.data()}));
+  owned=oSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.sold!==true);
+  profiles=pSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const settings=settingsSnap.exists()?settingsSnap.data():{};
+  const bg=duel.matchType==="tournament"?settings.tournamentBattleBackground:settings.normalBattleBackground;
+  if(bg)battleMain.style.backgroundImage=`url("${bg}")`;
+  render();
+  await maybeResolveRound();
+}
+
+function render(){
+  document.getElementById("p1Name").textContent=nameFor(duel.player1Id);
+  document.getElementById("p2Name").textContent=nameFor(duel.player2Id);
+  document.getElementById("p1Score").textContent=Number(duel.score1||0);
+  document.getElementById("p2Score").textContent=Number(duel.score2||0);
+  document.getElementById("roundNum").textContent=Number(duel.round||1);
+  document.getElementById("stakeInfo").textContent=duel.matchType==="tournament"?"🏟️ Турнір":`Банк: ${Number(duel.pot||0)} 💰`;
+
+  if(duel.status==="finished"){
+    submitMove.disabled=true;document.getElementById("finishedBox").style.display="block";
+    document.getElementById("finishedBox").textContent=duel.winnerId===user.uid?"🏆 Ти переміг!":"Матч завершено.";
+  }
+
+  const options=owned.map(o=>{const c=cards.find(x=>x.id===o.cardId);return c?`<option value="${esc(o.id)}">${esc(c.name||"Картка")} — P${Number(c.power||0)} S${Number(c.speed||0)} D${Number(c.defense||0)}</option>`:""}).join("");
+  attackCard.innerHTML='<option value="">Оберіть...</option>'+options;
+  defenseCard.innerHTML='<option value="">Оберіть...</option>'+options;
+
+  const history=Array.isArray(duel.roundHistory)?duel.roundHistory:[];
+  log.innerHTML=history.length?history.slice().reverse().map(h=>`<div class="entry"><b>Раунд ${h.round}:</b> ${esc(h.text||"")}</div>`).join(""):'<div class="entry">Матч почався. Обери атаку і захист.</div>';
+}
+
+function preview(select,el){const c=cardByOwned(select.value);el.textContent=cardText(c)}
+attackCard.addEventListener("change",()=>preview(attackCard,document.getElementById("attackPreview")));
+defenseCard.addEventListener("change",()=>preview(defenseCard,document.getElementById("defensePreview")));
+
+async function submit(){
+  if(duel.status!=="active")return;
+  const a=attackCard.value,d=defenseCard.value;
+  if(!a||!d){alert("Обери карту в атаку і захист.");return}
+  if(a===d){alert("Для атаки й захисту треба дві різні картки.");return}
+  submitMove.disabled=true;
+  const round=Number(duel.round||1);
+  try{
+    await setDoc(doc(db,"duel_moves",`${duelId}_${round}_${user.uid}`),{
+      duelId,round,userId:user.uid,attackOwnedId:a,defenseOwnedId:d,submittedAt:serverTimestamp()
+    });
+    myMoveSubmitted=true;waitBox.style.display="block";
+    await maybeResolveRound();
+  }catch(e){console.error(e);alert("Не вдалося зафіксувати хід.");submitMove.disabled=false}
+}
+
+async function maybeResolveRound(){
+  const dSnap=await getDoc(doc(db,"duels",duelId));if(!dSnap.exists())return;
+  duel={id:dSnap.id,...dSnap.data()};if(duel.status!=="active"){render();return}
+  const round=Number(duel.round||1);
+  const m1Ref=doc(db,"duel_moves",`${duelId}_${round}_${duel.player1Id}`);
+  const m2Ref=doc(db,"duel_moves",`${duelId}_${round}_${duel.player2Id}`);
+  const [m1s,m2s]=await Promise.all([getDoc(m1Ref),getDoc(m2Ref)]);
+  const myRef=user.uid===duel.player1Id?m1s:m2s;
+  if(myRef.exists()){myMoveSubmitted=true;submitMove.disabled=true;waitBox.style.display="block"}
+  if(!m1s.exists()||!m2s.exists())return;
+
+  try{
+    await runTransaction(db,async tx=>{
+      const freshSnap=await tx.get(doc(db,"duels",duelId));
+      if(!freshSnap.exists())return;
+      const fresh=freshSnap.data();
+      if(fresh.status!=="active"||Number(fresh.round||1)!==round)return;
+
+      const m1=m1s.data(),m2=m2s.data();
+      const [o1a,o1d,o2a,o2d]=[m1.attackOwnedId,m1.defenseOwnedId,m2.attackOwnedId,m2.defenseOwnedId].map(id=>owned.find(x=>x.id===id));
+      // Opponent ownership isn't in local 'owned'; read their ownership docs.
+      const refs=[m1.attackOwnedId,m1.defenseOwnedId,m2.attackOwnedId,m2.defenseOwnedId].map(id=>doc(db,"user_cards",id));
+      const snaps=[];for(const ref of refs)snaps.push(await tx.get(ref));
+      if(snaps.some(s=>!s.exists()||s.data().sold===true))throw new Error("CARD_MISSING");
+      const masters=[];
+      for(const snap of snaps){masters.push(await tx.get(doc(db,"cards",snap.data().cardId)))}
+      if(masters.some(s=>!s.exists()))throw new Error("CARD_MISSING");
+      const [a1,d1,a2,d2]=masters.map(s=>({id:s.id,...s.data()}));
+
+      const init1=Number(a1.speed||0)>Number(a2.speed||0)?3:0;
+      const init2=Number(a2.speed||0)>Number(a1.speed||0)?3:0;
+      const dmg1=Math.max(0,Number(a1.power||0)+roll(fresh.player1Id,a1,round)+init1-Number(d2.defense||0));
+      const dmg2=Math.max(0,Number(a2.power||0)+roll(fresh.player2Id,a2,round)+init2-Number(d1.defense||0));
+      let roundWinner=null;
+      if(dmg1>dmg2)roundWinner=fresh.player1Id;
+      else if(dmg2>dmg1)roundWinner=fresh.player2Id;
+      else if(Number(a1.speed||0)>Number(a2.speed||0))roundWinner=fresh.player1Id;
+      else if(Number(a2.speed||0)>Number(a1.speed||0))roundWinner=fresh.player2Id;
+      else roundWinner=(hash32(`${duelId}|${round}|tie`)%2===0)?fresh.player1Id:fresh.player2Id;
+
+      let s1=Number(fresh.score1||0),s2=Number(fresh.score2||0);
+      if(roundWinner===fresh.player1Id)s1++;else s2++;
+      const history=Array.isArray(fresh.roundHistory)?fresh.roundHistory:[];
+      const text=`${nameFor(fresh.player1Id)}: ${dmg1} шкоди · ${nameFor(fresh.player2Id)}: ${dmg2} шкоди. Раунд — ${nameFor(roundWinner)}.`;
+      const done=s1>=3||s2>=3;
+      tx.update(doc(db,"duels",duelId),{
+        score1:s1,score2:s2,round:done?round:round+1,
+        roundHistory:[...history,{round,winnerId:roundWinner,damage1:dmg1,damage2:dmg2,text}],
+        ...(done?{status:"resolving",winnerId:roundWinner,finishedRound:round}:{})
+      });
+    });
+
+    const after=await getDoc(doc(db,"duels",duelId));duel={id:after.id,...after.data()};
+    if(duel.status==="resolving")await finalizeMatch();
+    else{myMoveSubmitted=false;waitBox.style.display="none";submitMove.disabled=false;render()}
+  }catch(e){console.error("Resolve error",e)}
+}
+
+async function finalizeMatch(){
+  try{
+    await runTransaction(db,async tx=>{
+      const dRef=doc(db,"duels",duelId),dSnap=await tx.get(dRef);
+      if(!dSnap.exists())return;
+      const d=dSnap.data();if(d.status!=="resolving")return;
+      const winner=d.winnerId,loser=winner===d.player1Id?d.player2Id:d.player1Id;
+      const winWallet=doc(db,"wallets",winner),loseWallet=doc(db,"wallets",loser);
+      const [ww,lw,wr,lr]=await Promise.all([
+        tx.get(winWallet),tx.get(loseWallet),tx.get(doc(db,"duel_ratings",winner)),tx.get(doc(db,"duel_ratings",loser))
+      ]);
+      const wwd=ww.exists()?ww.data():{balance:0},lwd=lw.exists()?lw.data():{balance:0};
+      const wrd=wr.exists()?wr.data():{rating:1000,wins:0,losses:0},lrd=lr.exists()?lr.data():{rating:1000,wins:0,losses:0};
+      const prize=d.matchType==="tournament"?Number(d.tournamentPrize||0):Number(d.pot||0);
+      tx.set(winWallet,{userId:winner,balance:Number(wwd.balance||0)+prize,duelEscrow:0,updatedAt:serverTimestamp()},{merge:true});
+      tx.set(loseWallet,{userId:loser,balance:Number(lwd.balance||0),duelEscrow:0,updatedAt:serverTimestamp()},{merge:true});
+      tx.set(doc(db,"duel_ratings",winner),{userId:winner,rating:Number(wrd.rating||1000)+25,wins:Number(wrd.wins||0)+1,losses:Number(wrd.losses||0),updatedAt:serverTimestamp()},{merge:true});
+      tx.set(doc(db,"duel_ratings",loser),{userId:loser,rating:Math.max(0,Number(lrd.rating||1000)-10),wins:Number(lrd.wins||0),losses:Number(lrd.losses||0)+1,updatedAt:serverTimestamp()},{merge:true});
+      tx.delete(doc(db,"duel_locks",d.player1Id));tx.delete(doc(db,"duel_locks",d.player2Id));
+      tx.update(dRef,{status:"finished",prizePaid:prize,completedAt:serverTimestamp()});
+    });
+    const after=await getDoc(doc(db,"duels",duelId));duel={id:after.id,...after.data()};render();
+  }catch(e){console.error("Finalize error",e);alert("Матч завершився, але фіналізація потребує перевірки Rules/адміна.")}
+}
+
+submitMove.addEventListener("click",submit);
+onAuthStateChanged(auth,async u=>{if(!u){location.href="login.html";return}if(!duelId){location.href="duels.html";return}user=u;await loadAll()});
+</script>
+</body>
+</html>

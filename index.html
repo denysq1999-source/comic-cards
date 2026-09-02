@@ -829,6 +829,8 @@
 
       <button class="nav-button nav-auth pack-btn" id="packBtnTop" type="button" style="display:none;">🎁 Пакунок</button>
       <a class="nav-link nav-auth" id="shopBtnTop" href="shop.html" style="display:none;">🛒 Магазин</a>
+      <a class="nav-link nav-auth" id="duelsBtnTop" href="duels.html" style="display:none;">⚔️ Дуелі</a>
+      <a class="nav-link nav-auth" id="ratingBtnTop" href="leaderboard.html" style="display:none;">🏆 Рейтинг</a>
       <a class="nav-link nav-auth" id="profileBtnTop" href="profile.html">👤 Особистий кабінет</a>
       <a class="nav-link nav-admin" id="adminBtnTop" href="admin.html">⚙️ Адмін-панель</a>
       <button class="nav-button nav-auth" id="logoutBtnTop" type="button">Вийти</button>
@@ -984,6 +986,8 @@
     const adminBtnTop = document.getElementById("adminBtnTop");
     const profileBtnTop = document.getElementById("profileBtnTop");
     const shopBtnTop = document.getElementById("shopBtnTop");
+    const duelsBtnTop = document.getElementById("duelsBtnTop");
+    const ratingBtnTop = document.getElementById("ratingBtnTop");
     const logoutBtnTop = document.getElementById("logoutBtnTop");
     const userInfo = document.getElementById("userInfo");
 
@@ -1020,6 +1024,7 @@
     let currentUser = null;
     let siteSettings = {};
     let siteSettingsLoaded = false;
+    let duelLockedForUser = false;
     let activeGenre = "";
     let cachedComics = [];
     let cachedRatings = [];
@@ -1464,6 +1469,14 @@
 
     function updatePackButtonState(){
       if(!packBtnTop||!currentUser)return;
+      if(duelLockedForUser){
+        packBtnTop.disabled=true;
+        packBtnTop.classList.remove("ready");
+        packBtnTop.textContent="🎁 🔒 Дуель";
+        packBtnTop.title="Пакунки заблоковані до завершення активної дуелі.";
+        return;
+      }
+
       const remaining=packNextAvailableMs-Date.now();
       if(remaining>0){
         packBtnTop.disabled=true;
@@ -1473,6 +1486,18 @@
         packBtnTop.disabled=false;
         packBtnTop.classList.add("ready");
         packBtnTop.textContent="🎁 Пакунок";
+      }
+    }
+
+
+    async function loadDuelLockForUser(){
+      if(!currentUser){duelLockedForUser=false;return;}
+      try{
+        const snap=await getDoc(doc(db,"duel_locks",currentUser.uid));
+        duelLockedForUser=snap.exists()&&snap.data().active===true;
+      }catch(error){
+        console.error("Duel lock check error:",error);
+        duelLockedForUser=false;
       }
     }
 
@@ -1499,7 +1524,7 @@
     }
 
     async function openDailyPack(){
-      if(!currentUser||packBtnTop.disabled)return;
+      if(!currentUser||packBtnTop.disabled||duelLockedForUser)return;
       packOverlay.classList.add("show");
       packOverlay.setAttribute("aria-hidden","false");
       document.body.style.overflow="hidden";
@@ -1635,7 +1660,10 @@
         logoutBtnTop.style.display = "inline-flex";
         profileBtnTop.style.display = "inline-flex";
         shopBtnTop.style.display = "inline-flex";
+        duelsBtnTop.style.display = "inline-flex";
+        ratingBtnTop.style.display = "inline-flex";
         packBtnTop.style.display = "inline-flex";
+        await loadDuelLockForUser();
         await loadPackStatus();
 
         if (user.uid === ADMIN_UID) {
@@ -1653,6 +1681,8 @@
         logoutBtnTop.style.display = "none";
         profileBtnTop.style.display = "none";
         shopBtnTop.style.display = "none";
+        duelsBtnTop.style.display = "none";
+        ratingBtnTop.style.display = "none";
         packBtnTop.style.display = "none";
         adminBtnTop.style.display = "none";
         if(packTimer)clearInterval(packTimer);

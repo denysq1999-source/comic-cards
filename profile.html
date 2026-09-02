@@ -110,7 +110,18 @@
     .wallet-note.frozen{color:#ff9a9a}
     .shop-figure-badge{display:inline-block;background:#3a2c55;color:#d9c4ff;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800}
 
-  </style>
+  
+  /* ===== Дуелі ===== */
+  .stats{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .duel-profile-banner{
+    display:none;margin:0 0 18px;padding:14px 16px;border-radius:12px;
+    background:#321f1f;border:1px solid #5b3030;color:#ffb2b2;font-weight:800;line-height:1.45
+  }
+  .duel-profile-banner.show{display:block}
+  .duel-profile-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .duel-profile-actions a{display:inline-flex;padding:8px 10px;border-radius:8px;background:#432929;color:#ffd0d0;text-decoration:none}
+
+</style>
 </head>
 <body>
 
@@ -120,6 +131,8 @@
     <a class="btn" href="index.html">← На головну</a>
     <button class="btn pack-btn" id="packBtnTop" type="button">🎁 Пакунок</button>
     <a class="btn" href="shop.html">🛒 Магазин</a>
+    <a class="btn" href="duels.html">⚔️ Дуелі</a>
+    <a class="btn" href="leaderboard.html">🏆 Рейтинг</a>
     <a class="btn" id="adminLink" href="admin.html" style="display:none;">⚙️ Адмін-панель</a>
     <button class="btn orange" id="logoutBtn">Вийти</button>
   </div>
@@ -152,7 +165,17 @@
       <strong id="coinBalance" class="coin-balance">0</strong>
       <span>Монет</span>
     </div>
+    <div class="stat"><strong id="duelRating">1000</strong><span>Рейтинг PvP</span></div>
+    <div class="stat"><strong id="duelWins">0</strong><span>Перемог</span></div>
+    <div class="stat"><strong id="duelLosses">0</strong><span>Поразок</span></div>
   </section>
+
+  <div class="duel-profile-banner" id="duelLockBanner">
+    🔒 Інвентар заблокований до завершення активної дуелі.
+    <div class="duel-profile-actions">
+      <a id="activeDuelLink" href="duels.html">⚔️ Відкрити дуель</a>
+    </div>
+  </div>
 
   <section class="panel">
     <h2>🎒 Інвентар карток</h2>
@@ -252,6 +275,11 @@
   const comicsCount = document.getElementById("comicsCount");
   const coinBalance = document.getElementById("coinBalance");
   const walletNote = document.getElementById("walletNote");
+  const duelRating = document.getElementById("duelRating");
+  const duelWins = document.getElementById("duelWins");
+  const duelLosses = document.getElementById("duelLosses");
+  const duelLockBanner = document.getElementById("duelLockBanner");
+  const activeDuelLink = document.getElementById("activeDuelLink");
   const inventory = document.getElementById("inventory");
   const figureShelf = document.getElementById("figureShelf");
   const comicFilter = document.getElementById("comicFilter");
@@ -287,6 +315,9 @@
   let wallet = { balance:0, frozen:false };
   let ownedShopFigures = [];
   let shopFigures = [];
+  let duelLocked = false;
+  let activeDuelId = null;
+  let duelStats = { rating:1000, wins:0, losses:0 };
 
 
   async function redirectIfMaintenance(user) {
@@ -414,6 +445,7 @@
       packMessage.className="pack-message success";
       packMessage.textContent="Три картки додано в інвентар 🃏🃏🃏";
       await loadPackStatus();
+    await loadDuelState();
     await loadInventory();
     }catch(error){
       console.error("Daily pack error:",error);
@@ -468,6 +500,13 @@
       lastSeenAt: serverTimestamp()
     }, { merge:true });
 
+    await setDoc(doc(db,"player_profiles",currentUser.uid),{
+      userId:currentUser.uid,
+      displayName:currentUser.displayName || (currentUser.email ? currentUser.email.split("@")[0] : "Гравець"),
+      emailMasked:currentUser.email ? currentUser.email.replace(/^(.{1,2}).*(@.*)$/,"$1***$2") : "",
+      updatedAt:serverTimestamp()
+    },{merge:true});
+
     displayName.textContent =
       currentUser.displayName ||
       (currentUser.email ? currentUser.email.split("@")[0] : "Користувач");
@@ -503,9 +542,34 @@
     wallet=snap.exists()?{balance:0,frozen:false,...snap.data()}:{balance:0,frozen:false};
     coinBalance.textContent=Number(wallet.balance||0);
     walletNote.classList.toggle("frozen",Boolean(wallet.frozen));
+    walletNote.classList.toggle("frozen",Boolean(wallet.frozen||duelLocked));
     walletNote.textContent=wallet.frozen
       ?"🔒 Баланс заморожений адміністратором. Продаж і покупки тимчасово недоступні."
-      :"💰 Дублікати можна продавати за монети.";
+      :duelLocked
+        ?"⚔️ Активна дуель: продаж і видалення інвентарю заблоковані до завершення матчу."
+        :"💰 Дублікати можна продавати за монети.";
+  }
+
+
+  async function loadDuelState(){
+    const [lockSnap,ratingSnap] = await Promise.all([
+      getDoc(doc(db,"duel_locks",user.uid)),
+      getDoc(doc(db,"duel_ratings",user.uid))
+    ]);
+
+    duelLocked = lockSnap.exists() && lockSnap.data().active === true;
+    activeDuelId = duelLocked ? (lockSnap.data().duelId || null) : null;
+    duelStats = ratingSnap.exists()
+      ? {rating:1000,wins:0,losses:0,...ratingSnap.data()}
+      : {rating:1000,wins:0,losses:0};
+
+    duelRating.textContent = Number(duelStats.rating||1000);
+    duelWins.textContent = Number(duelStats.wins||0);
+    duelLosses.textContent = Number(duelStats.losses||0);
+    duelLockBanner.classList.toggle("show",duelLocked);
+    activeDuelLink.href = activeDuelId
+      ? `battle.html?duel=${encodeURIComponent(activeDuelId)}`
+      : "duels.html";
   }
 
   async function loadInventory() {
@@ -634,7 +698,7 @@
               class="sell-btn"
               type="button"
               data-sell-owned="${esc(own.id)}"
-              ${wallet.frozen ? "disabled" : ""}
+              ${(wallet.frozen||duelLocked) ? "disabled" : ""}
             >💰 +${cardSellPrice(card)}</button>
           </div>
         </div>
@@ -689,6 +753,10 @@
         if(!card)return;
         const price=cardSellPrice(card);
 
+        if(duelLocked){
+          alert("Інвентар заблокований до завершення дуелі.");
+          return;
+        }
         if(wallet.frozen){
           alert("Баланс заморожений адміністратором.");
           return;
@@ -741,6 +809,7 @@
 
     document.querySelectorAll("[data-delete-owned]").forEach(button => {
       button.addEventListener("click", async () => {
+        if(duelLocked){ alert("Інвентар заблокований до завершення дуелі."); return; }
         const ownedId = button.dataset.deleteOwned;
         const ownedCard = owned.find(item => item.id === ownedId);
         if (!ownedCard) return;
@@ -851,6 +920,7 @@
     const deleteShopButton = event.target.closest("[data-delete-shop-figure]");
 
     if (deleteShopButton && figureShelf.contains(deleteShopButton)) {
+      if(duelLocked){ alert("Інвентар заблокований до завершення дуелі."); return; }
       const ownedId = deleteShopButton.dataset.deleteShopFigure;
       const ownedFigure = ownedShopFigures.find(item => item.id === ownedId);
       if (!ownedFigure) return;
@@ -931,6 +1001,7 @@
     const deleteButton = event.target.closest("[data-delete-figure]");
 
     if (deleteButton && figureShelf.contains(deleteButton)) {
+      if(duelLocked){ alert("Інвентар заблокований до завершення дуелі."); return; }
       const ownedId = deleteButton.dataset.deleteFigure;
       const ownedFigure = ownedFigures.find(item => item.id === ownedId);
       if (!ownedFigure) return;
