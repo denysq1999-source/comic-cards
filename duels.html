@@ -79,7 +79,7 @@
   import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     getFirestore, collection, getDocs, getDoc, addDoc, setDoc, doc, query, where,
-    runTransaction, serverTimestamp
+    runTransaction, serverTimestamp, increment
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const db=getFirestore(auth.app);
@@ -219,31 +219,83 @@
     button.disabled=true;
     try{
       const duelRef=doc(db,"duels",id);
+
       await runTransaction(db,async tx=>{
+        // Читаємо тільки те, що цей користувач має право читати:
+        // саму дуель, власний гаманець і власний lock.
         const duelSnap=await tx.get(duelRef);
         if(!duelSnap.exists())throw new Error("NO_DUEL");
+
         const d=duelSnap.data();
         if(d.status!=="pending"||d.player2Id!==user.uid)throw new Error("NOT_PENDING");
 
-        const w1Ref=doc(db,"wallets",d.player1Id),w2Ref=doc(db,"wallets",d.player2Id);
-        const l1Ref=doc(db,"duel_locks",d.player1Id),l2Ref=doc(db,"duel_locks",d.player2Id);
-        const [w1,w2,l1,l2]=await Promise.all([tx.get(w1Ref),tx.get(w2Ref),tx.get(l1Ref),tx.get(l2Ref)]);
-        const a=w1.exists()?w1.data():{balance:0,frozen:false};
-        const b=w2.exists()?w2.data():{balance:0,frozen:false};
-        if(a.frozen||b.frozen)throw new Error("FROZEN");
-        if((l1.exists()&&l1.data().active)||(l2.exists()&&l2.data().active))throw new Error("LOCKED");
         const stake=Number(d.stake||0);
         if(stake<100||stake>5000)throw new Error("BAD_STAKE");
-        if(Number(a.balance||0)<stake||Number(b.balance||0)<stake)throw new Error("NO_MONEY");
 
-        tx.set(w1Ref,{userId:d.player1Id,balance:Number(a.balance||0)-stake,frozen:false,duelEscrow:stake,updatedAt:serverTimestamp()},{merge:true});
-        tx.set(w2Ref,{userId:d.player2Id,balance:Number(b.balance||0)-stake,frozen:false,duelEscrow:stake,updatedAt:serverTimestamp()},{merge:true});
+        const myWalletRef=doc(db,"wallets",user.uid);
+        const myLockRef=doc(db,"duel_locks",user.uid);
+        const [myWalletSnap,myLockSnap]=await Promise.all([
+          tx.get(myWalletRef),
+          tx.get(myLockRef)
+        ]);
+
+        const myWallet=myWalletSnap.exists()?myWalletSnap.data():{balance:0,frozen:false};
+
+        if(myWallet.frozen===true)throw new Error("FROZEN");
+        if(myLockSnap.exists()&&myLockSnap.data().active===true)throw new Error("LOCKED");
+        if(Number(myWallet.balance||0)<stake)throw new Error("NO_MONEY");
+
+        const w1Ref=doc(db,"wallets",d.player1Id);
+        const w2Ref=doc(db,"wallets",d.player2Id);
+        const l1Ref=doc(db,"duel_locks",d.player1Id);
+        const l2Ref=doc(db,"duel_locks",d.player2Id);
+
+        // Не читаємо чужий гаманець. Firestore сам атомарно застосує increment,
+        // а Rules перевірять, що баланс не пішов у мінус і списано саме stake.
+        tx.update(w1Ref,{
+          balance:increment(-stake),
+          duelEscrow:stake,
+          activeDuelId:id,
+          updatedAt:serverTimestamp()
+        });
+
+        tx.update(w2Ref,{
+          balance:increment(-stake),
+          duelEscrow:stake,
+          activeDuelId:id,
+          updatedAt:serverTimestamp()
+        });
+
+        // Якщо в когось уже існує активний lock, правила не дадуть його перезаписати.
         tx.set(l1Ref,{userId:d.player1Id,active:true,duelId:id,lockedAt:serverTimestamp()});
         tx.set(l2Ref,{userId:d.player2Id,active:true,duelId:id,lockedAt:serverTimestamp()});
-        tx.update(duelRef,{status:"active",pot:stake*2,acceptedAt:serverTimestamp(),round:1,score1:0,score2:0});
+
+        tx.update(duelRef,{
+          status:"active",
+          pot:stake*2,
+          acceptedAt:serverTimestamp(),
+          round:1,
+          score1:0,
+          score2:0
+        });
       });
+
       location.href=`battle.html?duel=${encodeURIComponent(id)}`;
-    }catch(e){console.error(e);alert(({NO_MONEY:"У когось із гравців уже недостатньо монет.",LOCKED:"Один із гравців уже в іншій дуелі.",FROZEN:"Баланс одного з гравців заморожений."}[e.message]||"Не вдалося прийняти дуель."));button.disabled=false}
+    }catch(e){
+      console.error(e);
+      const code=String(e?.code||"");
+      const text={
+        NO_MONEY:"Недостатньо монет для ставки.",
+        LOCKED:"Один із гравців уже в іншій дуелі.",
+        FROZEN:"Баланс заморожений адміністратором.",
+        BAD_STAKE:"Некоректна ставка."
+      }[e?.message]
+        || (code.includes("permission-denied")
+          ? "Firestore відхилив прийняття дуелі. Онови Rules з комплекту."
+          : "Не вдалося прийняти дуель.");
+      alert(text);
+      button.disabled=false;
+    }
   }
 
   async function simpleStatus(id,status){

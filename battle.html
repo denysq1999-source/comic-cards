@@ -71,7 +71,7 @@ label{display:block;font-weight:800;margin-bottom:7px}select{width:100%;backgrou
 <script type="module">
 import { auth } from './js/firebase.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore,collection,getDocs,getDoc,doc,query,where,setDoc,runTransaction,serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore,collection,getDocs,getDoc,doc,query,where,setDoc,runTransaction,serverTimestamp,increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const db=getFirestore(auth.app);
 const params=new URLSearchParams(location.search),duelId=params.get("duel");
 const battleMain=document.getElementById("battleMain"),attackCard=document.getElementById("attackCard"),defenseCard=document.getElementById("defenseCard"),submitMove=document.getElementById("submitMove"),waitBox=document.getElementById("waitBox"),log=document.getElementById("log");
@@ -137,8 +137,19 @@ async function submit(){
   submitMove.disabled=true;
   const round=Number(duel.round||1);
   try{
+    const attackOwned=owned.find(x=>x.id===a);
+    const defenseOwned=owned.find(x=>x.id===d);
+    if(!attackOwned||!defenseOwned)throw new Error("CARD_MISSING");
+
     await setDoc(doc(db,"duel_moves",`${duelId}_${round}_${user.uid}`),{
-      duelId,round,userId:user.uid,attackOwnedId:a,defenseOwnedId:d,submittedAt:serverTimestamp()
+      duelId,
+      round,
+      userId:user.uid,
+      attackOwnedId:a,
+      defenseOwnedId:d,
+      attackCardId:attackOwned.cardId,
+      defenseCardId:defenseOwned.cardId,
+      submittedAt:serverTimestamp()
     });
     myMoveSubmitted=true;waitBox.style.display="block";
     await maybeResolveRound();
@@ -164,15 +175,21 @@ async function maybeResolveRound(){
       if(fresh.status!=="active"||Number(fresh.round||1)!==round)return;
 
       const m1=m1s.data(),m2=m2s.data();
-      const [o1a,o1d,o2a,o2d]=[m1.attackOwnedId,m1.defenseOwnedId,m2.attackOwnedId,m2.defenseOwnedId].map(id=>owned.find(x=>x.id===id));
-      // Opponent ownership isn't in local 'owned'; read their ownership docs.
-      const refs=[m1.attackOwnedId,m1.defenseOwnedId,m2.attackOwnedId,m2.defenseOwnedId].map(id=>doc(db,"user_cards",id));
-      const snaps=[];for(const ref of refs)snaps.push(await tx.get(ref));
-      if(snaps.some(s=>!s.exists()||s.data().sold===true))throw new Error("CARD_MISSING");
-      const masters=[];
-      for(const snap of snaps){masters.push(await tx.get(doc(db,"cards",snap.data().cardId)))}
-      if(masters.some(s=>!s.exists()))throw new Error("CARD_MISSING");
-      const [a1,d1,a2,d2]=masters.map(s=>({id:s.id,...s.data()}));
+
+      // У move уже є перевірені master card IDs.
+      // Тому не треба читати чужі user_cards — це і ламало бій через Rules.
+      const refs=[
+        doc(db,"cards",m1.attackCardId),
+        doc(db,"cards",m1.defenseCardId),
+        doc(db,"cards",m2.attackCardId),
+        doc(db,"cards",m2.defenseCardId)
+      ];
+
+      const snaps=[];
+      for(const ref of refs)snaps.push(await tx.get(ref));
+      if(snaps.some(s=>!s.exists()))throw new Error("CARD_MISSING");
+
+      const [a1,d1,a2,d2]=snaps.map(s=>({id:s.id,...s.data()}));
 
       const init1=Number(a1.speed||0)>Number(a2.speed||0)?3:0;
       const init2=Number(a2.speed||0)>Number(a1.speed||0)?3:0;
@@ -211,18 +228,55 @@ async function finalizeMatch(){
       const d=dSnap.data();if(d.status!=="resolving")return;
       const winner=d.winnerId,loser=winner===d.player1Id?d.player2Id:d.player1Id;
       const winWallet=doc(db,"wallets",winner),loseWallet=doc(db,"wallets",loser);
-      const [ww,lw,wr,lr]=await Promise.all([
-        tx.get(winWallet),tx.get(loseWallet),tx.get(doc(db,"duel_ratings",winner)),tx.get(doc(db,"duel_ratings",loser))
+
+      // Рейтинги читати можна всім активним користувачам.
+      const [wr,lr]=await Promise.all([
+        tx.get(doc(db,"duel_ratings",winner)),
+        tx.get(doc(db,"duel_ratings",loser))
       ]);
-      const wwd=ww.exists()?ww.data():{balance:0},lwd=lw.exists()?lw.data():{balance:0};
-      const wrd=wr.exists()?wr.data():{rating:0,wins:0,losses:0},lrd=lr.exists()?lr.data():{rating:0,wins:0,losses:0};
+
+      const wrd=wr.exists()?wr.data():{rating:0,wins:0,losses:0};
+      const lrd=lr.exists()?lr.data():{rating:0,wins:0,losses:0};
       const prize=d.matchType==="tournament"?Number(d.tournamentPrize||0):Number(d.pot||0);
-      tx.set(winWallet,{userId:winner,balance:Number(wwd.balance||0)+prize,duelEscrow:0,updatedAt:serverTimestamp()},{merge:true});
-      tx.set(loseWallet,{userId:loser,balance:Number(lwd.balance||0),duelEscrow:0,updatedAt:serverTimestamp()},{merge:true});
-      tx.set(doc(db,"duel_ratings",winner),{userId:winner,rating:Number(wrd.rating||0)+25,wins:Number(wrd.wins||0)+1,losses:Number(wrd.losses||0),updatedAt:serverTimestamp()},{merge:true});
-      tx.set(doc(db,"duel_ratings",loser),{userId:loser,rating:Math.max(0,Number(lrd.rating||0)-10),wins:Number(lrd.wins||0),losses:Number(lrd.losses||0)+1,updatedAt:serverTimestamp()},{merge:true});
-      tx.delete(doc(db,"duel_locks",d.player1Id));tx.delete(doc(db,"duel_locks",d.player2Id));
-      tx.update(dRef,{status:"finished",prizePaid:prize,completedAt:serverTimestamp()});
+
+      // Чужий гаманець не читаємо. Працюємо атомарними increment/update.
+      tx.update(winWallet,{
+        balance:increment(prize),
+        duelEscrow:0,
+        activeDuelId:null,
+        updatedAt:serverTimestamp()
+      });
+
+      tx.update(loseWallet,{
+        duelEscrow:0,
+        activeDuelId:null,
+        updatedAt:serverTimestamp()
+      });
+
+      tx.set(doc(db,"duel_ratings",winner),{
+        userId:winner,
+        rating:Number(wrd.rating||0)+25,
+        wins:Number(wrd.wins||0)+1,
+        losses:Number(wrd.losses||0),
+        updatedAt:serverTimestamp()
+      },{merge:true});
+
+      tx.set(doc(db,"duel_ratings",loser),{
+        userId:loser,
+        rating:Math.max(0,Number(lrd.rating||0)-10),
+        wins:Number(lrd.wins||0),
+        losses:Number(lrd.losses||0)+1,
+        updatedAt:serverTimestamp()
+      },{merge:true});
+
+      tx.delete(doc(db,"duel_locks",d.player1Id));
+      tx.delete(doc(db,"duel_locks",d.player2Id));
+
+      tx.update(dRef,{
+        status:"finished",
+        prizePaid:prize,
+        completedAt:serverTimestamp()
+      });
     });
     const after=await getDoc(doc(db,"duels",duelId));duel={id:after.id,...after.data()};render();
   }catch(e){console.error("Finalize error",e);alert("Матч завершився, але фіналізація потребує перевірки Rules/адміна.")}
