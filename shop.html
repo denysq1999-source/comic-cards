@@ -142,10 +142,12 @@
       const shopRef=doc(db,"shop_figures",item.id);
 
       await runTransaction(db,async tx=>{
-        const [walletSnap,ownedSnap,shopSnap]=await Promise.all([
-          tx.get(walletRef),tx.get(ownedRef),tx.get(shopRef)
+        // ВАЖЛИВО: не читаємо ownedRef до створення.
+        // Для нового документа Firestore Rules могли блокувати get неіснуючого запису.
+        // Якщо фігурка вже куплена, tx.set нижче стане update, а rules його заборонять.
+        const [walletSnap,shopSnap]=await Promise.all([
+          tx.get(walletRef),tx.get(shopRef)
         ]);
-        if(ownedSnap.exists())throw new Error("ALREADY_OWNED");
         if(!shopSnap.exists()||shopSnap.data().enabled===false)throw new Error("NOT_AVAILABLE");
         const freshWallet=walletSnap.exists()?walletSnap.data():{balance:0,frozen:false};
         if(freshWallet.frozen===true)throw new Error("WALLET_FROZEN");
@@ -183,7 +185,10 @@
         NOT_AVAILABLE:"Товар уже недоступний.",
         WALLET_FROZEN:"Баланс заморожений адміністратором.",
         NO_MONEY:"Недостатньо монет."
-      }[error?.message]||"Не вдалося купити фігурку.";
+      }[error?.message]
+        || (String(error?.code||"").includes("permission-denied")
+          ? "Firestore відхилив покупку. Перевір правила економіки."
+          : "Не вдалося купити фігурку.");
       alert(msg);
       button.disabled=false;
     }
