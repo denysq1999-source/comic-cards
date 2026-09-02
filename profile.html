@@ -825,6 +825,20 @@
             <span class="shop-figure-badge">🛒 Магазин</span>
             <div class="figure-item-desc">${esc(figure.description||"Без опису")}</div>
             <div class="item-meta">Придбано: ${formatDate(own.obtainedAt)}</div>
+            <div class="figure-actions">
+              <button
+                class="view-btn"
+                type="button"
+                data-view-shop-figure="${esc(own.id)}"
+              >🔍 Переглянути</button>
+              <button
+                class="figure-delete-btn"
+                type="button"
+                data-delete-shop-figure="${esc(own.id)}"
+                title="Видалити фігурку"
+                aria-label="Видалити фігурку"
+              >🗑️</button>
+            </div>
           </div>
         </article>`;
     }).join("");
@@ -834,6 +848,86 @@
 
 
   figureShelf.addEventListener("click", async event => {
+    const deleteShopButton = event.target.closest("[data-delete-shop-figure]");
+
+    if (deleteShopButton && figureShelf.contains(deleteShopButton)) {
+      const ownedId = deleteShopButton.dataset.deleteShopFigure;
+      const ownedFigure = ownedShopFigures.find(item => item.id === ownedId);
+      if (!ownedFigure) return;
+
+      const figure = shopFigures.find(item => item.id === ownedFigure.shopFigureId);
+      const figureName = figure?.name || "цю фігурку";
+
+      const confirmed = confirm(
+        `Фігурку «${figureName}» буде видалено з полички. Ви впевнені?`
+      );
+      if (!confirmed) return;
+
+      try {
+        deleteShopButton.disabled = true;
+        await deleteDoc(doc(db, "user_shop_figures", ownedId));
+        await loadInventory();
+      } catch (error) {
+        console.error("Shop figure delete error:", error);
+        alert("Не вдалося видалити фігурку.");
+        deleteShopButton.disabled = false;
+      }
+      return;
+    }
+
+    const viewShopButton = event.target.closest("[data-view-shop-figure]");
+
+    if (viewShopButton && figureShelf.contains(viewShopButton)) {
+      const ownedFigure = ownedShopFigures.find(
+        item => item.id === viewShopButton.dataset.viewShopFigure
+      );
+      if (!ownedFigure) return;
+
+      const figure = shopFigures.find(
+        item => item.id === ownedFigure.shopFigureId
+      );
+      if (!figure) return;
+
+      viewerImage.src = figure.image
+        ? driveImage(figure.image)
+        : placeholder();
+
+      if (figure.backImage) {
+        viewerBackImage.src = driveImage(figure.backImage);
+        viewerBackImage.style.display = "block";
+        generatedBack.style.display = "none";
+      } else {
+        viewerBackImage.removeAttribute("src");
+        viewerBackImage.style.display = "none";
+        generatedBack.style.display = "flex";
+        backCardName.textContent = figure.name || "Без назви";
+        backCardDescription.textContent =
+          figure.description || "Опис відсутній.";
+      }
+
+      cardRotationY = 0;
+      cardRotationX = 0;
+      applyCardTransform();
+
+      [cardShineFront, cardShineBack].forEach(shine => {
+        shine.style.setProperty("--shine-x", "50%");
+        shine.style.setProperty("--shine-y", "50%");
+      });
+
+      viewerName.textContent = figure.name || "Без назви";
+      viewerComic.textContent = "🛒 Магазинна фігурка";
+      viewerRarity.textContent = "Унікальна фігурка";
+      viewerDescription.textContent =
+        figure.description || "Без опису";
+      viewerObtained.textContent =
+        `Придбано: ${formatDate(ownedFigure.obtainedAt)}`;
+
+      viewerOverlay.classList.add("show");
+      viewerOverlay.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      return;
+    }
+
     const deleteButton = event.target.closest("[data-delete-figure]");
 
     if (deleteButton && figureShelf.contains(deleteButton)) {
