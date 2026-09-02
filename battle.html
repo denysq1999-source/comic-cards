@@ -215,12 +215,12 @@ async function finalizeMatch(){
         tx.get(winWallet),tx.get(loseWallet),tx.get(doc(db,"duel_ratings",winner)),tx.get(doc(db,"duel_ratings",loser))
       ]);
       const wwd=ww.exists()?ww.data():{balance:0},lwd=lw.exists()?lw.data():{balance:0};
-      const wrd=wr.exists()?wr.data():{rating:1000,wins:0,losses:0},lrd=lr.exists()?lr.data():{rating:1000,wins:0,losses:0};
+      const wrd=wr.exists()?wr.data():{rating:0,wins:0,losses:0},lrd=lr.exists()?lr.data():{rating:0,wins:0,losses:0};
       const prize=d.matchType==="tournament"?Number(d.tournamentPrize||0):Number(d.pot||0);
       tx.set(winWallet,{userId:winner,balance:Number(wwd.balance||0)+prize,duelEscrow:0,updatedAt:serverTimestamp()},{merge:true});
       tx.set(loseWallet,{userId:loser,balance:Number(lwd.balance||0),duelEscrow:0,updatedAt:serverTimestamp()},{merge:true});
-      tx.set(doc(db,"duel_ratings",winner),{userId:winner,rating:Number(wrd.rating||1000)+25,wins:Number(wrd.wins||0)+1,losses:Number(wrd.losses||0),updatedAt:serverTimestamp()},{merge:true});
-      tx.set(doc(db,"duel_ratings",loser),{userId:loser,rating:Math.max(0,Number(lrd.rating||1000)-10),wins:Number(lrd.wins||0),losses:Number(lrd.losses||0)+1,updatedAt:serverTimestamp()},{merge:true});
+      tx.set(doc(db,"duel_ratings",winner),{userId:winner,rating:Number(wrd.rating||0)+25,wins:Number(wrd.wins||0)+1,losses:Number(wrd.losses||0),updatedAt:serverTimestamp()},{merge:true});
+      tx.set(doc(db,"duel_ratings",loser),{userId:loser,rating:Math.max(0,Number(lrd.rating||0)-10),wins:Number(lrd.wins||0),losses:Number(lrd.losses||0)+1,updatedAt:serverTimestamp()},{merge:true});
       tx.delete(doc(db,"duel_locks",d.player1Id));tx.delete(doc(db,"duel_locks",d.player2Id));
       tx.update(dRef,{status:"finished",prizePaid:prize,completedAt:serverTimestamp()});
     });

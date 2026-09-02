@@ -17,8 +17,8 @@ onAuthStateChanged(auth,async u=>{
  if(!u){location.href="login.html";return}
  const [r,p]=await Promise.all([getDocs(collection(db,"duel_ratings")),getDocs(collection(db,"player_profiles"))]);
  const profiles=p.docs.map(d=>({id:d.id,...d.data()}));
- const ratings=r.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>Number(b.rating||1000)-Number(a.rating||1000));
+ const ratings=r.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>Number(b.rating||0)-Number(a.rating||0));
  if(!ratings.length){rows.innerHTML='<div class="empty">Ще не було рейтингових матчів.</div>';return}
- rows.innerHTML=ratings.map((x,i)=>{const pr=profiles.find(p=>p.id===x.id);return `<div class="row ${i===0?"top":""}"><div class="rank">${i===0?"👑":"#"+(i+1)}</div><div>${esc(pr?.displayName||"Гравець")}</div><div class="rating">${Number(x.rating||1000)}</div><div class="hide-mobile">${Number(x.wins||0)}</div><div class="hide-mobile">${Number(x.losses||0)}</div></div>`}).join("");
+ rows.innerHTML=ratings.map((x,i)=>{const pr=profiles.find(p=>p.id===x.id);return `<div class="row ${i===0?"top":""}"><div class="rank">${i===0?"👑":"#"+(i+1)}</div><div>${esc(pr?.displayName||"Гравець")}</div><div class="rating">${Number(x.rating||0)}</div><div class="hide-mobile">${Number(x.wins||0)}</div><div class="hide-mobile">${Number(x.losses||0)}</div></div>`}).join("");
 });
 </script></body></html>

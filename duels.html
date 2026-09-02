@@ -76,7 +76,7 @@
 
 <script type="module">
   import { auth } from './js/firebase.js';
-  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     getFirestore, collection, getDocs, getDoc, addDoc, setDoc, doc, query, where,
     runTransaction, serverTimestamp
@@ -99,23 +99,35 @@
 
   async function loadProfiles(){
     const snap=await getDocs(collection(db,"player_profiles"));
-    profiles=snap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.id!==user.uid);
+    profiles=snap.docs
+      .map(d=>({id:d.id,...d.data()}))
+      .filter(p=>p.id!==user.uid && p.blocked!==true);
+
     opponentSelect.innerHTML='<option value="">Оберіть гравця...</option>'+profiles
       .sort((a,b)=>String(a.displayName||"").localeCompare(String(b.displayName||""),"uk"))
       .map(p=>`<option value="${esc(p.id)}">${esc(p.displayName||p.emailMasked||"Гравець")}</option>`).join("");
   }
 
   async function loadState(){
-    const [wSnap,lockSnap,allDuels]=await Promise.all([
+    const myAsP1=query(collection(db,"duels"),where("player1Id","==",user.uid));
+    const myAsP2=query(collection(db,"duels"),where("player2Id","==",user.uid));
+
+    const [wSnap,lockSnap,p1Snap,p2Snap]=await Promise.all([
       getDoc(doc(db,"wallets",user.uid)),
       getDoc(doc(db,"duel_locks",user.uid)),
-      getDocs(collection(db,"duels"))
+      getDocs(myAsP1),
+      getDocs(myAsP2)
     ]);
+
     wallet=wSnap.exists()?{balance:0,frozen:false,...wSnap.data()}:{balance:0,frozen:false};
     isLocked=lockSnap.exists()&&lockSnap.data().active===true;
-    duels=allDuels.docs.map(d=>({id:d.id,...d.data()}))
-      .filter(d=>d.player1Id===user.uid||d.player2Id===user.uid)
+
+    const merged=new Map();
+    [...p1Snap.docs,...p2Snap.docs].forEach(d=>merged.set(d.id,{id:d.id,...d.data()}));
+
+    duels=[...merged.values()]
       .sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
     balanceEl.textContent=`💰 ${Number(wallet.balance||0)}`;
     lockNotice.style.display=isLocked?"block":"none";
     inviteBtn.disabled=isLocked||wallet.frozen===true;
@@ -171,6 +183,13 @@
     if(wallet.frozen){msg("Баланс заморожений адміністратором.","err");return}
     if(isLocked){msg("Спочатку заверши активну дуель.","err");return}
     if(Number(wallet.balance||0)<stake){msg("Недостатньо монет для цієї ставки.","err");return}
+
+    const opponent=profiles.find(p=>p.id===opponentId);
+    if(!opponent || opponent.blocked===true){
+      msg("Цей користувач недоступний для дуелей.","err");
+      await loadProfiles();
+      return;
+    }
 
     const duplicate=duels.some(d=>d.status==="pending"&&((d.player1Id===user.uid&&d.player2Id===opponentId)||(d.player2Id===user.uid&&d.player1Id===opponentId)));
     if(duplicate){msg("Між вами вже є активний інвайт.","err");return}
@@ -243,6 +262,15 @@
 
   onAuthStateChanged(auth,async currentUser=>{
     if(!currentUser){location.href="login.html";return}
+
+    const blockedSnap=await getDoc(doc(db,"blocked_users",currentUser.uid));
+    if(blockedSnap.exists()&&blockedSnap.data().blocked===true){
+      alert("Цей акаунт заблоковано адміністратором.");
+      await signOut(auth);
+      location.href="login.html";
+      return;
+    }
+
     user=currentUser;
     await loadProfiles();
     await loadState();

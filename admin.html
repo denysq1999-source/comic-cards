@@ -1667,6 +1667,9 @@
           <div class="users-toolbar">
             <input id="usersSearch" type="search" placeholder="Пошук за email...">
             <button class="primary-btn" id="refreshUsersBtn" type="button" style="width:auto;">↻ Оновити</button>
+            <button class="user-action-btn block" id="resetAllPvpBtn" type="button" style="padding:10px 12px;">
+              🏆 Обнулити PvP всім
+            </button>
           </div>
 
           <div class="users-table-wrap">
@@ -2003,6 +2006,7 @@
 
     const usersSearch = document.getElementById("usersSearch");
     const refreshUsersBtn = document.getElementById("refreshUsersBtn");
+    const resetAllPvpBtn = document.getElementById("resetAllPvpBtn");
     const usersTableBody = document.getElementById("usersTableBody");
 
     const inventoryAuditOverlay = document.getElementById("inventoryAuditOverlay");
@@ -2168,6 +2172,38 @@
           '<tr><td colspan="6" style="color:#ff9292;">Не вдалося завантажити користувачів або інвентарі.</td></tr>';
       }
     }
+
+    async function resetAllPvpRatings() {
+      if (!confirm("Обнулити PvP рейтинг, перемоги та поразки ВСІМ користувачам?")) return;
+
+      try {
+        resetAllPvpBtn.disabled = true;
+        resetAllPvpBtn.textContent = "⏳ Обнулення...";
+
+        const ratingSnap = await getDocs(collection(db, "duel_ratings"));
+        const writes = ratingSnap.docs.map(item =>
+          setDoc(doc(db, "duel_ratings", item.id), {
+            userId: item.id,
+            rating: 0,
+            wins: 0,
+            losses: 0,
+            updatedAt: serverTimestamp(),
+            resetBy: ADMIN_UID
+          }, { merge:true })
+        );
+
+        await Promise.all(writes);
+        alert(`PvP обнулено. Записів: ${writes.length}`);
+      } catch (error) {
+        console.error("PvP reset error:", error);
+        alert("Не вдалося обнулити PvP рейтинг.");
+      } finally {
+        resetAllPvpBtn.disabled = false;
+        resetAllPvpBtn.textContent = "🏆 Обнулити PvP всім";
+      }
+    }
+
+    resetAllPvpBtn?.addEventListener("click", resetAllPvpRatings);
 
     function renderAdminUsers() {
       const q = (usersSearch?.value || "").trim().toLowerCase();
@@ -2352,6 +2388,13 @@
           try {
             if (currentlyBlocked) {
               await deleteDoc(doc(db, "blocked_users", uid));
+
+              await setDoc(doc(db, "player_profiles", uid), {
+                userId: uid,
+                blocked: false,
+                unblockedAt: serverTimestamp(),
+                moderationUpdatedBy: ADMIN_UID
+              }, { merge:true });
             } else {
               await setDoc(doc(db, "blocked_users", uid), {
                 userId: uid,
@@ -2360,6 +2403,15 @@
                 blockedAt: serverTimestamp(),
                 blockedBy: ADMIN_UID
               });
+
+              // Публічний duel-профіль отримує лише прапорець blocked.
+              // Це прибирає користувача зі списку доступних суперників.
+              await setDoc(doc(db, "player_profiles", uid), {
+                userId: uid,
+                blocked: true,
+                blockedAt: serverTimestamp(),
+                moderationUpdatedBy: ADMIN_UID
+              }, { merge:true });
             }
 
             await loadAdminUsers();

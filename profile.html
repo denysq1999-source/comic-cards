@@ -165,7 +165,7 @@
       <strong id="coinBalance" class="coin-balance">0</strong>
       <span>Монет</span>
     </div>
-    <div class="stat"><strong id="duelRating">1000</strong><span>Рейтинг PvP</span></div>
+    <div class="stat"><strong id="duelRating">0</strong><span>Рейтинг PvP</span></div>
     <div class="stat"><strong id="duelWins">0</strong><span>Перемог</span></div>
     <div class="stat"><strong id="duelLosses">0</strong><span>Поразок</span></div>
   </section>
@@ -317,7 +317,7 @@
   let shopFigures = [];
   let duelLocked = false;
   let activeDuelId = null;
-  let duelStats = { rating:1000, wins:0, losses:0 };
+  let duelStats = { rating:0, wins:0, losses:0 };
 
 
   async function redirectIfMaintenance(user) {
@@ -560,10 +560,10 @@
     duelLocked = lockSnap.exists() && lockSnap.data().active === true;
     activeDuelId = duelLocked ? (lockSnap.data().duelId || null) : null;
     duelStats = ratingSnap.exists()
-      ? {rating:1000,wins:0,losses:0,...ratingSnap.data()}
-      : {rating:1000,wins:0,losses:0};
+      ? {rating:0,wins:0,losses:0,...ratingSnap.data()}
+      : {rating:0,wins:0,losses:0};
 
-    duelRating.textContent = Number(duelStats.rating||1000);
+    duelRating.textContent = Number(duelStats.rating||0);
     duelWins.textContent = Number(duelStats.wins||0);
     duelLosses.textContent = Number(duelStats.losses||0);
     duelLockBanner.classList.toggle("show",duelLocked);
