@@ -1016,6 +1016,28 @@
       }
     });
 
+
+    function applyCatalogLayoutForUser(isAdminUser) {
+      const catalogLayout = document.querySelector(".catalog-layout");
+      if (!catalogLayout) return;
+
+      const hasVisibleAds =
+        Boolean(siteSettings.ad1Enabled) ||
+        Boolean(siteSettings.ad2Enabled) ||
+        Boolean(siteSettings.ad3Enabled);
+
+      // Адмін завжди працює без рекламної колонки.
+      if (isAdminUser) {
+        adRail.classList.remove("show");
+        catalogLayout.classList.add("no-ads");
+        return;
+      }
+
+      // Для звичайного користувача реклама працює за налаштуваннями.
+      adRail.classList.toggle("show", hasVisibleAds);
+      catalogLayout.classList.toggle("no-ads", !hasVisibleAds);
+    }
+
     async function loadSiteSettings() {
       try {
         const snap = await getDoc(doc(db, "site_settings", "home"));
@@ -1080,6 +1102,7 @@
           Boolean(data.ad2Enabled) ||
           Boolean(data.ad3Enabled);
 
+        // До завершення авторизації застосовуємо звичайний режим.
         adRail.classList.toggle("show", hasVisibleAds);
 
         const catalogLayout = document.querySelector(".catalog-layout");
@@ -1433,6 +1456,7 @@
       }
 
       const isAdminUser = Boolean(user && user.uid === ADMIN_UID);
+      applyCatalogLayoutForUser(isAdminUser);
       if (siteSettings.maintenanceMode && !isAdminUser) {
         guestSection.style.display = "none";
         catalogSection.style.display = "none";
