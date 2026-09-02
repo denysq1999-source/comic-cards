@@ -28,11 +28,11 @@
     .item-img{aspect-ratio:5/7;background:#0b0b0b}.item-img img{width:100%;height:100%;object-fit:cover;display:block}
     .item-body{padding:14px}.item-name{font-size:17px;font-weight:800;margin-bottom:6px}.item-comic{color:#8f8f8f;font-size:13px;margin-bottom:7px}.rarity{display:inline-block;background:#272727;border:1px solid #353535;border-radius:999px;padding:5px 9px;color:#ffb347;font-size:12px;font-weight:800;margin-bottom:10px}
     .item-meta{color:#777;font-size:12px}
-    .item-actions{margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-    .view-btn,.trash-btn{width:100%;border:0;border-radius:8px;padding:10px 12px;cursor:pointer;font-weight:800}
-    .view-btn{background:#2b3a4a;color:#dbeeff}
+    .item-actions{margin-top:12px;display:grid;grid-template-columns:minmax(0,1fr) 44px 86px;gap:7px;align-items:stretch}
+    .view-btn,.trash-btn{width:100%;border:0;border-radius:8px;cursor:pointer;font-weight:800}
+    .view-btn{background:#2b3a4a;color:#dbeeff;padding:10px 12px;font-size:13px}
     .view-btn:hover{background:#35516d}
-    .trash-btn{background:#2a2020;color:#ff9a9a}
+    .trash-btn{background:#2a2020;color:#ff9a9a;padding:0;min-width:44px;font-size:16px;display:flex;align-items:center;justify-content:center}
     .trash-btn:hover{background:#3a2424;color:#ffb3b3}
 
     .viewer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.86);display:none;align-items:center;justify-content:center;padding:20px;z-index:1000}
@@ -103,7 +103,7 @@
 
 
     .coin-balance{color:#ffd166!important}
-    .sell-btn{width:100%;border:0;border-radius:8px;padding:10px 12px;cursor:pointer;font-weight:800;background:#5a4216;color:#ffe4a3}
+    .sell-btn{width:100%;border:0;border-radius:8px;padding:10px 7px;cursor:pointer;font-weight:800;background:#5a4216;color:#ffe4a3;font-size:12px;white-space:nowrap}
     .sell-btn:hover{background:#74571c}
     .sell-btn:disabled{opacity:.45;cursor:not-allowed}
     .wallet-note{margin:0 0 18px;color:#999;font-size:13px}
@@ -627,7 +627,9 @@
               class="trash-btn"
               type="button"
               data-delete-owned="${esc(own.id)}"
-            >🗑️ Видалити</button>
+              title="Видалити картку"
+              aria-label="Видалити картку"
+            >🗑️</button>
             <button
               class="sell-btn"
               type="button"
