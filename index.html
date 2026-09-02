@@ -702,6 +702,18 @@
         justify-content: center;
         gap: 22px;
       }
+
+      /* Якщо реклама вимкнена — каталог займає всю ширину,
+         без порожньої колонки зліва. */
+      .catalog-layout.no-ads {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+        max-width: 1120px;
+      }
+
+      .catalog-layout.no-ads .catalog-main {
+        width: 100%;
+      }
     }
 
     /* На середніх екранах рекламу прибираємо раніше,
@@ -1069,6 +1081,11 @@
           Boolean(data.ad3Enabled);
 
         adRail.classList.toggle("show", hasVisibleAds);
+
+        const catalogLayout = document.querySelector(".catalog-layout");
+        if (catalogLayout) {
+          catalogLayout.classList.toggle("no-ads", !hasVisibleAds);
+        }
       } catch (error) {
         console.error("Site settings load error:", error);
         siteSettingsLoaded = false;
