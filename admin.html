@@ -1117,7 +1117,66 @@
     .user-action-btn.freeze{background:#5a315f}
     @media(max-width:900px){.shop-admin-grid{grid-template-columns:1fr}}
 
-  </style>
+  
+    /* ===== Жанри коміксу ===== */
+    .genre-admin-grid{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      padding:12px;
+      background:#131313;
+      border:1px solid #303030;
+      border-radius:10px;
+    }
+
+    .genre-admin-option{
+      position:relative;
+    }
+
+    .genre-admin-option input{
+      position:absolute;
+      opacity:0;
+      pointer-events:none;
+    }
+
+    .genre-admin-option span{
+      display:inline-flex;
+      align-items:center;
+      padding:7px 10px;
+      border-radius:999px;
+      background:#202020;
+      border:1px solid #363636;
+      color:#bbb;
+      font-size:12px;
+      font-weight:800;
+      cursor:pointer;
+      transition:.18s ease;
+    }
+
+    .genre-admin-option input:checked + span{
+      background:#2d4667;
+      border-color:#42658f;
+      color:#dcecff;
+    }
+
+    .comic-genres-admin{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+    }
+
+    .comic-genre-admin{
+      display:inline-flex;
+      padding:5px 8px;
+      border-radius:999px;
+      background:#202631;
+      border:1px solid #313b49;
+      color:#b9d6ff;
+      font-size:11px;
+      font-weight:800;
+    }
+
+</style>
 </head>
 <body>
   <!-- Ліве меню -->
@@ -1341,6 +1400,101 @@
                     <span>🩸 Насильство</span>
                   </label>
                 </div>
+              </div>
+
+              <div class="form-group">
+                <label>Жанри</label>
+                <div class="genre-admin-grid" id="comicGenres">
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Фентезі">
+                    <span>Фентезі</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Наукова фантастика">
+                    <span>Наукова фантастика</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Жахи">
+                    <span>Жахи</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Містика">
+                    <span>Містика</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Пригоди">
+                    <span>Пригоди</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Бойовик">
+                    <span>Бойовик</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Драма">
+                    <span>Драма</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Комедія">
+                    <span>Комедія</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Романтика">
+                    <span>Романтика</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Детектив">
+                    <span>Детектив</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Трилер">
+                    <span>Трилер</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Вестерн">
+                    <span>Вестерн</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Історичний">
+                    <span>Історичний</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Військовий">
+                    <span>Військовий</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Постапокаліпсис">
+                    <span>Постапокаліпсис</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Кіберпанк">
+                    <span>Кіберпанк</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Стімпанк">
+                    <span>Стімпанк</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Супергероїка">
+                    <span>Супергероїка</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Темне фентезі">
+                    <span>Темне фентезі</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Фольклор / міфологія">
+                    <span>Фольклор / міфологія</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Психологічний">
+                    <span>Психологічний</span>
+                  </label>
+                  <label class="genre-admin-option">
+                    <input type="checkbox" name="comicGenre" value="Сатира">
+                    <span>Сатира</span>
+                  </label>
+                </div>
+                <div class="hint">Можна вибрати кілька жанрів.</div>
               </div>
 
               <div class="form-group">
@@ -2285,6 +2439,7 @@
     const comicNudity = document.getElementById("comicNudity");
     const comicViolence = document.getElementById("comicViolence");
     const comicHashtags = document.getElementById("comicHashtags");
+    const comicGenres = document.getElementById("comicGenres");
     const coverPreview = document.getElementById("coverPreview");
     const coverPreviewImg = document.getElementById("coverPreviewImg");
     const comicsGrid = document.getElementById("comicsGrid");
@@ -2429,6 +2584,14 @@
                 ${escapeHtml(comic.description || "Без опису")}
               </div>
 
+              ${Array.isArray(comic.genres) && comic.genres.length ? `
+                <div class="comic-genres-admin">
+                  ${comic.genres.map(genre => `
+                    <span class="comic-genre-admin">🏷️ ${escapeHtml(genre)}</span>
+                  `).join("")}
+                </div>
+              ` : ""}
+
               ${Array.isArray(comic.contentWarnings) && comic.contentWarnings.length ? `
                 <div class="content-flags-admin">
                   ${comic.contentWarnings.map(label => `
@@ -2492,6 +2655,7 @@
           comicHashtags.value = Array.isArray(comic.hashtags)
             ? comic.hashtags.map(tag => `#${tag}`).join(" ")
             : "";
+          setSelectedComicGenres(comic.genres || []);
 
           updateCoverPreview();
 
@@ -2526,6 +2690,19 @@
       });
     }
 
+
+    function getSelectedComicGenres() {
+      return [...comicGenres.querySelectorAll('input[name="comicGenre"]:checked')]
+        .map(input => input.value);
+    }
+
+    function setSelectedComicGenres(genres = []) {
+      const selected = new Set(Array.isArray(genres) ? genres : []);
+      comicGenres.querySelectorAll('input[name="comicGenre"]').forEach(input => {
+        input.checked = selected.has(input.value);
+      });
+    }
+
     comicForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
@@ -2534,6 +2711,7 @@
       const description = comicDescription.value.trim();
       const contentWarnings = getComicContentWarnings();
       const hashtags = normalizeComicHashtags(comicHashtags.value);
+      const genres = getSelectedComicGenres();
 
       if (!title) {
         showMessage("Заповни назву коміксу.", "error");
@@ -2547,6 +2725,7 @@
           description,
           contentWarnings,
           hashtags,
+          genres,
           updatedAt: serverTimestamp()
         }, { merge: true });
 
@@ -2558,6 +2737,7 @@
           description,
           contentWarnings,
           hashtags,
+          genres,
           createdAt: serverTimestamp()
         });
 
@@ -2576,6 +2756,7 @@
       comicNudity.checked = false;
       comicViolence.checked = false;
       comicHashtags.value = "";
+      setSelectedComicGenres([]);
       updateCoverPreview();
     });
 
@@ -2588,6 +2769,7 @@
       comicNudity.checked = false;
       comicViolence.checked = false;
       comicHashtags.value = "";
+      setSelectedComicGenres([]);
       updateCoverPreview();
       comicSubmitBtn.textContent = "💾 Додати комікс";
       cancelComicEditBtn.style.display = "none";

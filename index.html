@@ -729,6 +729,80 @@
       }
     }
 
+
+    /* ===== Жанрові теги ===== */
+    .genre-filter-wrap{
+      margin:0 auto 24px;
+      max-width:1120px;
+    }
+
+    .genre-filter-title{
+      color:#9a9a9a;
+      font-size:13px;
+      margin-bottom:10px;
+      text-align:center;
+    }
+
+    .genre-filter{
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+      gap:8px;
+    }
+
+    .genre-chip{
+      border:1px solid #343434;
+      background:#1c1c1c;
+      color:#cfcfcf;
+      border-radius:999px;
+      padding:7px 11px;
+      font-size:12px;
+      font-weight:800;
+      cursor:pointer;
+      transition:.18s ease;
+    }
+
+    .genre-chip:hover{
+      border-color:#555;
+      background:#282828;
+      color:#fff;
+    }
+
+    .genre-chip.active{
+      background:#ff9800;
+      border-color:#ff9800;
+      color:#fff;
+    }
+
+    .comic-genres{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:1px;
+    }
+
+    .comic-genre{
+      display:inline-flex;
+      align-items:center;
+      padding:5px 8px;
+      border-radius:999px;
+      background:#202631;
+      border:1px solid #313b49;
+      color:#b9d6ff;
+      font-size:11px;
+      font-weight:800;
+    }
+
+    @media(max-width:650px){
+      .genre-filter{
+        justify-content:flex-start;
+      }
+
+      .genre-filter-wrap{
+        overflow:hidden;
+      }
+    }
+
 </style>
 </head>
 
@@ -832,6 +906,35 @@
             <p>Обирай історію, читай розділи та залишай свою оцінку.</p>
           </div>
 
+          <div class="genre-filter-wrap">
+            <div class="genre-filter-title">🏷️ Жанри</div>
+            <div class="genre-filter" id="genreFilter">
+              <button class="genre-chip active" type="button" data-genre="">Усі</button>
+              <button class="genre-chip" type="button" data-genre="Фентезі">Фентезі</button>
+              <button class="genre-chip" type="button" data-genre="Наукова фантастика">Наукова фантастика</button>
+              <button class="genre-chip" type="button" data-genre="Жахи">Жахи</button>
+              <button class="genre-chip" type="button" data-genre="Містика">Містика</button>
+              <button class="genre-chip" type="button" data-genre="Пригоди">Пригоди</button>
+              <button class="genre-chip" type="button" data-genre="Бойовик">Бойовик</button>
+              <button class="genre-chip" type="button" data-genre="Драма">Драма</button>
+              <button class="genre-chip" type="button" data-genre="Комедія">Комедія</button>
+              <button class="genre-chip" type="button" data-genre="Романтика">Романтика</button>
+              <button class="genre-chip" type="button" data-genre="Детектив">Детектив</button>
+              <button class="genre-chip" type="button" data-genre="Трилер">Трилер</button>
+              <button class="genre-chip" type="button" data-genre="Вестерн">Вестерн</button>
+              <button class="genre-chip" type="button" data-genre="Історичний">Історичний</button>
+              <button class="genre-chip" type="button" data-genre="Військовий">Військовий</button>
+              <button class="genre-chip" type="button" data-genre="Постапокаліпсис">Постапокаліпсис</button>
+              <button class="genre-chip" type="button" data-genre="Кіберпанк">Кіберпанк</button>
+              <button class="genre-chip" type="button" data-genre="Стімпанк">Стімпанк</button>
+              <button class="genre-chip" type="button" data-genre="Супергероїка">Супергероїка</button>
+              <button class="genre-chip" type="button" data-genre="Темне фентезі">Темне фентезі</button>
+              <button class="genre-chip" type="button" data-genre="Фольклор / міфологія">Фольклор / міфологія</button>
+              <button class="genre-chip" type="button" data-genre="Психологічний">Психологічний</button>
+              <button class="genre-chip" type="button" data-genre="Сатира">Сатира</button>
+            </div>
+          </div>
+
           <div class="comics-grid" id="comicsGrid"></div>
         </div>
       </div>
@@ -892,6 +995,7 @@
     const authLoading = document.getElementById("authLoading");
     const catalogSection = document.getElementById("catalogSection");
     const comicsGrid = document.getElementById("comicsGrid");
+    const genreFilter = document.getElementById("genreFilter");
     const guestBanner = document.getElementById("guestBanner");
     const guestBannerImg = document.getElementById("guestBannerImg");
     const googleGuestBtn = document.getElementById("googleGuestBtn");
@@ -916,6 +1020,9 @@
     let currentUser = null;
     let siteSettings = {};
     let siteSettingsLoaded = false;
+    let activeGenre = "";
+    let cachedComics = [];
+    let cachedRatings = [];
 
     function escapeHtml(value = "") {
       return String(value)
@@ -1163,6 +1270,7 @@
         updatedAt: serverTimestamp()
       }, { merge: true });
 
+      cachedRatings = await loadRatings();
       await renderComics();
     }
 
@@ -1181,7 +1289,16 @@
     async function renderComics() {
       let comics, ratings;
       try {
-        [comics, ratings] = await Promise.all([loadComics(), loadRatings()]);
+        if (!cachedComics.length && !cachedRatings.length) {
+          [cachedComics, cachedRatings] = await Promise.all([loadComics(), loadRatings()]);
+        }
+
+        ratings = cachedRatings;
+        comics = activeGenre
+          ? cachedComics.filter(comic =>
+              Array.isArray(comic.genres) && comic.genres.includes(activeGenre)
+            )
+          : cachedComics;
       } catch (error) {
         console.error("Catalog load error:", error);
         comicsGrid.innerHTML = `
@@ -1196,7 +1313,9 @@
       if (comics.length === 0) {
         comicsGrid.innerHTML = `
           <div class="empty-state">
-            📭 Поки що коміксів немає.
+            ${activeGenre
+              ? `🏷️ У жанрі «${escapeHtml(activeGenre)}» поки немає коміксів.`
+              : "📭 Поки що коміксів немає."}
           </div>
         `;
         return;
@@ -1233,6 +1352,14 @@
               <div class="comic-description">
                 ${escapeHtml(comic.description || "Без опису")}
               </div>
+
+              ${Array.isArray(comic.genres) && comic.genres.length ? `
+                <div class="comic-genres">
+                  ${comic.genres.map(genre => `
+                    <span class="comic-genre">🏷️ ${escapeHtml(genre)}</span>
+                  `).join("")}
+                </div>
+              ` : ""}
 
               ${Array.isArray(comic.contentWarnings) && comic.contentWarnings.length ? `
                 <div class="comic-content-flags">
@@ -1299,6 +1426,21 @@
       });
     }
 
+
+
+    // ===== Фільтр за жанрами =====
+    genreFilter.addEventListener("click", event => {
+      const button = event.target.closest("[data-genre]");
+      if (!button || !genreFilter.contains(button)) return;
+
+      activeGenre = button.dataset.genre || "";
+
+      genreFilter.querySelectorAll(".genre-chip").forEach(chip => {
+        chip.classList.toggle("active", chip === button);
+      });
+
+      renderComics().catch(console.error);
+    });
 
     // ===== Щоденний пакунок: 3 картки раз на 24 години =====
     const PACK_COOLDOWN_MS = 24 * 60 * 60 * 1000;
