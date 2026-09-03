@@ -151,6 +151,15 @@ const params=new URLSearchParams(location.search),duelId=params.get("duel");
 const battleMain=document.getElementById("battleMain"),attackCard=document.getElementById("attackCard"),defenseCard=document.getElementById("defenseCard"),submitMove=document.getElementById("submitMove"),waitBox=document.getElementById("waitBox"),log=document.getElementById("log");
 let user=null,duel=null,cards=[],owned=[],profiles=[],myMoveSubmitted=false;
 
+["attackImage","defenseImage","wager1Img","wager2Img"].forEach(id=>{
+  const img=document.getElementById(id);
+  img?.addEventListener("error",()=>{
+    img.style.display="none";
+    img.closest(".card-visual")?.classList.remove("has");
+  });
+});
+
+
 function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;")}
 function nameFor(uid){const p=profiles.find(x=>x.id===uid);return p?.displayName||`Гравець ${uid.slice(0,6)}`}
 function hash32(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
@@ -158,7 +167,25 @@ function rarityMax(r){return ({Common:2,Rare:4,Epic:6,Legendary:8}[r]||2)}
 function cardByOwned(id){const o=owned.find(x=>x.id===id);return o?cards.find(c=>c.id===o.cardId):null}
 function roll(uid,card,round){const max=rarityMax(card?.rarity);return hash32(`${duelId}|${round}|${uid}|${card?.id}`)%(max+1)}
 function cardText(c){return c?`Power ${Number(c.power||0)} · Speed ${Number(c.speed||0)} · Defense ${Number(c.defense||0)} · ${c.rarity||"Common"}`:""}
-function cardImage(c){return c?.imageUrl||c?.image||c?.frontImageUrl||c?.cover||""}
+
+function extractGoogleDriveFileId(url=""){
+  const patterns=[
+    /\/file\/d\/([a-zA-Z0-9_-]+)/,
+    /[?&]id=([a-zA-Z0-9_-]+)/,
+    /\/d\/([a-zA-Z0-9_-]+)/
+  ];
+  for(const pattern of patterns){
+    const match=String(url).match(pattern);
+    if(match&&match[1]) return match[1];
+  }
+  return null;
+}
+function getCardImageUrl(url=""){
+  const fileId=extractGoogleDriveFileId(url);
+  return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000` : url;
+}
+
+function cardImage(c){return getCardImageUrl(c?.image||c?.imageUrl||c?.frontImageUrl||c?.cover||"")}
 function showCardVisual(select,wrapId,imgId,previewId){
   const c=cardByOwned(select.value);
   const wrap=document.getElementById(wrapId),img=document.getElementById(imgId),preview=document.getElementById(previewId);
