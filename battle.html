@@ -298,6 +298,14 @@ async function loadAll(){
   const bg=duel.matchType==="tournament"?settings.tournamentBattleBackground:settings.normalBattleBackground;
   if(bg)battleMain.style.backgroundImage=`url("${bg}")`;
   render();
+
+  // Якщо попередня фіналізація впала, дуель лишається у resolving.
+  // При повторному вході автоматично завершуємо її й знімаємо lock.
+  if(duel.status==="resolving"){
+    await finalizeMatch();
+    return;
+  }
+
   await maybeResolveRound();
 }
 

@@ -154,7 +154,25 @@
   function msg(text,type=""){inviteMsg.textContent=text;inviteMsg.className=`msg ${type}`}
 
 
-  function cardImage(c){return c?.imageUrl||c?.image||c?.frontImageUrl||c?.cover||""}
+  function extractGoogleDriveFileId(url=""){
+    const value=String(url||"").trim();
+    const patterns=[
+      /\/file\/d\/([a-zA-Z0-9_-]+)/,
+      /[?&]id=([a-zA-Z0-9_-]+)/,
+      /\/d\/([a-zA-Z0-9_-]+)/
+    ];
+    for(const pattern of patterns){
+      const match=value.match(pattern);
+      if(match&&match[1]) return match[1];
+    }
+    return null;
+  }
+
+  function cardImage(c){
+    const raw=String(c?.image||c?.imageUrl||c?.frontImageUrl||c?.cover||"").trim();
+    const fileId=extractGoogleDriveFileId(raw);
+    return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200` : raw;
+  }
 
   async function loadOwnedCardsForWager(){
     const [ownedSnap,cardsSnap]=await Promise.all([
@@ -169,6 +187,11 @@
       return c?`<option value="${esc(o.id)}">${esc(c.name||"Картка")} · ${esc(c.rarity||"Common")}</option>`:"";
     }).join("");
   }
+
+  wagerCardPreviewImg.addEventListener("error",()=>{
+    wagerCardPreviewImg.removeAttribute("src");
+    wagerCardPreview.classList.remove("has");
+  });
 
   wagerCardSelect.addEventListener("change",()=>{
     const owned=ownedCards.find(x=>x.id===wagerCardSelect.value);
@@ -248,7 +271,7 @@
   function filteredDuels(){
     if(activeTab==="incoming") return duels.filter(d=>d.status==="pending"&&d.player2Id===user.uid);
     if(activeTab==="outgoing") return duels.filter(d=>d.status==="pending"&&d.player1Id===user.uid);
-    if(activeTab==="active") return duels.filter(d=>d.status==="active");
+    if(activeTab==="active") return duels.filter(d=>["active","resolving"].includes(d.status));
     return duels.filter(d=>["finished","rejected","cancelled"].includes(d.status));
   }
 
@@ -282,7 +305,7 @@
             <button class="small accept" data-accept="${d.id}">✅ Прийняти</button>
             <button class="small reject" data-reject="${d.id}">✖ Відхилити</button>`:""}
           ${d.status==="pending"&&d.player1Id===user.uid?`<button class="small reject" data-cancel="${d.id}">Скасувати</button>`:""}
-          ${d.status==="active"?`<a class="small orange" href="battle.html?duel=${encodeURIComponent(d.id)}">🎮 До бою</a>`:""}
+          ${["active","resolving"].includes(d.status)?`<a class="small orange" href="battle.html?duel=${encodeURIComponent(d.id)}">${d.status==="resolving"?"🧯 Завершити матч":"🎮 До бою"}</a>`:""}
         </div>
       </article>`;
     }).join("");
