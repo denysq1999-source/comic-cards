@@ -16,7 +16,7 @@ main:before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.56);poin
 .side h2{margin:0 0 12px}.pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.pick{background:#121212;border:1px solid #333;border-radius:11px;padding:12px}
 label{display:block;font-weight:800;margin-bottom:7px}select{width:100%;background:#0b0b0b;color:#fff;border:1px solid #3b3b3b;border-radius:8px;padding:10px}
 .card-preview{margin-top:10px;color:#aaa;font-size:12px;line-height:1.5}.submit{margin-top:14px;width:100%;border:0;border-radius:9px;padding:12px;background:#ff9800;color:#fff;font-weight:900;cursor:pointer}
-.submit:disabled{opacity:.5}.battle-log{margin-top:18px;background:rgba(15,15,15,.9);border:1px solid #383838;border-radius:14px;padding:16px}
+.submit:disabled{opacity:.5}.surrender-btn{margin-top:10px;width:100%;border:1px solid #6a2e2e;border-radius:9px;padding:11px;background:#351818;color:#ffb3b3;font-weight:900;cursor:pointer}.surrender-btn:hover{background:#4a2020}.surrender-btn:disabled{opacity:.45;cursor:not-allowed}.battle-log{margin-top:18px;background:rgba(15,15,15,.9);border:1px solid #383838;border-radius:14px;padding:16px}
 .log{display:grid;gap:8px;max-height:300px;overflow:auto}.entry{background:#111;border-radius:8px;padding:10px;color:#ccc;font-size:13px;line-height:1.5}
 .wait{padding:14px;background:#2c2413;color:#ffd27a;border-radius:10px;margin-top:12px;display:none}.finished{padding:18px;background:#14341d;color:#9ff1b5;border-radius:12px;text-align:center;font-size:20px;font-weight:900;margin-top:18px;display:none}
 @media(max-width:800px){.arena{grid-template-columns:1fr}.scorebar{grid-template-columns:1fr}.pick-grid{grid-template-columns:1fr}}
@@ -104,6 +104,7 @@ label{display:block;font-weight:800;margin-bottom:7px}select{width:100%;backgrou
           </div>
         </div>
         <button class="submit" id="submitMove">✅ Підтвердити хід</button>
+        <button class="surrender-btn" id="surrenderBtn" type="button">🏳️ Здатися</button>
         <div class="wait" id="waitBox">⏳ Хід зафіксовано. Чекаємо суперника...</div>
       </section>
 
@@ -148,7 +149,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
 import { getFirestore,collection,getDocs,getDoc,doc,query,where,setDoc,runTransaction,serverTimestamp,increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const db=getFirestore(auth.app);
 const params=new URLSearchParams(location.search),duelId=params.get("duel");
-const battleMain=document.getElementById("battleMain"),attackCard=document.getElementById("attackCard"),defenseCard=document.getElementById("defenseCard"),submitMove=document.getElementById("submitMove"),waitBox=document.getElementById("waitBox"),log=document.getElementById("log");
+const battleMain=document.getElementById("battleMain"),attackCard=document.getElementById("attackCard"),defenseCard=document.getElementById("defenseCard"),submitMove=document.getElementById("submitMove"),surrenderBtn=document.getElementById("surrenderBtn"),waitBox=document.getElementById("waitBox"),log=document.getElementById("log");
 let user=null,duel=null,cards=[],owned=[],profiles=[],myMoveSubmitted=false;
 
 ["attackImage","defenseImage","wager1Img","wager2Img"].forEach(id=>{
@@ -229,7 +230,9 @@ function render(){
   document.getElementById("stakeInfo").textContent=duel.matchType==="tournament"?"🏟️ Турнір":`Банк: ${Number(duel.pot||0)} 💰`;
 
   if(duel.status==="finished"){
-    submitMove.disabled=true;document.getElementById("finishedBox").style.display="block";
+    submitMove.disabled=true;
+    surrenderBtn.disabled=true;
+    document.getElementById("finishedBox").style.display="block";
     document.getElementById("finishedBox").textContent=duel.winnerId===user.uid?"🏆 Ти переміг!":"Матч завершено.";
   }
 
@@ -435,6 +438,63 @@ async function finalizeMatch(){
     const after=await getDoc(doc(db,"duels",duelId));duel={id:after.id,...after.data()};render();
   }catch(e){console.error("Finalize error",e);alert("Матч завершився, але фіналізація потребує перевірки Rules/адміна.")}
 }
+
+
+async function surrenderMatch(){
+  if(!user || !duel || duel.status!=="active") return;
+
+  const opponentId = duel.player1Id===user.uid ? duel.player2Id : duel.player1Id;
+  const opponentName = nameFor(opponentId);
+
+  if(!confirm(`Здатися у цьому матчі?\n\nПеремогу отримає ${opponentName}. Ставка та карти на кону перейдуть переможцю.`)) return;
+
+  surrenderBtn.disabled=true;
+  submitMove.disabled=true;
+
+  try{
+    const dRef=doc(db,"duels",duelId);
+
+    await runTransaction(db,async tx=>{
+      const freshSnap=await tx.get(dRef);
+      if(!freshSnap.exists()) throw new Error("NO_DUEL");
+
+      const fresh=freshSnap.data();
+      if(fresh.status!=="active") throw new Error("NOT_ACTIVE");
+      if(fresh.player1Id!==user.uid && fresh.player2Id!==user.uid) throw new Error("NOT_PARTICIPANT");
+
+      const winnerId=fresh.player1Id===user.uid ? fresh.player2Id : fresh.player1Id;
+
+      tx.update(dRef,{
+        status:"resolving",
+        winnerId
+      });
+    });
+
+    const after=await getDoc(doc(db,"duels",duelId));
+    duel={id:after.id,...after.data()};
+
+    if(duel.status==="resolving"){
+      await finalizeMatch();
+    }
+  }catch(error){
+    console.error("Surrender error:",error);
+
+    if(String(error?.code||"").includes("permission-denied")){
+      alert("Firestore відхилив здачу. Перевір актуальні Rules.");
+    }else if(error?.message==="NOT_ACTIVE"){
+      alert("Матч уже завершений або його стан змінився.");
+    }else{
+      alert("Не вдалося здатися. Спробуй ще раз.");
+    }
+
+    if(duel?.status==="active"){
+      surrenderBtn.disabled=false;
+      submitMove.disabled=myMoveSubmitted;
+    }
+  }
+}
+
+surrenderBtn.addEventListener("click",surrenderMatch);
 
 submitMove.addEventListener("click",submit);
 onAuthStateChanged(auth,async u=>{if(!u){location.href="login.html";return}if(!duelId){location.href="duels.html";return}user=u;await loadAll()});
