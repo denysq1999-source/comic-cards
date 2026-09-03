@@ -37,7 +37,8 @@
     }
 
     input[type="email"],
-    input[type="password"] {
+    input[type="password"],
+    input[type="text"] {
       width: 100%;
       padding: 12px;
       margin-top: 15px;
@@ -50,7 +51,8 @@
     }
 
     input[type="email"]:focus,
-    input[type="password"]:focus {
+    input[type="password"]:focus,
+    input[type="text"]:focus {
       border-color: #ff9800;
     }
 
@@ -198,6 +200,17 @@
       required
     >
 
+    <input
+      type="text"
+      id="referralCode"
+      placeholder="Реферальний код (необов'язково)"
+      autocomplete="off"
+      maxlength="40"
+    >
+    <div class="legal-note" style="text-align:left;">
+      🎁 Код друга: +500 💰 тобі, +200 💰 другу. Код адміністратора: +1000 💰 тобі.
+    </div>
+
     <div class="legal-box" id="legalBox">
       <h3>📜 Основні правила та політика приватності</h3>
 
@@ -306,21 +319,106 @@
     import {
       getFirestore,
       doc,
+      getDoc,
       setDoc,
+      runTransaction,
+      increment,
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const db = getFirestore(auth.app);
+    const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
 
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const password2Input = document.getElementById('password2');
     const legalConsent = document.getElementById('legalConsent');
+    const referralCodeInput = document.getElementById('referralCode');
     const registerBtn = document.getElementById('registerBtn');
     const errorDiv = document.getElementById('error');
     const successDiv = document.getElementById('success');
 
     const LEGAL_VERSION = '1.0';
+
+    const ADMIN_REFERRAL_CODE="SHOCKER1000";
+
+    function makeReferralCode(uid){
+        const clean=String(uid||"").replace(/[^a-zA-Z0-9]/g,"").toUpperCase();
+        return `CC-${clean.slice(0,6)}${clean.slice(-4)}`;
+    }
+
+    function referralUrl(code){
+        const base=new URL("register.html",location.href);
+        base.searchParams.set("ref",code);
+        return base.href;
+    }
+
+    async function ensureMyReferralCode(uid){
+        const code=uid===ADMIN_UID?ADMIN_REFERRAL_CODE:makeReferralCode(uid);
+        await setDoc(doc(db,"referral_codes",code),{
+            code,
+            ownerId:uid,
+            isAdminCode:uid===ADMIN_UID,
+            active:true,
+            updatedAt:serverTimestamp()
+        },{merge:true});
+        return code;
+    }
+
+
+    async function activateRegistrationReferral(user,rawCode){
+      const code=String(rawCode||"").trim().toUpperCase();
+      if(!code) return 0;
+
+      const claimRef=doc(db,"referral_claims",user.uid);
+      const codeRef=doc(db,"referral_codes",code);
+      const myWalletRef=doc(db,"wallets",user.uid);
+
+      await runTransaction(db,async tx=>{
+        const [claimSnap,codeSnap,myWalletSnap]=await Promise.all([
+          tx.get(claimRef),tx.get(codeRef),tx.get(myWalletRef)
+        ]);
+        if(claimSnap.exists()) throw new Error("REF_ALREADY_USED");
+        if(!codeSnap.exists()||codeSnap.data().active!==true) throw new Error("REF_INVALID");
+
+        const codeData=codeSnap.data();
+        const ownerId=codeData.ownerId;
+        if(!ownerId||ownerId===user.uid) throw new Error("REF_SELF");
+
+        const isAdminCode=ownerId===ADMIN_UID||codeData.isAdminCode===true;
+        const newUserReward=isAdminCode?1000:500;
+        const ownerReward=isAdminCode?0:200;
+        const myWallet=myWalletSnap.exists()?myWalletSnap.data():{balance:0,frozen:false};
+
+        tx.set(claimRef,{
+          userId:user.uid,code,ownerId,isAdminCode,
+          newUserReward,ownerReward,claimedAt:serverTimestamp()
+        });
+
+        tx.set(myWalletRef,{
+          userId:user.uid,
+          balance:Number(myWallet.balance||0)+newUserReward,
+          frozen:Boolean(myWallet.frozen),
+          lastReferralClaimId:user.uid,
+          updatedAt:serverTimestamp()
+        },{merge:true});
+
+        if(ownerReward>0){
+          tx.set(doc(db,"wallets",ownerId),{
+            userId:ownerId,
+            balance:increment(ownerReward),
+            lastReferralRewardFor:user.uid,
+            updatedAt:serverTimestamp()
+          },{merge:true});
+        }
+      });
+      return code===ADMIN_REFERRAL_CODE?1000:500;
+    }
+
+    const refFromUrl=new URLSearchParams(location.search).get("ref");
+    if(refFromUrl) referralCodeInput.value=refFromUrl.toUpperCase();
+
+
 
     legalConsent.addEventListener('change', () => {
       registerBtn.disabled = !legalConsent.checked;
@@ -395,8 +493,27 @@
           { merge: true }
         );
 
-        successDiv.textContent =
-          'Акаунт створено. Правила прийнято ✅';
+        // Створюємо нульовий гаманець і власний реферальний код.
+        await setDoc(doc(db,"wallets",user.uid),{
+          userId:user.uid,balance:0,frozen:false,updatedAt:serverTimestamp()
+        },{merge:true});
+
+        await ensureMyReferralCode(user.uid);
+
+        let referralBonus=0;
+        const enteredReferral=referralCodeInput.value.trim();
+        if(enteredReferral){
+          try{
+            referralBonus=await activateRegistrationReferral(user,enteredReferral);
+          }catch(refError){
+            console.error("Referral registration error:",refError);
+            // Акаунт не ламаємо: код можна буде ввести один раз у профілі.
+          }
+        }
+
+        successDiv.textContent = referralBonus
+          ? `Акаунт створено ✅ Реферальний бонус: +${referralBonus} 💰`
+          : 'Акаунт створено. Правила прийнято ✅';
 
         // Після реєстрації повертаємо користувача на сторінку входу.
         await signOut(auth);

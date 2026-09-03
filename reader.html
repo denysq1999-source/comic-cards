@@ -385,7 +385,10 @@
         border-right: none;
       }
     }
-  </style>
+  
+    .chapter-reward-toast{position:fixed;right:18px;bottom:18px;z-index:1200;background:#1f3d24;border:1px solid #35633d;color:#a9efb5;padding:12px 15px;border-radius:10px;font-weight:800;display:none;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+    .chapter-reward-toast.show{display:block}
+</style>
 </head>
 
 <body>
@@ -410,6 +413,7 @@
       <div class="state">Завантаження коміксу…</div>
     </div>
   </main>
+<div class="chapter-reward-toast" id="chapterRewardToast"></div>
 
 
   <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
@@ -455,6 +459,7 @@
       where,
       setDoc,
       writeBatch,
+      runTransaction,
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -489,6 +494,11 @@
     let comicCollectibles = [];
     let currentDrop = null;
     let dropObserver = null;
+    let rewardObserver = null;
+    let rewardTimer = null;
+    const CHAPTER_REWARD = 50;
+    const MIN_READ_MS = 15000;
+    const chapterRewardToast=document.getElementById("chapterRewardToast");
 
     function extractGoogleDriveFileId(url) {
       if (!url) return null;
@@ -620,6 +630,90 @@
       });
     }
 
+
+    function showChapterRewardToast(text){
+      chapterRewardToast.textContent=text;
+      chapterRewardToast.classList.add("show");
+      setTimeout(()=>chapterRewardToast.classList.remove("show"),3500);
+    }
+
+    async function ensureReadSession(chapter){
+      const id=`${currentUser.uid}_${chapter.id}`;
+      const ref=doc(db,"chapter_read_sessions",id);
+      const snap=await getDoc(ref);
+      if(!snap.exists()){
+        await setDoc(ref,{
+          userId:currentUser.uid,
+          chapterId:chapter.id,
+          comicId,
+          startedAt:serverTimestamp()
+        });
+      }
+      return ref;
+    }
+
+    async function claimChapterReward(chapter){
+      if(!currentUser)return;
+      const claimId=`${currentUser.uid}_${chapter.id}`;
+      const claimRef=doc(db,"chapter_rewards",claimId);
+      const walletRef=doc(db,"wallets",currentUser.uid);
+
+      try{
+        await runTransaction(db,async tx=>{
+          const [claimSnap,walletSnap]=await Promise.all([tx.get(claimRef),tx.get(walletRef)]);
+          if(claimSnap.exists())throw new Error("ALREADY_REWARDED");
+          const w=walletSnap.exists()?walletSnap.data():{balance:0,frozen:false};
+
+          tx.set(claimRef,{
+            userId:currentUser.uid,
+            chapterId:chapter.id,
+            comicId,
+            amount:CHAPTER_REWARD,
+            claimedAt:serverTimestamp()
+          });
+
+          tx.set(walletRef,{
+            userId:currentUser.uid,
+            balance:Number(w.balance||0)+CHAPTER_REWARD,
+            frozen:Boolean(w.frozen),
+            lastChapterRewardId:claimId,
+            updatedAt:serverTimestamp()
+          },{merge:true});
+        });
+        showChapterRewardToast(`📖 Розділ прочитано: +${CHAPTER_REWARD} 💰`);
+      }catch(e){
+        if(e?.message!=="ALREADY_REWARDED")console.error("Chapter reward error:",e);
+      }
+    }
+
+    async function setupChapterReward(chapter,pages){
+      if(rewardObserver){rewardObserver.disconnect();rewardObserver=null}
+      if(rewardTimer){clearTimeout(rewardTimer);rewardTimer=null}
+      if(!currentUser||!pages.length)return;
+
+      const claimId=`${currentUser.uid}_${chapter.id}`;
+      const existing=await getDoc(doc(db,"chapter_rewards",claimId));
+      if(existing.exists())return;
+
+      await ensureReadSession(chapter);
+      const openedAt=Date.now();
+      const pageEls=[...document.querySelectorAll(".page-wrap")];
+      const lastPage=pageEls[pageEls.length-1];
+      if(!lastPage)return;
+
+      rewardObserver=new IntersectionObserver(entries=>{
+        const hit=entries.some(e=>e.isIntersecting&&e.intersectionRatio>=0.6);
+        if(!hit)return;
+        rewardObserver.disconnect();rewardObserver=null;
+
+        const wait=Math.max(0,MIN_READ_MS-(Date.now()-openedAt));
+        rewardTimer=setTimeout(()=>claimChapterReward(chapter),wait);
+      },{threshold:[0.6]});
+
+      rewardObserver.observe(lastPage);
+    }
+
+
     function renderChapter(chapterId) {
       const chapter = comicChapters.find(item => item.id === chapterId);
       if (!chapter) return;
@@ -679,6 +773,7 @@
       `;
 
       setupCollectibleDrop(chapter, pages);
+      setupChapterReward(chapter, pages).catch(console.error);
 
       const prevBtn = document.getElementById("prevChapterBtn");
       const nextBtn = document.getElementById("nextChapterBtn");
