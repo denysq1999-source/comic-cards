@@ -121,7 +121,14 @@
   .duel-profile-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .duel-profile-actions a{display:inline-flex;padding:8px 10px;border-radius:8px;background:#432929;color:#ffd0d0;text-decoration:none}
 
-.collection-tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.collection-tab,.collection-toggle{border:1px solid #363636;border-radius:9px;padding:10px 14px;background:#232323;color:#ddd;cursor:pointer;font-weight:800}.collection-tab.active{background:#ff9800;border-color:#ff9800;color:#fff}.collection-toggle{margin-left:auto}.collection-view[hidden]{display:none!important}.collection-content.collapsed{display:none!important}@media(max-width:650px){.collection-toggle{margin-left:0;width:100%}}</style>
+.collection-tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.collection-tab,.collection-toggle{border:1px solid #363636;border-radius:9px;padding:10px 14px;background:#232323;color:#ddd;cursor:pointer;font-weight:800}.collection-tab.active{background:#ff9800;border-color:#ff9800;color:#fff}.collection-toggle{margin-left:auto}.collection-view[hidden]{display:none!important}.collection-content.collapsed{display:none!important}@media(max-width:650px){.collection-toggle{margin-left:0;width:100%}}
+    .figure-source-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px}
+    .figure-source-btn{border:1px solid #363636;border-radius:999px;padding:8px 12px;background:#222;color:#ccc;cursor:pointer;font-weight:800;font-size:12px}
+    .figure-source-btn.active{background:#5a3a17;border-color:#8c5a1d;color:#ffd18b}
+    .figure-source-badge{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;margin-bottom:2px}
+    .figure-source-badge.comic{background:#1f3a4a;color:#bfe7ff}
+    .figure-source-badge.shop{background:#3a2c55;color:#dfccff}
+</style>
 </head>
 <body>
 
@@ -195,7 +202,14 @@
     <div class="collection-view" id="figuresView" hidden>
       <h2>🧍 Поличка фігурок</h2>
       <p class="panel-sub">Тут зберігаються колекційні фігурки, які ти знаходиш під час читання або купуєш у магазині.</p>
-      <div class="collection-content" id="figuresContent"><div class="figure-shelf" id="figureShelf"></div></div>
+      <div class="collection-content" id="figuresContent">
+        <div class="figure-source-toolbar">
+          <button class="figure-source-btn active" type="button" data-figure-source="all">Усі</button>
+          <button class="figure-source-btn" type="button" data-figure-source="comic">📚 З коміксів</button>
+          <button class="figure-source-btn" type="button" data-figure-source="shop">🛒 З магазину</button>
+        </div>
+        <div class="figure-shelf" id="figureShelf"></div>
+      </div>
     </div>
   </section>
 </main>
@@ -476,6 +490,7 @@
 
 
   let activeCollectionTab="cards"; const collectionCollapsed={cards:false,figures:false};
+  let figureSourceFilter="all";
   function updateCollectionUI(){
     const c=activeCollectionTab==="cards";
     cardsTabBtn.classList.toggle("active",c); figuresTabBtn.classList.toggle("active",!c);
@@ -487,6 +502,15 @@
   cardsTabBtn.addEventListener("click",()=>{activeCollectionTab="cards";updateCollectionUI()});
   figuresTabBtn.addEventListener("click",()=>{activeCollectionTab="figures";updateCollectionUI()});
   collectionToggleBtn.addEventListener("click",()=>{collectionCollapsed[activeCollectionTab]=!collectionCollapsed[activeCollectionTab];updateCollectionUI()});
+
+  document.querySelectorAll("[data-figure-source]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      figureSourceFilter=btn.dataset.figureSource||"all";
+      document.querySelectorAll("[data-figure-source]").forEach(x=>x.classList.toggle("active",x===btn));
+      renderFigureShelf();
+    });
+  });
+
   updateCollectionUI();
 
   onAuthStateChanged(auth, async currentUser => {
@@ -860,7 +884,12 @@
   function resetCard3D(){cardDragging=false;activePointerId=null;cardRotationY=0;cardRotationX=0;viewerImageWrap.classList.remove("dragging");applyCardTransform();[cardShineFront,cardShineBack].forEach(sh=>{sh.style.setProperty("--shine-x","50%");sh.style.setProperty("--shine-y","50%")})}
 
   function renderFigureShelf() {
-    const hasAnyFigures = ownedFigures.length || ownedShopFigures.length;
+    const showComic = figureSourceFilter==="all" || figureSourceFilter==="comic";
+    const showShop = figureSourceFilter==="all" || figureSourceFilter==="shop";
+    const visibleNormal = showComic ? ownedFigures : [];
+    const visibleShop = showShop ? ownedShopFigures : [];
+    const hasAnyFigures = visibleNormal.length || visibleShop.length;
+
     if (!hasAnyFigures) {
       figureShelf.innerHTML = `
         <div class="empty">
@@ -871,7 +900,7 @@
       return;
     }
 
-    const normalHtml = ownedFigures.map(own => {
+    const normalHtml = visibleNormal.map(own => {
       const figure = figures.find(item => item.id === own.figureId);
       if (!figure) return "";
 
@@ -883,7 +912,8 @@
           <img src="${image}" alt="${esc(figure.name || "Фігурка")}">
           <div class="figure-item-info">
             <div class="figure-item-title">${esc(figure.name || "Без назви")}</div>
-            <div class="figure-item-comic">${esc(comic?.title || "Невідомий комікс")}</div>
+            <span class="figure-source-badge comic">📚 З коміксу</span>
+            <div class="figure-item-comic">Комікс: ${esc(comic?.title || "Невідомий комікс")}</div>
             <div class="figure-item-desc">${esc(figure.description || "Без опису")}</div>
             <div class="item-meta">Отримано: ${formatDate(own.obtainedAt)}</div>
             <div class="figure-actions">
@@ -895,7 +925,7 @@
       `;
     }).join("");
 
-    const shopHtml = ownedShopFigures.map(own => {
+    const shopHtml = visibleShop.map(own => {
       const figure=shopFigures.find(item=>item.id===own.shopFigureId);
       if(!figure)return "";
       const image=figure.image?driveImage(figure.image):placeholder();
@@ -904,7 +934,7 @@
           <img src="${image}" alt="${esc(figure.name||"Фігурка")}">
           <div class="figure-item-info">
             <div class="figure-item-title">${esc(figure.name||"Без назви")}</div>
-            <span class="shop-figure-badge">🛒 Магазин</span>
+            <span class="figure-source-badge shop">🛒 Куплено в магазині</span>
             <div class="figure-item-desc">${esc(figure.description||"Без опису")}</div>
             <div class="item-meta">Придбано: ${formatDate(own.obtainedAt)}</div>
             <div class="figure-actions">
