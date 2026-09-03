@@ -121,7 +121,7 @@
   .duel-profile-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .duel-profile-actions a{display:inline-flex;padding:8px 10px;border-radius:8px;background:#432929;color:#ffd0d0;text-decoration:none}
 
-</style>
+.collection-tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.collection-tab,.collection-toggle{border:1px solid #363636;border-radius:9px;padding:10px 14px;background:#232323;color:#ddd;cursor:pointer;font-weight:800}.collection-tab.active{background:#ff9800;border-color:#ff9800;color:#fff}.collection-toggle{margin-left:auto}.collection-view[hidden]{display:none!important}.collection-content.collapsed{display:none!important}@media(max-width:650px){.collection-toggle{margin-left:0;width:100%}}</style>
 </head>
 <body>
 
@@ -177,30 +177,28 @@
     </div>
   </div>
 
-  <section class="panel">
-    <h2>🎒 Інвентар карток</h2>
-    <div class="wallet-note" id="walletNote">💰 Дублікати можна продавати за монети.</div>
-    <p class="panel-sub">Тут зберігатимуться картки, які користувач отримав під час читання коміксів.</p>
-
-    <div class="toolbar">
-      <select id="comicFilter">
-        <option value="">Усі комікси</option>
-      </select>
-      <input id="searchInput" type="search" placeholder="Пошук картки...">
+  <section class="panel" id="collectionPanel">
+    <div class="collection-tabs">
+      <button class="collection-tab active" id="cardsTabBtn" type="button">🎴 Картки</button>
+      <button class="collection-tab" id="figuresTabBtn" type="button">🧍 Фігурки</button>
+      <button class="collection-toggle" id="collectionToggleBtn" type="button">👁️ Приховати картки</button>
     </div>
-
-    <div class="inventory" id="inventory"></div>
+    <div class="collection-view" id="cardsView">
+      <h2>🎒 Інвентар карток</h2>
+      <div class="wallet-note" id="walletNote">💰 Дублікати можна продавати за монети.</div>
+      <p class="panel-sub">Тут зберігатимуться картки, які користувач отримав під час читання коміксів.</p>
+      <div class="collection-content" id="cardsContent">
+        <div class="toolbar"><select id="comicFilter"><option value="">Усі комікси</option></select><input id="searchInput" type="search" placeholder="Пошук картки..."></div>
+        <div class="inventory" id="inventory"></div>
+      </div>
+    </div>
+    <div class="collection-view" id="figuresView" hidden>
+      <h2>🧍 Поличка фігурок</h2>
+      <p class="panel-sub">Тут зберігаються колекційні фігурки, які ти знаходиш під час читання або купуєш у магазині.</p>
+      <div class="collection-content" id="figuresContent"><div class="figure-shelf" id="figureShelf"></div></div>
+    </div>
   </section>
 </main>
-
-
-  <section class="inventory-panel" style="margin-top:24px;">
-    <h2>🧍 Поличка фігурок</h2>
-    <p class="sub">Тут зберігаються колекційні фігурки, які ти знаходиш під час читання.</p>
-    <div class="figure-shelf" id="figureShelf">
-      <div class="empty">Поличка поки що порожня. 👀<br>Читай комікси та знаходь фігурки під час читання.</div>
-    </div>
-  </section>
 
 <div class="viewer-overlay" id="viewerOverlay" aria-hidden="true">
   <div class="viewer-modal">
@@ -284,6 +282,7 @@
   const figureShelf = document.getElementById("figureShelf");
   const comicFilter = document.getElementById("comicFilter");
   const searchInput = document.getElementById("searchInput");
+  const cardsTabBtn=document.getElementById("cardsTabBtn"), figuresTabBtn=document.getElementById("figuresTabBtn"), collectionToggleBtn=document.getElementById("collectionToggleBtn"), cardsView=document.getElementById("cardsView"), figuresView=document.getElementById("figuresView"), cardsContent=document.getElementById("cardsContent"), figuresContent=document.getElementById("figuresContent");
   const viewerOverlay = document.getElementById("viewerOverlay");
   const viewerCloseBtn = document.getElementById("viewerCloseBtn");
   const viewerImage = document.getElementById("viewerImage");
@@ -475,6 +474,20 @@
   packCloseBtn.addEventListener("click",closePackOverlay);
   packOverlay.addEventListener("click",e=>{if(e.target===packOverlay)closePackOverlay()});
 
+
+  let activeCollectionTab="cards"; const collectionCollapsed={cards:false,figures:false};
+  function updateCollectionUI(){
+    const c=activeCollectionTab==="cards";
+    cardsTabBtn.classList.toggle("active",c); figuresTabBtn.classList.toggle("active",!c);
+    cardsView.hidden=!c; figuresView.hidden=c;
+    cardsContent.classList.toggle("collapsed",collectionCollapsed.cards); figuresContent.classList.toggle("collapsed",collectionCollapsed.figures);
+    const hidden=collectionCollapsed[activeCollectionTab];
+    collectionToggleBtn.textContent=hidden?`👁️ Показати ${c?"картки":"фігурки"}`:`👁️ Приховати ${c?"картки":"фігурки"}`;
+  }
+  cardsTabBtn.addEventListener("click",()=>{activeCollectionTab="cards";updateCollectionUI()});
+  figuresTabBtn.addEventListener("click",()=>{activeCollectionTab="figures";updateCollectionUI()});
+  collectionToggleBtn.addEventListener("click",()=>{collectionCollapsed[activeCollectionTab]=!collectionCollapsed[activeCollectionTab];updateCollectionUI()});
+  updateCollectionUI();
 
   onAuthStateChanged(auth, async currentUser => {
     if (await redirectIfMaintenance(currentUser)) return;
