@@ -120,7 +120,7 @@
         <button class="tab active" data-tab="incoming">📥 Вхідні</button>
         <button class="tab" data-tab="outgoing">📤 Вихідні</button>
         <button class="tab" data-tab="active">⚔️ Активні</button>
-        <button class="tab" data-tab="history">📜 Історія</button>
+        <button class="tab" data-tab="history">📜 Історія</button><button class="tab" id="clearHistoryBtn" type="button">🗑️ Очистити історію</button>
       </div>
       <div class="list" id="duelsList"><div class="empty">Завантаження...</div></div>
     </section>
@@ -133,7 +133,7 @@
   import {
     getFirestore, collection, getDocs, getDoc, addDoc, setDoc, doc, query, where,
     runTransaction, serverTimestamp, increment
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  ,deleteDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const db=getFirestore(auth.app);
   const balanceEl=document.getElementById("balance");
@@ -154,25 +154,7 @@
   function msg(text,type=""){inviteMsg.textContent=text;inviteMsg.className=`msg ${type}`}
 
 
-  
-function extractGoogleDriveFileId(url=""){
-  const patterns=[
-    /\/file\/d\/([a-zA-Z0-9_-]+)/,
-    /[?&]id=([a-zA-Z0-9_-]+)/,
-    /\/d\/([a-zA-Z0-9_-]+)/
-  ];
-  for(const pattern of patterns){
-    const match=String(url).match(pattern);
-    if(match&&match[1]) return match[1];
-  }
-  return null;
-}
-function getCardImageUrl(url=""){
-  const fileId=extractGoogleDriveFileId(url);
-  return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000` : url;
-}
-
-  function cardImage(c){return getCardImageUrl(c?.image||c?.imageUrl||c?.frontImageUrl||c?.cover||"")}
+  function cardImage(c){return c?.imageUrl||c?.image||c?.frontImageUrl||c?.cover||""}
 
   async function loadOwnedCardsForWager(){
     const [ownedSnap,cardsSnap]=await Promise.all([
@@ -187,12 +169,6 @@ function getCardImageUrl(url=""){
       return c?`<option value="${esc(o.id)}">${esc(c.name||"Картка")} · ${esc(c.rarity||"Common")}</option>`:"";
     }).join("");
   }
-
-
-  wagerCardPreviewImg.addEventListener("error",()=>{
-    wagerCardPreviewImg.removeAttribute("src");
-    wagerCardPreview.classList.remove("has");
-  });
 
   wagerCardSelect.addEventListener("change",()=>{
     const owned=ownedCards.find(x=>x.id===wagerCardSelect.value);
@@ -217,6 +193,23 @@ function getCardImageUrl(url=""){
       .sort((a,b)=>String(a.displayName||"").localeCompare(String(b.displayName||""),"uk"))
       .map(p=>`<option value="${esc(p.id)}">${esc(p.displayName||p.emailMasked||"Гравець")}</option>`).join("");
   }
+
+
+  async function clearHistory(){
+    const old=duels.filter(d=>["finished","cancelled","rejected"].includes(d.status));
+    if(!old.length){ alert("Історія вже порожня."); return; }
+    if(!confirm(`Очистити історію дуелей? Записів: ${old.length}\nАктивні матчі та інвайти залишаться.`)) return;
+    const btn=document.getElementById("clearHistoryBtn");
+    btn.disabled=true;
+    try{
+      for(const d of old) await deleteDoc(doc(db,"duels",d.id));
+      await loadState();
+    }catch(e){
+      console.error(e);
+      alert(String(e?.code||"").includes("permission-denied") ? "Потрібно оновити Firestore Rules з комплекту." : "Не вдалося очистити історію.");
+    }finally{ btn.disabled=false; }
+  }
+  document.getElementById("clearHistoryBtn")?.addEventListener("click",clearHistory);
 
   async function loadState(){
     const myAsP1=query(collection(db,"duels"),where("player1Id","==",user.uid));
