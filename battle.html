@@ -152,13 +152,6 @@ const params=new URLSearchParams(location.search),duelId=params.get("duel");
 const battleMain=document.getElementById("battleMain"),attackCard=document.getElementById("attackCard"),defenseCard=document.getElementById("defenseCard"),submitMove=document.getElementById("submitMove"),surrenderBtn=document.getElementById("surrenderBtn"),waitBox=document.getElementById("waitBox"),log=document.getElementById("log");
 let user=null,duel=null,cards=[],owned=[],profiles=[],myMoveSubmitted=false;
 
-["attackImage","defenseImage","wager1Img","wager2Img"].forEach(id=>{
-  const img=document.getElementById(id);
-  img?.addEventListener("error",()=>{
-    img.style.display="none";
-    img.closest(".card-visual")?.classList.remove("has");
-  });
-});
 
 
 function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;")}
@@ -170,35 +163,90 @@ function roll(uid,card,round){const max=rarityMax(card?.rarity);return hash32(`$
 function cardText(c){return c?`Power ${Number(c.power||0)} · Speed ${Number(c.speed||0)} · Defense ${Number(c.defense||0)} · ${c.rarity||"Common"}`:""}
 
 function extractGoogleDriveFileId(url=""){
+  const value=String(url||"").trim();
   const patterns=[
     /\/file\/d\/([a-zA-Z0-9_-]+)/,
     /[?&]id=([a-zA-Z0-9_-]+)/,
     /\/d\/([a-zA-Z0-9_-]+)/
   ];
   for(const pattern of patterns){
-    const match=String(url).match(pattern);
+    const match=value.match(pattern);
     if(match&&match[1]) return match[1];
   }
   return null;
 }
-function getCardImageUrl(url=""){
-  const fileId=extractGoogleDriveFileId(url);
-  return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000` : url;
+
+function cardRawImage(c){
+  return String(c?.image||c?.imageUrl||c?.frontImageUrl||c?.cover||"").trim();
 }
 
-function cardImage(c){return getCardImageUrl(c?.image||c?.imageUrl||c?.frontImageUrl||c?.cover||"")}
+function cardImageCandidates(c){
+  const raw=cardRawImage(c);
+  if(!raw) return [];
+
+  const id=extractGoogleDriveFileId(raw);
+  if(!id) return [raw];
+
+  // Кілька робочих варіантів Google Drive.
+  // Якщо thumbnail на конкретному браузері/файлі відмовить —
+  // img автоматично перейде до наступного URL.
+  return [
+    `https://drive.google.com/thumbnail?id=${id}&sz=w1200`,
+    `https://drive.google.com/uc?export=view&id=${id}`,
+    `https://lh3.googleusercontent.com/d/${id}=w1200`,
+    raw
+  ];
+}
+
+function setCardImageWithFallback(img,card,wrap=null){
+  const candidates=cardImageCandidates(card);
+  let index=0;
+
+  function fail(){
+    index+=1;
+    if(index<candidates.length){
+      img.src=candidates[index];
+      return;
+    }
+    img.removeAttribute("src");
+    img.style.display="none";
+    wrap?.classList.remove("has");
+  }
+
+  img.onerror=fail;
+
+  if(!candidates.length){
+    img.removeAttribute("src");
+    img.style.display="none";
+    wrap?.classList.remove("has");
+    return;
+  }
+
+  img.style.display="";
+  img.src=candidates[0];
+  wrap?.classList.add("has");
+}
+
+function cardImage(c){
+  const candidates=cardImageCandidates(c);
+  return candidates[0]||"";
+}
 function showCardVisual(select,wrapId,imgId,previewId){
   const c=cardByOwned(select.value);
-  const wrap=document.getElementById(wrapId),img=document.getElementById(imgId),preview=document.getElementById(previewId);
+  const wrap=document.getElementById(wrapId);
+  const img=document.getElementById(imgId);
+  const preview=document.getElementById(previewId);
+
   preview.textContent=cardText(c);
-  const src=cardImage(c);
-  if(src){
-    img.src=src;
-    wrap.classList.add("has");
-  }else{
+
+  if(!c){
     img.removeAttribute("src");
+    img.style.display="none";
     wrap.classList.remove("has");
+    return;
   }
+
+  setCardImageWithFallback(img,c,wrap);
 }
 
 
@@ -247,8 +295,8 @@ function render(){
   function paintWager(card,imgId,nameId,ownerId,emptyId,ownerName){
     const img=document.getElementById(imgId),name=document.getElementById(nameId),owner=document.getElementById(ownerId),empty=document.getElementById(emptyId);
     if(card){
-      const src=cardImage(card);
-      if(src){img.src=src;img.style.display="block"}else{img.style.display="none"}
+      setCardImageWithFallback(img,card,null);
+      img.style.display=cardImageCandidates(card).length?"block":"none";
       name.textContent=card.name||"Картка";
       owner.textContent=ownerName;
       empty.style.display="none";
