@@ -25,7 +25,30 @@
     .small.accept{background:#1f5f36;color:#dff7e7}.small.reject{background:#4b2525;color:#ffc0c0}.small.orange{background:#ff9800;color:#fff}
     .empty{border:1px dashed #333;border-radius:12px;padding:38px 16px;text-align:center;color:#777}.lock{margin-top:14px;padding:12px;border-radius:10px;background:#321e1e;color:#ffb0b0;display:none}
     @media(max-width:820px){.layout{grid-template-columns:1fr}.duel-top{flex-direction:column}}
-  </style>
+  
+.wager-select-box{
+  margin-top:14px;
+  padding:13px;
+  border:1px solid #3b3125;
+  border-radius:10px;
+  background:#13110e;
+}
+.wager-preview{
+  margin-top:10px;
+  min-height:180px;
+  border:1px dashed #3a332a;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  color:#777;
+}
+.wager-preview img{width:100%;height:220px;object-fit:contain;display:none;background:#090909}
+.wager-preview.has img{display:block}
+.wager-preview.has span{display:none}
+
+</style>
 </head>
 <body>
 <header>
@@ -57,6 +80,17 @@
         <label for="stakeInput">Ставка, 💰</label>
         <input id="stakeInput" type="number" min="100" max="5000" step="100" value="100">
         <div class="note">Кожен гравець ставить однакову суму. Переможець забирає весь банк.</div>
+      </div>
+      <div class="wager-select-box">
+        <label for="wagerCardSelect">🃏 Додатково поставити карту на кон</label>
+        <select id="wagerCardSelect">
+          <option value="">Без карти</option>
+        </select>
+        <div class="wager-preview" id="wagerCardPreview">
+          <span>Обереш карту — тут з’явиться її зображення.</span>
+          <img id="wagerCardPreviewImg" alt="Карта на кон">
+        </div>
+        <div class="note">Карта блокується на час матчу. Після завершення переходить переможцю.</div>
       </div>
       <button class="primary" id="inviteBtn" type="button">⚔️ Надіслати виклик</button>
       <div class="msg" id="inviteMsg"></div>
@@ -90,12 +124,45 @@
   const inviteMsg=document.getElementById("inviteMsg");
   const duelsList=document.getElementById("duelsList");
   const lockNotice=document.getElementById("lockNotice");
-  let user=null,wallet={balance:0,frozen:false},profiles=[],duels=[],activeTab="incoming",isLocked=false;
+  const wagerCardSelect=document.getElementById("wagerCardSelect");
+  const wagerCardPreview=document.getElementById("wagerCardPreview");
+  const wagerCardPreviewImg=document.getElementById("wagerCardPreviewImg");
+  let user=null,wallet={balance:0,frozen:false},profiles=[],duels=[],activeTab="incoming",isLocked=false,ownedCards=[],cardCatalog=[];
 
   function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
   function labelFor(uid){const p=profiles.find(x=>x.id===uid);return p?.displayName||p?.emailMasked||`Гравець ${uid.slice(0,6)}`}
   function statusText(s){return ({pending:"Очікує",active:"Активна",finished:"Завершена",rejected:"Відхилена",cancelled:"Скасована"}[s]||s)}
   function msg(text,type=""){inviteMsg.textContent=text;inviteMsg.className=`msg ${type}`}
+
+
+  function cardImage(c){return c?.imageUrl||c?.image||c?.frontImageUrl||c?.cover||""}
+
+  async function loadOwnedCardsForWager(){
+    const [ownedSnap,cardsSnap]=await Promise.all([
+      getDocs(query(collection(db,"user_cards"),where("userId","==",user.uid))),
+      getDocs(collection(db,"cards"))
+    ]);
+    ownedCards=ownedSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.sold!==true);
+    cardCatalog=cardsSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+    wagerCardSelect.innerHTML='<option value="">Без карти</option>'+ownedCards.map(o=>{
+      const c=cardCatalog.find(x=>x.id===o.cardId);
+      return c?`<option value="${esc(o.id)}">${esc(c.name||"Картка")} · ${esc(c.rarity||"Common")}</option>`:"";
+    }).join("");
+  }
+
+  wagerCardSelect.addEventListener("change",()=>{
+    const owned=ownedCards.find(x=>x.id===wagerCardSelect.value);
+    const card=owned?cardCatalog.find(x=>x.id===owned.cardId):null;
+    const src=cardImage(card);
+    if(src){
+      wagerCardPreviewImg.src=src;
+      wagerCardPreview.classList.add("has");
+    }else{
+      wagerCardPreviewImg.removeAttribute("src");
+      wagerCardPreview.classList.remove("has");
+    }
+  });
 
   async function loadProfiles(){
     const snap=await getDocs(collection(db,"player_profiles"));
@@ -206,6 +273,10 @@
         round:1,
         score1:0,
         score2:0,
+        wagerOwned1Id:wagerCardSelect.value||null,
+        wagerCard1Id:(ownedCards.find(x=>x.id===wagerCardSelect.value)?.cardId)||null,
+        wagerOwned2Id:null,
+        wagerCard2Id:null,
         createdAt:serverTimestamp()
       });
       msg("Виклик надіслано ⚔️","ok");
@@ -324,6 +395,7 @@
     }
 
     user=currentUser;
+    await loadOwnedCardsForWager();
     await loadProfiles();
     await loadState();
   });
