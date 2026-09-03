@@ -380,6 +380,22 @@ async function finalizeMatch(){
         updatedAt:serverTimestamp()
       },{merge:true});
 
+      // Якщо обидва гравці поставили карти на кон — обидві переходять переможцю.
+      if(
+        d.cardWagerActive===true &&
+        d.wagerOwned1Id && d.wagerCard1Id &&
+        d.wagerOwned2Id && d.wagerCard2Id
+      ){
+        const transferData={
+          userId:winner,
+          transferDuelId:duelId,
+          transferredAt:serverTimestamp()
+        };
+
+        tx.update(doc(db,"user_cards",d.wagerOwned1Id),transferData);
+        tx.update(doc(db,"user_cards",d.wagerOwned2Id),transferData);
+      }
+
       tx.delete(doc(db,"duel_locks",d.player1Id));
       tx.delete(doc(db,"duel_locks",d.player2Id));
 

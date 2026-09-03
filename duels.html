@@ -48,6 +48,25 @@
 .wager-preview.has img{display:block}
 .wager-preview.has span{display:none}
 
+
+.incoming-wager{
+  margin-top:10px;
+  padding:10px;
+  border:1px solid #3a332a;
+  border-radius:9px;
+  background:#14110e;
+}
+.incoming-wager label{
+  display:block;
+  margin-bottom:6px;
+  color:#d8c49a;
+  font-size:12px;
+  font-weight:800;
+}
+.incoming-wager select{
+  width:100%;
+}
+
 </style>
 </head>
 <body>
@@ -201,6 +220,14 @@
     renderList();
   }
 
+
+  function wagerOptionsHtml(){
+    return '<option value="">Без карти</option>' + ownedCards.map(o=>{
+      const c=cardCatalog.find(x=>x.id===o.cardId);
+      return c ? `<option value="${esc(o.id)}">${esc(c.name||"Картка")} · ${esc(c.rarity||"Common")}</option>` : "";
+    }).join("");
+  }
+
   function filteredDuels(){
     if(activeTab==="incoming") return duels.filter(d=>d.status==="pending"&&d.player2Id===user.uid);
     if(activeTab==="outgoing") return duels.filter(d=>d.status==="pending"&&d.player1Id===user.uid);
@@ -228,6 +255,13 @@
         </div>
         <div class="duel-actions">
           ${d.status==="pending"&&d.player2Id===user.uid?`
+            <div class="incoming-wager">
+              <label for="wager-${d.id}">🃏 Твоя карта на кон (необов'язково)</label>
+              <select id="wager-${d.id}" data-wager-select="${d.id}">
+                ${wagerOptionsHtml()}
+              </select>
+              <div class="note">Якщо карти не поставили ОБИДВА — матч почнеться тільки за монети.</div>
+            </div>
             <button class="small accept" data-accept="${d.id}">✅ Прийняти</button>
             <button class="small reject" data-reject="${d.id}">✖ Відхилити</button>`:""}
           ${d.status==="pending"&&d.player1Id===user.uid?`<button class="small reject" data-cancel="${d.id}">Скасувати</button>`:""}
@@ -288,6 +322,12 @@
   async function acceptDuel(id,button){
     if(!confirm("Прийняти дуель і заморозити ставку?"))return;
     button.disabled=true;
+
+    const wagerSelect=document.querySelector(`[data-wager-select="${CSS.escape(id)}"]`);
+    const wagerOwned2Id=wagerSelect?.value||null;
+    const wagerOwned2=ownedCards.find(x=>x.id===wagerOwned2Id);
+    const wagerCard2Id=wagerOwned2?.cardId||null;
+
     try{
       const duelRef=doc(db,"duels",id);
 
@@ -341,13 +381,23 @@
         tx.set(l1Ref,{userId:d.player1Id,active:true,duelId:id,lockedAt:serverTimestamp()});
         tx.set(l2Ref,{userId:d.player2Id,active:true,duelId:id,lockedAt:serverTimestamp()});
 
+        const bothHaveWager =
+          Boolean(d.wagerOwned1Id && d.wagerCard1Id && wagerOwned2Id && wagerCard2Id);
+
         tx.update(duelRef,{
           status:"active",
           pot:stake*2,
           acceptedAt:serverTimestamp(),
           round:1,
           score1:0,
-          score2:0
+          score2:0,
+
+          // Карти на кону діють лише якщо ОБИДВА гравці поставили карту.
+          wagerOwned1Id: bothHaveWager ? d.wagerOwned1Id : null,
+          wagerCard1Id: bothHaveWager ? d.wagerCard1Id : null,
+          wagerOwned2Id: bothHaveWager ? wagerOwned2Id : null,
+          wagerCard2Id: bothHaveWager ? wagerCard2Id : null,
+          cardWagerActive: bothHaveWager
         });
       });
 
