@@ -76,10 +76,12 @@ label{display:block;font-weight:800;margin-bottom:7px}select{width:100%;backgrou
 
 
 .chat-panel{margin-top:18px;background:rgba(15,15,15,.92);border:1px solid #383838;border-radius:14px;padding:16px}.chat-panel h2{margin:0 0 12px}.chat-messages{height:260px;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:8px;background:#0b0b0b;border:1px solid #292929;border-radius:10px}.chat-msg{max-width:78%;padding:9px 11px;border-radius:11px;background:#222;line-height:1.35;word-break:break-word}.chat-msg.mine{align-self:flex-end;background:#3a2708;border:1px solid #8a5a08}.chat-msg.other{align-self:flex-start}.chat-author{font-size:11px;color:#ffb347;font-weight:900;margin-bottom:3px}.chat-time{font-size:10px;color:#777;margin-top:4px;text-align:right}.chat-form{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.chat-input{width:100%;background:#0b0b0b;color:#fff;border:1px solid #3b3b3b;border-radius:8px;padding:11px}.chat-send{border:0;border-radius:8px;background:#ff9800;color:#fff;font-weight:900;padding:0 16px;cursor:pointer}.chat-send:disabled,.chat-input:disabled{opacity:.5}.chat-note{font-size:11px;color:#777;margin-top:7px}@media(max-width:600px){.chat-form{grid-template-columns:1fr}.chat-send{padding:11px}.chat-msg{max-width:90%}}
+
+.friend-actions{margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.friend-btn{border:1px solid #5b4728;border-radius:8px;padding:9px 12px;background:#241b0e;color:#ffd18a;font-weight:900;cursor:pointer}.friend-btn:disabled{opacity:.55;cursor:not-allowed}
 </style>
 </head>
 <body>
-<header><div class="brand">⚔️ Поле бою</div><div><a class="btn" href="duels.html">← Дуелі</a> <a class="btn" href="leaderboard.html">🏆 Рейтинг</a></div></header>
+<header><div class="brand">⚔️ Поле бою</div><div><a class="btn" href="duels.html">← Дуелі</a> <a class="btn" href="leaderboard.html">🏆 Рейтинг</a> <a class="btn" href="friends.html">👥 Друзі</a></div></header>
 <main id="battleMain">
   <div class="board">
     <div class="scorebar">
@@ -119,6 +121,7 @@ label{display:block;font-weight:800;margin-bottom:7px}select{width:100%;backgrou
           <b>Рідкість</b> додає лише невеликий детермінований «кидок».<br><br>
           Переможець раунду отримує 1 очко. <b>Перший до 3</b> виграє матч і весь банк.
         </div>
+        <div class="friend-actions"><button class="friend-btn" id="addOpponentFriend" type="button">➕ Додати суперника в друзі</button></div>
       </section>
     </div>
 
@@ -164,7 +167,7 @@ const db=getFirestore(auth.app);
 const params=new URLSearchParams(location.search),duelId=params.get("duel");
 const battleMain=document.getElementById("battleMain"),attackCard=document.getElementById("attackCard"),defenseCard=document.getElementById("defenseCard"),submitMove=document.getElementById("submitMove"),surrenderBtn=document.getElementById("surrenderBtn"),waitBox=document.getElementById("waitBox"),log=document.getElementById("log");
 let user=null,duel=null,cards=[],owned=[],profiles=[],myMoveSubmitted=false;
-const chatMessages=document.getElementById("chatMessages"),chatForm=document.getElementById("chatForm"),chatInput=document.getElementById("chatInput"),chatSend=document.getElementById("chatSend");
+const chatMessages=document.getElementById("chatMessages"),chatForm=document.getElementById("chatForm"),chatInput=document.getElementById("chatInput"),chatSend=document.getElementById("chatSend"),addOpponentFriend=document.getElementById("addOpponentFriend");
 let stopChat=null;
 
 
@@ -333,6 +336,40 @@ async function sendChatMessage(){
   finally{chatSend.disabled=false;chatInput.focus()}
 }
 chatForm.addEventListener("submit",e=>{e.preventDefault();sendChatMessage()});
+
+function pairId(a,b){return [a,b].sort().join("__")}
+async function refreshOpponentFriendButton(){
+  if(!user||!duel)return;
+  const other=duel.player1Id===user.uid?duel.player2Id:duel.player1Id;
+  try{
+    const [friendSnap,outSnap,inSnap,blockOut,blockIn]=await Promise.all([
+      getDoc(doc(db,"friendships",pairId(user.uid,other))),
+      getDoc(doc(db,"friend_requests",`${user.uid}__${other}`)),
+      getDoc(doc(db,"friend_requests",`${other}__${user.uid}`)),
+      getDoc(doc(db,"friend_blocks",`${user.uid}__${other}`)),
+      getDoc(doc(db,"friend_blocks",`${other}__${user.uid}`))
+    ]);
+    if(blockOut.exists()||blockIn.exists()){addOpponentFriend.textContent="🚫 Додавання недоступне";addOpponentFriend.disabled=true;return}
+    if(friendSnap.exists()){addOpponentFriend.textContent="✅ Уже в друзях";addOpponentFriend.disabled=true;return}
+    if(inSnap.exists()){addOpponentFriend.textContent="👥 Є вхідна заявка";addOpponentFriend.disabled=false;return}
+    if(outSnap.exists()){addOpponentFriend.textContent="⏳ Заявку надіслано";addOpponentFriend.disabled=true;return}
+    addOpponentFriend.textContent="➕ Додати суперника в друзі";addOpponentFriend.disabled=false;
+  }catch(e){console.error("Friend state",e)}
+}
+async function addOpponentAsFriend(){
+  if(!user||!duel)return;
+  const other=duel.player1Id===user.uid?duel.player2Id:duel.player1Id;
+  const incoming=await getDoc(doc(db,"friend_requests",`${other}__${user.uid}`));
+  if(incoming.exists()){location.href="friends.html";return}
+  try{
+    await setDoc(doc(db,"friend_requests",`${user.uid}__${other}`),{
+      fromId:user.uid,toId:other,status:"pending",createdAt:serverTimestamp()
+    });
+    await refreshOpponentFriendButton();
+    alert("Заявку в друзі надіслано 😼");
+  }catch(e){console.error(e);alert("Не вдалося надіслати заявку в друзі.")}
+}
+addOpponentFriend.addEventListener("click",addOpponentAsFriend);
 
 async function loadAll(){
   const [dSnap,cSnap,oSnap,pSnap,settingsSnap]=await Promise.all([
