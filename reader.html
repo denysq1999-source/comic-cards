@@ -701,14 +701,17 @@
       const lastPage=pageEls[pageEls.length-1];
       if(!lastPage)return;
 
+      // Остання сторінка коміксу часто вища за екран, тому 60% її площі
+      // фізично не може одночасно потрапити у viewport. Достатньо факту,
+      // що читач реально дійшов до останньої сторінки.
       rewardObserver=new IntersectionObserver(entries=>{
-        const hit=entries.some(e=>e.isIntersecting&&e.intersectionRatio>=0.6);
+        const hit=entries.some(e=>e.isIntersecting&&e.intersectionRatio>0);
         if(!hit)return;
         rewardObserver.disconnect();rewardObserver=null;
 
         const wait=Math.max(0,MIN_READ_MS-(Date.now()-openedAt));
         rewardTimer=setTimeout(()=>claimChapterReward(chapter),wait);
-      },{threshold:[0.6]});
+      },{threshold:[0.01]});
 
       rewardObserver.observe(lastPage);
     }
