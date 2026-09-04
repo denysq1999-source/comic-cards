@@ -159,7 +159,7 @@ label{display:block;font-weight:800;margin-bottom:7px}select{width:100%;backgrou
 <script type="module">
 import { auth } from './js/firebase.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore,collection,getDocs,getDoc,doc,query,where,setDoc,runTransaction,serverTimestamp,increment,addDoc,onSnapshot,orderBy,limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore,collection,getDocs,getDoc,doc,query,where,setDoc,runTransaction,serverTimestamp,increment,addDoc,onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const db=getFirestore(auth.app);
 const params=new URLSearchParams(location.search),duelId=params.get("duel");
 const battleMain=document.getElementById("battleMain"),attackCard=document.getElementById("attackCard"),defenseCard=document.getElementById("defenseCard"),submitMove=document.getElementById("submitMove"),surrenderBtn=document.getElementById("surrenderBtn"),waitBox=document.getElementById("waitBox"),log=document.getElementById("log");
@@ -302,12 +302,24 @@ function formatChatTime(ts){
 }
 function startMatchChat(){
   if(stopChat)stopChat();
-  const q=query(collection(db,"duel_messages"),where("duelId","==",duelId),orderBy("createdAt","asc"),limit(100));
+  // Без orderBy у Firestore: так чат не потребує окремого composite index.
+  // Беремо лише повідомлення цієї дуелі, а сортуємо вже в браузері.
+  const q=query(collection(db,"duel_messages"),where("duelId","==",duelId));
   stopChat=onSnapshot(q,snap=>{
-    const rows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const rows=snap.docs
+      .map(d=>({id:d.id,...d.data()}))
+      .sort((a,b)=>{
+        const at=a.createdAt?.seconds||0, bt=b.createdAt?.seconds||0;
+        if(at!==bt)return at-bt;
+        return String(a.id).localeCompare(String(b.id));
+      })
+      .slice(-100);
     chatMessages.innerHTML=rows.length?rows.map(m=>`<div class="chat-msg ${m.userId===user.uid?"mine":"other"}"><div class="chat-author">${esc(nameFor(m.userId))}</div><div>${esc(m.text||"")}</div><div class="chat-time">${esc(formatChatTime(m.createdAt))}</div></div>`).join(""):'<div class="entry">💬 Чат порожній. Можеш привітатися 😼</div>';
     chatMessages.scrollTop=chatMessages.scrollHeight;
-  },e=>{console.error("Chat error",e);chatMessages.innerHTML='<div class="entry">Не вдалося завантажити чат.</div>'});
+  },e=>{
+    console.error("Chat error",e);
+    chatMessages.innerHTML=`<div class="entry">Не вдалося завантажити чат${e?.code?` (${esc(e.code)})`:""}.</div>`;
+  });
 }
 async function sendChatMessage(){
   const text=chatInput.value.trim();
