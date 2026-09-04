@@ -74,6 +74,8 @@ label{display:block;font-weight:800;margin-bottom:7px}select{width:100%;backgrou
 .wager-owner{font-size:12px;color:#999;margin-top:4px}
 @media(max-width:700px){.wager-grid{grid-template-columns:1fr}}
 
+
+.chat-panel{margin-top:18px;background:rgba(15,15,15,.92);border:1px solid #383838;border-radius:14px;padding:16px}.chat-panel h2{margin:0 0 12px}.chat-messages{height:260px;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:8px;background:#0b0b0b;border:1px solid #292929;border-radius:10px}.chat-msg{max-width:78%;padding:9px 11px;border-radius:11px;background:#222;line-height:1.35;word-break:break-word}.chat-msg.mine{align-self:flex-end;background:#3a2708;border:1px solid #8a5a08}.chat-msg.other{align-self:flex-start}.chat-author{font-size:11px;color:#ffb347;font-weight:900;margin-bottom:3px}.chat-time{font-size:10px;color:#777;margin-top:4px;text-align:right}.chat-form{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.chat-input{width:100%;background:#0b0b0b;color:#fff;border:1px solid #3b3b3b;border-radius:8px;padding:11px}.chat-send{border:0;border-radius:8px;background:#ff9800;color:#fff;font-weight:900;padding:0 16px;cursor:pointer}.chat-send:disabled,.chat-input:disabled{opacity:.5}.chat-note{font-size:11px;color:#777;margin-top:7px}@media(max-width:600px){.chat-form{grid-template-columns:1fr}.chat-send{padding:11px}.chat-msg{max-width:90%}}
 </style>
 </head>
 <body>
@@ -138,6 +140,17 @@ label{display:block;font-weight:800;margin-bottom:7px}select{width:100%;backgrou
       </div>
     </section>
 
+
+    <section class="chat-panel" id="chatPanel">
+      <h2>💬 Чат матчу</h2>
+      <div class="chat-messages" id="chatMessages"><div class="entry">Завантаження чату...</div></div>
+      <form class="chat-form" id="chatForm">
+        <input class="chat-input" id="chatInput" maxlength="300" autocomplete="off" placeholder="Напиши супернику...">
+        <button class="chat-send" id="chatSend" type="submit">Надіслати</button>
+      </form>
+      <div class="chat-note" id="chatNote">До 300 символів · чат бачать лише учасники матчу.</div>
+    </section>
+
     <div class="finished" id="finishedBox"></div>
     <section class="battle-log"><h2 style="margin-top:0">🧾 Журнал матчу</h2><div class="log" id="log"></div></section>
   </div>
@@ -146,11 +159,13 @@ label{display:block;font-weight:800;margin-bottom:7px}select{width:100%;backgrou
 <script type="module">
 import { auth } from './js/firebase.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore,collection,getDocs,getDoc,doc,query,where,setDoc,runTransaction,serverTimestamp,increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore,collection,getDocs,getDoc,doc,query,where,setDoc,runTransaction,serverTimestamp,increment,addDoc,onSnapshot,orderBy,limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const db=getFirestore(auth.app);
 const params=new URLSearchParams(location.search),duelId=params.get("duel");
 const battleMain=document.getElementById("battleMain"),attackCard=document.getElementById("attackCard"),defenseCard=document.getElementById("defenseCard"),submitMove=document.getElementById("submitMove"),surrenderBtn=document.getElementById("surrenderBtn"),waitBox=document.getElementById("waitBox"),log=document.getElementById("log");
 let user=null,duel=null,cards=[],owned=[],profiles=[],myMoveSubmitted=false;
+const chatMessages=document.getElementById("chatMessages"),chatForm=document.getElementById("chatForm"),chatInput=document.getElementById("chatInput"),chatSend=document.getElementById("chatSend");
+let stopChat=null;
 
 
 
@@ -282,6 +297,31 @@ function showCardVisual(select,wrapId,imgId,previewId){
 }
 
 
+function formatChatTime(ts){
+  try{return ts?.toDate?ts.toDate().toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit"}):""}catch{return ""}
+}
+function startMatchChat(){
+  if(stopChat)stopChat();
+  const q=query(collection(db,"duel_messages"),where("duelId","==",duelId),orderBy("createdAt","asc"),limit(100));
+  stopChat=onSnapshot(q,snap=>{
+    const rows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    chatMessages.innerHTML=rows.length?rows.map(m=>`<div class="chat-msg ${m.userId===user.uid?"mine":"other"}"><div class="chat-author">${esc(nameFor(m.userId))}</div><div>${esc(m.text||"")}</div><div class="chat-time">${esc(formatChatTime(m.createdAt))}</div></div>`).join(""):'<div class="entry">💬 Чат порожній. Можеш привітатися 😼</div>';
+    chatMessages.scrollTop=chatMessages.scrollHeight;
+  },e=>{console.error("Chat error",e);chatMessages.innerHTML='<div class="entry">Не вдалося завантажити чат.</div>'});
+}
+async function sendChatMessage(){
+  const text=chatInput.value.trim();
+  if(!text||!user||!duel)return;
+  if(!["active","resolving"].includes(duel.status)){alert("Матч уже завершено.");return}
+  chatSend.disabled=true;
+  try{
+    await addDoc(collection(db,"duel_messages"),{duelId,userId:user.uid,text:text.slice(0,300),createdAt:serverTimestamp()});
+    chatInput.value="";
+  }catch(e){console.error("Send chat error",e);alert("Не вдалося надіслати повідомлення.")}
+  finally{chatSend.disabled=false;chatInput.focus()}
+}
+chatForm.addEventListener("submit",e=>{e.preventDefault();sendChatMessage()});
+
 async function loadAll(){
   const [dSnap,cSnap,oSnap,pSnap,settingsSnap]=await Promise.all([
     getDoc(doc(db,"duels",duelId)),getDocs(collection(db,"cards")),
@@ -298,6 +338,7 @@ async function loadAll(){
   const bg=duel.matchType==="tournament"?settings.tournamentBattleBackground:settings.normalBattleBackground;
   if(bg)battleMain.style.backgroundImage=`url("${bg}")`;
   render();
+  startMatchChat();
 
   // Якщо попередня фіналізація впала, дуель лишається у resolving.
   // При повторному вході автоматично завершуємо її й знімаємо lock.
@@ -322,6 +363,7 @@ function render(){
     surrenderBtn.disabled=true;
     document.getElementById("finishedBox").style.display="block";
     document.getElementById("finishedBox").textContent=duel.winnerId===user.uid?"🏆 Ти переміг!":"Матч завершено.";
+    chatInput.disabled=true;chatSend.disabled=true;document.getElementById("chatNote").textContent="Матч завершено · чат залишився тільки для читання.";
   }
 
   const options=owned.map(o=>{const c=cards.find(x=>x.id===o.cardId);return c?`<option value="${esc(o.id)}">${esc(c.name||"Картка")} — P${Number(c.power||0)} S${Number(c.speed||0)} D${Number(c.defense||0)}</option>`:""}).join("");
