@@ -367,7 +367,7 @@ async function addOpponentAsFriend(){
     });
     await refreshOpponentFriendButton();
     alert("Заявку в друзі надіслано 😼");
-  }catch(e){console.error(e);alert("Не вдалося надіслати заявку в друзі.")}
+  }catch(e){console.error("Friend request error",e);alert(`Не вдалося надіслати заявку в друзі: ${e.code||e.message||"помилка"}`)}
 }
 addOpponentFriend.addEventListener("click",addOpponentAsFriend);
 
