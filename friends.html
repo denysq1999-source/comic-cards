@@ -31,7 +31,48 @@ async function removeFriend(other){if(!confirm(`Видалити ${nameFor(other
 async function blockUser(other){if(!confirm(`Заблокувати ${nameFor(other)}? Він не зможе надсилати тобі заявки в друзі.`))return;await setDoc(doc(db,"friend_blocks",`${user.uid}__${other}`),{blockerId:user.uid,blockedId:other,createdAt:serverTimestamp()});const ops=[doc(db,"friendships",pairId(user.uid,other)),doc(db,"friend_requests",`${user.uid}__${other}`),doc(db,"friend_requests",`${other}__${user.uid}`)];for(const r of ops){try{await deleteDoc(r)}catch{}}await loadAll()}
 async function unblock(other){await deleteDoc(doc(db,"friend_blocks",`${user.uid}__${other}`));await loadAll()}
 let dmTarget=null,dmUnsub=null;function dmId(a,b){return [a,b].sort().join("__")}function fmtTime(ts){try{return ts?.toDate?.().toLocaleString("uk-UA")||""}catch{return ""}}
-function openDM(uid){dmTarget=uid;$('dmTitle').textContent=`💬 ${nameFor(uid)}`;$('dmOverlay').style.display='flex';$('dmList').innerHTML='<div class="empty">Завантаження...</div>';if(dmUnsub)dmUnsub();const cid=dmId(user.uid,uid);getDoc(doc(db,'private_chat_clears',`${user.uid}__${cid}`)).then(clearSnap=>{const clearSec=clearSnap.exists()?(clearSnap.data().clearedAt?.seconds||0):0;dmUnsub=onSnapshot(query(collection(db,'private_messages'),where('conversationId','==',cid)),snap=>{const arr=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>(m.createdAt?.seconds||0)>clearSec).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));$('dmList').innerHTML=arr.length?arr.map(m=>`<div class="dm-bubble ${m.senderId===user.uid?'mine':'theirs'}"><div>${esc(m.text)}</div><div class="dm-time">${esc(fmtTime(m.createdAt))}</div></div>`).join(''):'<div class="empty">Переписки ще немає. Напиши першим 😼</div>';$('dmList').scrollTop=$('dmList').scrollHeight},e=>{$('dmList').innerHTML='<div class="empty">Не вдалося завантажити повідомлення.</div>';console.error(e)});window.__dmClearSec=clearSec});}
+function openDM(uid){
+  dmTarget=uid;
+  $('dmTitle').textContent=`💬 ${nameFor(uid)}`;
+  $('dmOverlay').style.display='flex';
+  $('dmList').innerHTML='<div class="empty">Завантаження...</div>';
+  if(dmUnsub)dmUnsub();
+  const cid=dmId(user.uid,uid);
+
+  getDoc(doc(db,'private_chat_clears',`${user.uid}__${cid}`)).then(clearSnap=>{
+    const clearSec=clearSnap.exists()?(clearSnap.data().clearedAt?.seconds||0):0;
+    let sent=[],received=[];
+
+    const paint=()=>{
+      const byId=new Map();
+      [...sent,...received].forEach(m=>{if(m.conversationId===cid)byId.set(m.id,m)});
+      const arr=[...byId.values()]
+        .filter(m=>(m.createdAt?.seconds||0)>clearSec)
+        .sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));
+      $('dmList').innerHTML=arr.length?arr.map(m=>`<div class="dm-bubble ${m.senderId===user.uid?'mine':'theirs'}"><div>${esc(m.text)}</div><div class="dm-time">${esc(fmtTime(m.createdAt))}</div></div>`).join(''):'<div class="empty">Переписки ще немає. Напиши першим 😼</div>';
+      $('dmList').scrollTop=$('dmList').scrollHeight;
+    };
+
+    const fail=e=>{
+      console.error('DM load error',e);
+      $('dmList').innerHTML=`<div class="empty">Не вдалося завантажити повідомлення. ${esc(e?.code||'')}</div>`;
+    };
+
+    // Firestore Rules не фільтрують колекцію самі. Тому читаємо лише
+    // повідомлення, де поточний користувач явно sender або receiver,
+    // а потрібну розмову відсіюємо вже у браузері. Composite index не потрібен.
+    const unsubSent=onSnapshot(query(collection(db,'private_messages'),where('senderId','==',user.uid)),snap=>{
+      sent=snap.docs.map(d=>({id:d.id,...d.data()}));paint();
+    },fail);
+    const unsubReceived=onSnapshot(query(collection(db,'private_messages'),where('receiverId','==',user.uid)),snap=>{
+      received=snap.docs.map(d=>({id:d.id,...d.data()}));paint();
+    },fail);
+    dmUnsub=()=>{unsubSent();unsubReceived()};
+  }).catch(e=>{
+    console.error('DM clear state error',e);
+    $('dmList').innerHTML=`<div class="empty">Не вдалося завантажити повідомлення. ${esc(e?.code||'')}</div>`;
+  });
+}
 function closeDM(){if(dmUnsub){dmUnsub();dmUnsub=null}$('dmOverlay').style.display='none';dmTarget=null}
 $('dmClose').onclick=closeDM;$('dmOverlay').onclick=e=>{if(e.target===$('dmOverlay'))closeDM()};$('dmSend').onclick=async()=>{const text=$('dmText').value.trim();if(!dmTarget||!text)return;try{const cid=dmId(user.uid,dmTarget);await addDoc(collection(db,'private_messages'),{conversationId:cid,senderId:user.uid,receiverId:dmTarget,text:text.slice(0,500),createdAt:serverTimestamp()});$('dmText').value=''}catch(e){console.error(e);alert('Не вдалося надіслати повідомлення.')}};$('dmText').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('dmSend').click()}});$('dmClear').onclick=async()=>{if(!dmTarget||!confirm('Видалити переписку для себе? У друга вона залишиться.'))return;try{const cid=dmId(user.uid,dmTarget);await setDoc(doc(db,'private_chat_clears',`${user.uid}__${cid}`),{userId:user.uid,conversationId:cid,clearedAt:serverTimestamp()});alert('Переписку приховано для тебе.');closeDM()}catch(e){console.error(e);alert('Не вдалося видалити переписку.')}};
 function item(uid,buttons){return `<div class="item"><div><div class="name">${esc(nameFor(uid))}</div><div class="sub">${esc(profiles.find(x=>x.id===uid)?.friendCode||friendCode(uid))}</div></div><div class="actions">${buttons}</div></div>`}
