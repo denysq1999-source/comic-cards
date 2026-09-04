@@ -1666,6 +1666,16 @@
             Керування доступом користувачів без видалення їхніх карток та інвентарю.
           </p>
 
+          <div style="background:#151515;border:1px solid #333;border-radius:10px;padding:14px;margin-bottom:16px;">
+            <strong style="display:block;margin-bottom:8px;">🔗 Адмінське реферальне посилання</strong>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <input id="adminReferralLink" readonly style="flex:1;min-width:260px;background:#101010;color:#fff;border:1px solid #343434;border-radius:8px;padding:10px 12px;">
+              <button class="user-action-btn wallet" id="copyAdminReferralBtn" type="button">📋 Копіювати</button>
+              <button class="user-action-btn inspect" id="shareAdminReferralBtn" type="button">📤 Скинути посилання</button>
+            </div>
+            <div class="hint">Код адміністратора дає новому користувачу 1000 💰.</div>
+          </div>
+
           <div class="users-toolbar">
             <input id="usersSearch" type="search" placeholder="Пошук за email...">
             <button class="primary-btn" id="refreshUsersBtn" type="button" style="width:auto;">↻ Оновити</button>
@@ -2006,7 +2016,35 @@
 
     const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
 
+    const ADMIN_REFERRAL_CODE="SHOCKER1000";
+
+    function makeReferralCode(uid){
+        const clean=String(uid||"").replace(/[^a-zA-Z0-9]/g,"").toUpperCase();
+        return `CC-${clean.slice(0,6)}${clean.slice(-4)}`;
+    }
+
+    function referralUrl(code){
+        const base=new URL("register.html",location.href);
+        base.searchParams.set("ref",code);
+        return base.href;
+    }
+
+    async function ensureMyReferralCode(uid){
+        const code=uid===ADMIN_UID?ADMIN_REFERRAL_CODE:makeReferralCode(uid);
+        await setDoc(doc(db,"referral_codes",code),{
+            code,
+            ownerId:uid,
+            isAdminCode:uid===ADMIN_UID,
+            active:true,
+            updatedAt:serverTimestamp()
+        },{merge:true});
+        return code;
+    }
+
     const usersSearch = document.getElementById("usersSearch");
+    const adminReferralLink=document.getElementById("adminReferralLink");
+    const copyAdminReferralBtn=document.getElementById("copyAdminReferralBtn");
+    const shareAdminReferralBtn=document.getElementById("shareAdminReferralBtn");
     const refreshUsersBtn = document.getElementById("refreshUsersBtn");
     const resetAllPvpBtn = document.getElementById("resetAllPvpBtn");
     const usersTableBody = document.getElementById("usersTableBody");
@@ -2044,7 +2082,10 @@
       if (user.uid !== ADMIN_UID) {
         alert("Немає доступу");
         window.location.href = "index.html";
+        return;
       }
+
+      setupAdminReferral().catch(error=>console.error("Referral setup error:",error));
     });
 
     // ===== Вихід =====
@@ -2129,6 +2170,27 @@
         risk
       };
     }
+
+    async function setupAdminReferral(){
+      const code=await ensureMyReferralCode(ADMIN_UID);
+      const link=referralUrl(code);
+      if(adminReferralLink)adminReferralLink.value=link;
+    }
+
+    copyAdminReferralBtn?.addEventListener("click",async()=>{
+      await navigator.clipboard.writeText(adminReferralLink.value);
+      alert("Адмінське реферальне посилання скопійовано.");
+    });
+
+    shareAdminReferralBtn?.addEventListener("click",async()=>{
+      const url=adminReferralLink.value;
+      if(navigator.share){
+        await navigator.share({title:"Comic Cards",text:"Приєднуйся до Comic Cards 🎴",url});
+      }else{
+        await navigator.clipboard.writeText(url);
+        alert("Посилання скопійовано — можеш скинути його куди потрібно.");
+      }
+    });
 
     async function loadAdminUsers() {
       try {
@@ -2264,6 +2326,7 @@
                   type="button"
                   data-inspect-user="${escapeHtml(user.id)}"
                 >🔎 Інвентар</button>
+                <button class="user-action-btn inspect" type="button" data-copy-ref="${escapeHtml(user.id)}">🔗 Рефпосилання</button>
 
                 <button class="user-action-btn wallet" type="button" data-wallet-add="${escapeHtml(user.id)}">💰 + монети</button>
                 <button class="user-action-btn freeze" type="button" data-wallet-freeze="${escapeHtml(user.id)}">❄️ Баланс</button>
@@ -2296,6 +2359,17 @@
         });
       });
 
+
+      document.querySelectorAll("[data-copy-ref]").forEach(button=>{
+        button.addEventListener("click",async()=>{
+          const uid=button.dataset.copyRef;
+          const code=uid===ADMIN_UID?ADMIN_REFERRAL_CODE:makeReferralCode(uid);
+          await setDoc(doc(db,"referral_codes",code),{code,ownerId:uid,isAdminCode:uid===ADMIN_UID,active:true,updatedAt:serverTimestamp()},{merge:true});
+          const link=referralUrl(code);
+          await navigator.clipboard.writeText(link);
+          alert("Реферальне посилання користувача скопійовано.");
+        });
+      });
 
       document.querySelectorAll("[data-wallet-add]").forEach(button=>{
         button.addEventListener("click",async()=>{
