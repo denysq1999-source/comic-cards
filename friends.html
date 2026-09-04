@@ -30,10 +30,51 @@ async function cancelRequest(toId){await deleteDoc(doc(db,"friend_requests",`${u
 async function removeFriend(other){if(!confirm(`Видалити ${nameFor(other)} з друзів?`))return;await deleteDoc(doc(db,"friendships",pairId(user.uid,other)));await loadAll()}
 async function blockUser(other){if(!confirm(`Заблокувати ${nameFor(other)}? Він не зможе надсилати тобі заявки в друзі.`))return;await setDoc(doc(db,"friend_blocks",`${user.uid}__${other}`),{blockerId:user.uid,blockedId:other,createdAt:serverTimestamp()});const ops=[doc(db,"friendships",pairId(user.uid,other)),doc(db,"friend_requests",`${user.uid}__${other}`),doc(db,"friend_requests",`${other}__${user.uid}`)];for(const r of ops){try{await deleteDoc(r)}catch{}}await loadAll()}
 async function unblock(other){await deleteDoc(doc(db,"friend_blocks",`${user.uid}__${other}`));await loadAll()}
-let dmTarget=null,dmUnsub=null;function dmId(a,b){return [a,b].sort().join("__")}function fmtTime(ts){try{return ts?.toDate?.().toLocaleString("uk-UA")||""}catch{return ""}}
-function openDM(uid){dmTarget=uid;$('dmTitle').textContent=`💬 ${nameFor(uid)}`;$('dmOverlay').style.display='flex';$('dmList').innerHTML='<div class="empty">Завантаження...</div>';if(dmUnsub)dmUnsub();const cid=dmId(user.uid,uid);getDoc(doc(db,'private_chat_clears',`${user.uid}__${cid}`)).then(clearSnap=>{const clearSec=clearSnap.exists()?(clearSnap.data().clearedAt?.seconds||0):0;dmUnsub=onSnapshot(query(collection(db,'private_messages'),where('conversationId','==',cid)),snap=>{const arr=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>(m.createdAt?.seconds||0)>clearSec).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));$('dmList').innerHTML=arr.length?arr.map(m=>`<div class="dm-bubble ${m.senderId===user.uid?'mine':'theirs'}"><div>${esc(m.text)}</div><div class="dm-time">${esc(fmtTime(m.createdAt))}</div></div>`).join(''):'<div class="empty">Переписки ще немає. Напиши першим 😼</div>';$('dmList').scrollTop=$('dmList').scrollHeight},e=>{$('dmList').innerHTML='<div class="empty">Не вдалося завантажити повідомлення.</div>';console.error(e)});window.__dmClearSec=clearSec});}
+let dmTarget=null,dmUnsub=null;function dmId(a,b){return [a,b].sort().join("__")}function fmtTime(ts){try{return ts?.toDate?.().toLocaleString("uk-UA")||""}catch{return ""}}function tsMillis(ts){try{if(!ts)return 0;if(typeof ts.toMillis==="function")return ts.toMillis();return Number(ts.seconds||0)*1000+Number(ts.nanoseconds||0)/1000000}catch{return 0}}
+function openDM(uid){
+  dmTarget=uid;
+  $('dmTitle').textContent=`💬 ${nameFor(uid)}`;
+  $('dmOverlay').style.display='flex';
+  $('dmList').innerHTML='<div class="empty">Завантаження...</div>';
+  if(dmUnsub)dmUnsub();
+  const cid=dmId(user.uid,uid);
+
+  getDoc(doc(db,'private_chat_clears',`${user.uid}__${cid}`)).then(clearSnap=>{
+    const clearAt=clearSnap.exists()?tsMillis(clearSnap.data().clearedAt):0;
+    let sent=[],received=[];
+
+    const paint=()=>{
+      const byId=new Map();
+      [...sent,...received].forEach(m=>{if(m.conversationId===cid)byId.set(m.id,m)});
+      const arr=[...byId.values()]
+        .filter(m=>tsMillis(m.createdAt)>clearAt)
+        .sort((a,b)=>tsMillis(a.createdAt)-tsMillis(b.createdAt));
+      $('dmList').innerHTML=arr.length?arr.map(m=>`<div class="dm-bubble ${m.senderId===user.uid?'mine':'theirs'}"><div>${esc(m.text)}</div><div class="dm-time">${esc(fmtTime(m.createdAt))}</div></div>`).join(''):'<div class="empty">Переписки ще немає. Напиши першим 😼</div>';
+      $('dmList').scrollTop=$('dmList').scrollHeight;
+    };
+
+    const fail=e=>{
+      console.error('DM load error',e);
+      $('dmList').innerHTML=`<div class="empty">Не вдалося завантажити повідомлення. ${esc(e?.code||'')}</div>`;
+    };
+
+    // Firestore Rules не фільтрують колекцію самі. Тому читаємо лише
+    // повідомлення, де поточний користувач явно sender або receiver,
+    // а потрібну розмову відсіюємо вже у браузері. Composite index не потрібен.
+    const unsubSent=onSnapshot(query(collection(db,'private_messages'),where('senderId','==',user.uid)),snap=>{
+      sent=snap.docs.map(d=>({id:d.id,...d.data()}));paint();
+    },fail);
+    const unsubReceived=onSnapshot(query(collection(db,'private_messages'),where('receiverId','==',user.uid)),snap=>{
+      received=snap.docs.map(d=>({id:d.id,...d.data()}));paint();
+    },fail);
+    dmUnsub=()=>{unsubSent();unsubReceived()};
+  }).catch(e=>{
+    console.error('DM clear state error',e);
+    $('dmList').innerHTML=`<div class="empty">Не вдалося завантажити повідомлення. ${esc(e?.code||'')}</div>`;
+  });
+}
 function closeDM(){if(dmUnsub){dmUnsub();dmUnsub=null}$('dmOverlay').style.display='none';dmTarget=null}
-$('dmClose').onclick=closeDM;$('dmOverlay').onclick=e=>{if(e.target===$('dmOverlay'))closeDM()};$('dmSend').onclick=async()=>{const text=$('dmText').value.trim();if(!dmTarget||!text)return;try{const cid=dmId(user.uid,dmTarget);await addDoc(collection(db,'private_messages'),{conversationId:cid,senderId:user.uid,receiverId:dmTarget,text:text.slice(0,500),createdAt:serverTimestamp()});$('dmText').value=''}catch(e){console.error(e);alert('Не вдалося надіслати повідомлення.')}};$('dmText').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('dmSend').click()}});$('dmClear').onclick=async()=>{if(!dmTarget||!confirm('Видалити переписку для себе? У друга вона залишиться.'))return;try{const cid=dmId(user.uid,dmTarget);await setDoc(doc(db,'private_chat_clears',`${user.uid}__${cid}`),{userId:user.uid,conversationId:cid,clearedAt:serverTimestamp()});alert('Переписку приховано для тебе.');closeDM()}catch(e){console.error(e);alert('Не вдалося видалити переписку.')}};
+$('dmClose').onclick=closeDM;$('dmOverlay').onclick=e=>{if(e.target===$('dmOverlay'))closeDM()};$('dmSend').onclick=async()=>{const text=$('dmText').value.trim();if(!dmTarget||!text)return;try{const cid=dmId(user.uid,dmTarget);await addDoc(collection(db,'private_messages'),{conversationId:cid,senderId:user.uid,receiverId:dmTarget,text:text.slice(0,500),createdAt:serverTimestamp()});$('dmText').value=''}catch(e){console.error(e);alert('Не вдалося надіслати повідомлення.')}};$('dmText').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('dmSend').click()}});$('dmClear').onclick=async()=>{if(!dmTarget||!confirm('Очистити переписку для себе? У друга стара історія залишиться.'))return;const target=dmTarget;try{const cid=dmId(user.uid,target);await setDoc(doc(db,'private_chat_clears',`${user.uid}__${cid}`),{userId:user.uid,conversationId:cid,clearedAt:serverTimestamp()});closeDM();setTimeout(()=>openDM(target),120);alert('Переписку очищено. Можна одразу писати знову 💬');}catch(e){console.error(e);alert('Не вдалося очистити переписку.')}};
 function item(uid,buttons){return `<div class="item"><div><div class="name">${esc(nameFor(uid))}</div><div class="sub">${esc(profiles.find(x=>x.id===uid)?.friendCode||friendCode(uid))}</div></div><div class="actions">${buttons}</div></div>`}
 let reportTarget=null;function openReport(uid){reportTarget=uid;$('reportWho').textContent=`Гравець: ${nameFor(uid)}`;$('reportText').value="";$('reportOverlay').style.display="flex";} $('reportCancel').onclick=()=>{$('reportOverlay').style.display="none"};$('reportOverlay').onclick=e=>{if(e.target===$('reportOverlay'))$('reportOverlay').style.display="none"};$('reportSend').onclick=async()=>{const text=$('reportText').value.trim();if(!reportTarget||text.length<3){alert("Напиши причину репорту.");return} $('reportSend').disabled=true;try{await addDoc(collection(db,"player_reports"),{reporterId:user.uid,targetId:reportTarget,duelId:null,message:text.slice(0,800),status:"new",createdAt:serverTimestamp()});$('reportOverlay').style.display="none";alert("Репорт надіслано адміністратору.");}catch(e){console.error(e);alert("Не вдалося надіслати репорт.");}finally{$('reportSend').disabled=false}};
 async function loadAll(){const [ps,fa,fb,ri,ro,bl]=await Promise.all([getDocs(collection(db,"player_profiles")),getDocs(query(collection(db,"friendships"),where("userA","==",user.uid))),getDocs(query(collection(db,"friendships"),where("userB","==",user.uid))),getDocs(query(collection(db,"friend_requests"),where("toId","==",user.uid))),getDocs(query(collection(db,"friend_requests"),where("fromId","==",user.uid))),getDocs(query(collection(db,"friend_blocks"),where("blockerId","==",user.uid)))]);profiles=ps.docs.map(d=>({id:d.id,...d.data()}));const friends=[...fa.docs,...fb.docs].map(d=>{const x=d.data();return x.userA===user.uid?x.userB:x.userA});const incoming=ri.docs.map(d=>d.data()).filter(x=>x.status==="pending"),outgoing=ro.docs.map(d=>d.data()).filter(x=>x.status==="pending"),blocked=bl.docs.map(d=>d.data());$('friendsList').innerHTML=friends.length?friends.map(uid=>item(uid,`<button class="msg-mini" data-dm="${esc(uid)}">💬 Повідомлення</button><button class="danger" data-remove="${esc(uid)}">Видалити</button><button class="danger" data-block="${esc(uid)}">🚫 Блок</button><button class="report-mini" data-report="${esc(uid)}">🔺 Репорт</button>`)).join(""):'<div class="empty">Поки друзів немає.</div>';$('incomingList').innerHTML=incoming.length?incoming.map(x=>item(x.fromId,`<button class="ok" data-accept="${esc(x.fromId)}">✅ Прийняти</button><button data-reject="${esc(x.fromId)}">Відхилити</button><button class="danger" data-block="${esc(x.fromId)}">🚫 Блок</button><button class="report-mini" data-report="${esc(x.fromId)}">🔺 Репорт</button>`)).join(""):'<div class="empty">Немає вхідних заявок.</div>';$('outgoingList').innerHTML=outgoing.length?outgoing.map(x=>item(x.toId,`<button data-cancel="${esc(x.toId)}">Скасувати</button><button class="danger" data-block="${esc(x.toId)}">🚫 Блок</button><button class="report-mini" data-report="${esc(x.toId)}">🔺 Репорт</button>`)).join(""):'<div class="empty">Немає надісланих заявок.</div>';$('blockedList').innerHTML=blocked.length?blocked.map(x=>item(x.blockedId,`<button data-unblock="${esc(x.blockedId)}">Розблокувати</button>`)).join(""):'<div class="empty">Список блокування порожній.</div>';$('incomingCount').textContent=incoming.length?`(${incoming.length})`:"";bindActions()}
