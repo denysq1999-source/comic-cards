@@ -128,14 +128,6 @@
     .figure-source-badge{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;margin-bottom:2px}
     .figure-source-badge.comic{background:#1f3a4a;color:#bfe7ff}
     .figure-source-badge.shop{background:#3a2c55;color:#dfccff}
-
-  .ref-panel{background:#1a1a1a;border:1px solid #2c2c2c;border-radius:14px;padding:18px;margin-bottom:24px}
-  .ref-panel h2{margin:0 0 8px}.ref-sub{color:#999;font-size:13px;line-height:1.5;margin-bottom:14px}
-  .ref-grid{display:grid;grid-template-columns:1fr auto auto;gap:8px}.ref-grid input{min-width:0;background:#101010;color:#fff;border:1px solid #363636;border-radius:8px;padding:10px 12px}
-  .ref-btn{border:0;border-radius:8px;background:#5a3a17;color:#ffd18b;padding:10px 12px;font-weight:800;cursor:pointer}.ref-btn:disabled{opacity:.5}
-  .ref-claim{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}.ref-claim input{background:#101010;color:#fff;border:1px solid #363636;border-radius:8px;padding:10px 12px}
-  .ref-status{margin-top:10px;color:#aaa;font-size:13px}.ref-status.ok{color:#7fda94}.ref-status.err{color:#ff9292}
-  @media(max-width:700px){.ref-grid,.ref-claim{grid-template-columns:1fr}.ref-grid .ref-btn{width:100%}}
 </style>
 </head>
 <body>
@@ -147,6 +139,7 @@
     <button class="btn pack-btn" id="packBtnTop" type="button">🎁 Пакунок</button>
     <a class="btn" href="shop.html">🛒 Магазин</a>
     <a class="btn" href="duels.html">⚔️ Дуелі</a>
+    <a class="btn" href="friends.html">👥 Друзі</a>
     <a class="btn" href="leaderboard.html">🏆 Рейтинг</a>
     <a class="btn" id="adminLink" href="admin.html" style="display:none;">⚙️ Адмін-панель</a>
     <button class="btn orange" id="logoutBtn">Вийти</button>
@@ -183,21 +176,6 @@
     <div class="stat"><strong id="duelRating">0</strong><span>Рейтинг PvP</span></div>
     <div class="stat"><strong id="duelWins">0</strong><span>Перемог</span></div>
     <div class="stat"><strong id="duelLosses">0</strong><span>Поразок</span></div>
-  </section>
-
-  <section class="ref-panel">
-    <h2>🤝 Реферальна система</h2>
-    <p class="ref-sub">Поділись своїм посиланням. Друг отримає 500 💰, а ти — 200 💰 після активації коду.</p>
-    <div class="ref-grid">
-      <input id="myReferralLink" readonly value="Завантаження...">
-      <button class="ref-btn" id="copyReferralBtn" type="button">📋 Копіювати</button>
-      <button class="ref-btn" id="shareReferralBtn" type="button">📤 Поділитися</button>
-    </div>
-    <div class="ref-claim" id="referralClaimBox">
-      <input id="referralClaimInput" placeholder="Ввести реферальний код один раз">
-      <button class="ref-btn" id="claimReferralBtn" type="button">🎁 Активувати</button>
-    </div>
-    <div class="ref-status" id="referralStatus"></div>
   </section>
 
   <div class="duel-profile-banner" id="duelLockBanner">
@@ -295,7 +273,6 @@
     setDoc,
     serverTimestamp,
     runTransaction,
-    increment,
     Timestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -316,13 +293,6 @@
   const duelLosses = document.getElementById("duelLosses");
   const duelLockBanner = document.getElementById("duelLockBanner");
   const activeDuelLink = document.getElementById("activeDuelLink");
-  const myReferralLink=document.getElementById("myReferralLink");
-  const copyReferralBtn=document.getElementById("copyReferralBtn");
-  const shareReferralBtn=document.getElementById("shareReferralBtn");
-  const referralClaimBox=document.getElementById("referralClaimBox");
-  const referralClaimInput=document.getElementById("referralClaimInput");
-  const claimReferralBtn=document.getElementById("claimReferralBtn");
-  const referralStatus=document.getElementById("referralStatus");
   const inventory = document.getElementById("inventory");
   const figureShelf = document.getElementById("figureShelf");
   const comicFilter = document.getElementById("comicFilter");
@@ -544,146 +514,6 @@
 
   updateCollectionUI();
 
-
-  const ADMIN_REFERRAL_CODE="SHOCKER1000";
-
-  function makeReferralCode(uid){
-    const clean=String(uid||"").replace(/[^a-zA-Z0-9]/g,"").toUpperCase();
-    return `CC-${clean.slice(0,6)}${clean.slice(-4)}`;
-  }
-
-  function referralUrl(code){
-    const base=new URL("register.html",location.href);
-    base.searchParams.set("ref",code);
-    return base.href;
-  }
-
-  async function ensureMyReferralCode(uid){
-    const code=uid===ADMIN_UID?ADMIN_REFERRAL_CODE:makeReferralCode(uid);
-    await setDoc(doc(db,"referral_codes",code),{
-      code,
-      ownerId:uid,
-      isAdminCode:uid===ADMIN_UID,
-      active:true,
-      updatedAt:serverTimestamp()
-    },{merge:true});
-    return code;
-  }
-
-  async function activateReferralCode(rawCode){
-    const code=String(rawCode||"").trim().toUpperCase();
-    if(!code) throw new Error("REF_EMPTY");
-
-    const claimRef=doc(db,"referral_claims",user.uid);
-    const codeRef=doc(db,"referral_codes",code);
-    const myWalletRef=doc(db,"wallets",user.uid);
-
-    await runTransaction(db,async tx=>{
-      const [claimSnap,codeSnap,myWalletSnap]=await Promise.all([
-        tx.get(claimRef),tx.get(codeRef),tx.get(myWalletRef)
-      ]);
-
-      if(claimSnap.exists()) throw new Error("REF_ALREADY_USED");
-      if(!codeSnap.exists()||codeSnap.data().active!==true) throw new Error("REF_INVALID");
-
-      const codeData=codeSnap.data();
-      const ownerId=codeData.ownerId;
-      if(!ownerId||ownerId===user.uid) throw new Error("REF_SELF");
-
-      const isAdminCode=ownerId===ADMIN_UID||codeData.isAdminCode===true;
-      const newUserReward=isAdminCode?1000:500;
-      const ownerReward=isAdminCode?0:200;
-      const myWallet=myWalletSnap.exists()?myWalletSnap.data():{balance:0,frozen:false};
-
-      tx.set(claimRef,{
-        userId:user.uid,
-        code,
-        ownerId,
-        isAdminCode,
-        newUserReward,
-        ownerReward,
-        claimedAt:serverTimestamp()
-      });
-
-      tx.set(myWalletRef,{
-        userId:user.uid,
-        balance:Number(myWallet.balance||0)+newUserReward,
-        frozen:Boolean(myWallet.frozen),
-        lastReferralClaimId:user.uid,
-        updatedAt:serverTimestamp()
-      },{merge:true});
-
-      if(ownerReward>0){
-        const ownerWalletRef=doc(db,"wallets",ownerId);
-        // Чужий гаманець не читаємо: increment атомарний.
-        tx.set(ownerWalletRef,{
-          userId:ownerId,
-          balance:increment(ownerReward),
-          lastReferralRewardFor:user.uid,
-          updatedAt:serverTimestamp()
-        },{merge:true});
-      }
-    });
-
-    return code===ADMIN_REFERRAL_CODE?1000:500;
-  }
-
-  async function loadReferralState(){
-    const code=await ensureMyReferralCode(user.uid);
-    const link=referralUrl(code);
-    myReferralLink.value=link;
-
-    const claimSnap=await getDoc(doc(db,"referral_claims",user.uid));
-    if(claimSnap.exists()){
-      referralClaimBox.style.display="none";
-      const d=claimSnap.data();
-      referralStatus.textContent=`✅ Реферальний код уже використано. Бонус: +${Number(d.newUserReward||0)} 💰`;
-      referralStatus.className="ref-status ok";
-    }else{
-      referralClaimBox.style.display="grid";
-      referralStatus.textContent="Код можна активувати лише один раз.";
-      referralStatus.className="ref-status";
-    }
-  }
-
-  copyReferralBtn.addEventListener("click",async()=>{
-    await navigator.clipboard.writeText(myReferralLink.value);
-    referralStatus.textContent="📋 Реферальне посилання скопійовано.";
-    referralStatus.className="ref-status ok";
-  });
-
-  shareReferralBtn.addEventListener("click",async()=>{
-    const url=myReferralLink.value;
-    if(navigator.share){
-      await navigator.share({title:"Comic Cards",text:"Приєднуйся до Comic Cards 🎴",url});
-    }else{
-      await navigator.clipboard.writeText(url);
-      referralStatus.textContent="📋 Посилання скопійовано — можеш надіслати другу.";
-      referralStatus.className="ref-status ok";
-    }
-  });
-
-  claimReferralBtn.addEventListener("click",async()=>{
-    const code=referralClaimInput.value.trim();
-    if(!code)return;
-    claimReferralBtn.disabled=true;
-    try{
-      const reward=await activateReferralCode(code);
-      referralStatus.textContent=`🎁 Код активовано: +${reward} 💰`;
-      referralStatus.className="ref-status ok";
-      await loadWallet();
-      await loadReferralState();
-    }catch(e){
-      referralStatus.textContent={
-        REF_ALREADY_USED:"Цей акаунт уже використовував реферальний код.",
-        REF_INVALID:"Такого активного коду немає.",
-        REF_SELF:"Свій власний код активувати не можна."
-      }[e?.message]||"Не вдалося активувати код.";
-      referralStatus.className="ref-status err";
-    }finally{claimReferralBtn.disabled=false}
-  });
-
-
   onAuthStateChanged(auth, async currentUser => {
     if (await redirectIfMaintenance(currentUser)) return;
     if (!currentUser) {
@@ -727,7 +557,6 @@
       roleBadge.textContent = "USER";
     }
 
-    await loadReferralState();
     await loadInventory();
   });
 
@@ -747,11 +576,7 @@
   }
 
   async function loadWallet(){
-    let snap=await getDoc(doc(db,"wallets",user.uid));
-    if(!snap.exists()){
-      await setDoc(doc(db,"wallets",user.uid),{userId:user.uid,balance:0,frozen:false,updatedAt:serverTimestamp()});
-      snap=await getDoc(doc(db,"wallets",user.uid));
-    }
+    const snap=await getDoc(doc(db,"wallets",user.uid));
     wallet=snap.exists()?{balance:0,frozen:false,...snap.data()}:{balance:0,frozen:false};
     coinBalance.textContent=Number(wallet.balance||0);
     walletNote.classList.toggle("frozen",Boolean(wallet.frozen));

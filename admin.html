@@ -1230,7 +1230,7 @@
     .tournament-row{display:grid;grid-template-columns:1fr 140px;gap:12px}
     @media(max-width:900px){.duel-admin-grid{grid-template-columns:1fr}.tournament-row{grid-template-columns:1fr}}
 
-</style>
+.report-row{background:#121212;border:1px solid #3a2626;border-left:4px solid #e53935;border-radius:10px;padding:12px;margin:10px 0}.report-row.new{background:#1b1111}.report-meta{font-size:12px;color:#999;margin-bottom:7px}.report-msg{white-space:pre-wrap;line-height:1.5}.report-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.report-badge{display:inline-block;background:#b71c1c;color:#fff;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:900}</style>
 </head>
 <body>
   <!-- Ліве меню -->
@@ -1269,6 +1269,7 @@
     <div class="menu-item" data-section="users">
       <span>👥</span> Користувачі
     </div>
+    <div class="menu-item" data-section="reports"><span>🔺</span> Репорти <b id="reportsBadge" style="color:#ff5252"></b></div>
     <div class="menu-item" data-section="duels">
       <span>⚔️</span> Дуелі й турніри
     </div>
@@ -1657,21 +1658,13 @@
       </section>
 
       <!-- Користувачі -->
+      <section class="section" id="reports"><div class="panel"><h2>🔺 Репорти на гравців</h2><p class="panel-subtitle">Повідомлення від гравців. Тут видно автора репорту, гравця, на якого поскаржились, і текст.</p><button class="primary-btn" id="refreshReportsBtn" type="button" style="width:auto">↻ Оновити</button><div id="reportsList" style="margin-top:14px"><div style="color:#777">Відкрий розділ, щоб завантажити репорти.</div></div></div></section>
       <section class="section" id="users">
         <div class="panel">
           <h2>👥 Користувачі</h2>
           <p class="panel-subtitle">
             Керування доступом користувачів без видалення їхніх карток та інвентарю.
           </p>
-          <div style="background:#151515;border:1px solid #333;border-radius:10px;padding:14px;margin-bottom:16px;">
-            <strong style="display:block;margin-bottom:8px;">🔗 Адмінське реферальне посилання</strong>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <input id="adminReferralLink" readonly style="flex:1;min-width:260px;background:#101010;color:#fff;border:1px solid #343434;border-radius:8px;padding:10px 12px;">
-              <button class="user-action-btn wallet" id="copyAdminReferralBtn" type="button">📋 Копіювати</button>
-              <button class="user-action-btn inspect" id="shareAdminReferralBtn" type="button">📤 Скинути посилання</button>
-            </div>
-            <div class="hint">Код адміністратора дає новому користувачу 1000 💰.</div>
-          </div>
 
           <div class="users-toolbar">
             <input id="usersSearch" type="search" placeholder="Пошук за email...">
@@ -2013,35 +2006,7 @@
 
     const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
 
-    const ADMIN_REFERRAL_CODE="SHOCKER1000";
-
-    function makeReferralCode(uid){
-        const clean=String(uid||"").replace(/[^a-zA-Z0-9]/g,"").toUpperCase();
-        return `CC-${clean.slice(0,6)}${clean.slice(-4)}`;
-    }
-
-    function referralUrl(code){
-        const base=new URL("register.html",location.href);
-        base.searchParams.set("ref",code);
-        return base.href;
-    }
-
-    async function ensureMyReferralCode(uid){
-        const code=uid===ADMIN_UID?ADMIN_REFERRAL_CODE:makeReferralCode(uid);
-        await setDoc(doc(db,"referral_codes",code),{
-            code,
-            ownerId:uid,
-            isAdminCode:uid===ADMIN_UID,
-            active:true,
-            updatedAt:serverTimestamp()
-        },{merge:true});
-        return code;
-    }
-
     const usersSearch = document.getElementById("usersSearch");
-    const adminReferralLink=document.getElementById("adminReferralLink");
-    const copyAdminReferralBtn=document.getElementById("copyAdminReferralBtn");
-    const shareAdminReferralBtn=document.getElementById("shareAdminReferralBtn");
     const refreshUsersBtn = document.getElementById("refreshUsersBtn");
     const resetAllPvpBtn = document.getElementById("resetAllPvpBtn");
     const usersTableBody = document.getElementById("usersTableBody");
@@ -2164,28 +2129,6 @@
         risk
       };
     }
-
-
-    async function setupAdminReferral(){
-      const code=await ensureMyReferralCode(ADMIN_UID);
-      const link=referralUrl(code);
-      if(adminReferralLink)adminReferralLink.value=link;
-    }
-
-    copyAdminReferralBtn?.addEventListener("click",async()=>{
-      await navigator.clipboard.writeText(adminReferralLink.value);
-      alert("Адмінське реферальне посилання скопійовано.");
-    });
-
-    shareAdminReferralBtn?.addEventListener("click",async()=>{
-      const url=adminReferralLink.value;
-      if(navigator.share){
-        await navigator.share({title:"Comic Cards",text:"Приєднуйся до Comic Cards 🎴",url});
-      }else{
-        await navigator.clipboard.writeText(url);
-        alert("Посилання скопійовано — можеш скинути його куди потрібно.");
-      }
-    });
 
     async function loadAdminUsers() {
       try {
@@ -2323,7 +2266,6 @@
                 >🔎 Інвентар</button>
 
                 <button class="user-action-btn wallet" type="button" data-wallet-add="${escapeHtml(user.id)}">💰 + монети</button>
-                <button class="user-action-btn inspect" type="button" data-copy-ref="${escapeHtml(user.id)}">🔗 Рефпосилання</button>
                 <button class="user-action-btn freeze" type="button" data-wallet-freeze="${escapeHtml(user.id)}">❄️ Баланс</button>
                 <button class="user-action-btn block" type="button" data-wallet-reset="${escapeHtml(user.id)}">0️⃣ Обнулити</button>
 
@@ -2355,18 +2297,6 @@
       });
 
 
-
-      document.querySelectorAll("[data-copy-ref]").forEach(button=>{
-        button.addEventListener("click",async()=>{
-          const uid=button.dataset.copyRef;
-          const code=uid===ADMIN_UID?ADMIN_REFERRAL_CODE:makeReferralCode(uid);
-          await setDoc(doc(db,"referral_codes",code),{code,ownerId:uid,isAdminCode:uid===ADMIN_UID,active:true,updatedAt:serverTimestamp()},{merge:true});
-          const link=referralUrl(code);
-          await navigator.clipboard.writeText(link);
-          alert("Реферальне посилання користувача скопійовано.");
-        });
-      });
-
       document.querySelectorAll("[data-wallet-add]").forEach(button=>{
         button.addEventListener("click",async()=>{
           const uid=button.dataset.walletAdd;
@@ -2383,8 +2313,7 @@
             updatedAt:serverTimestamp(),
             updatedBy:ADMIN_UID
           },{merge:true});
-          await setupAdminReferral();
-      await loadAdminUsers();
+          await loadAdminUsers();
         });
       });
 
@@ -2643,7 +2572,27 @@
     refreshUsersBtn?.addEventListener("click", loadAdminUsers);
 
     // ===== Перемикання меню =====
-    const menuItems = document.querySelectorAll(".menu-item");
+    const reportsList=document.getElementById("reportsList"),reportsBadge=document.getElementById("reportsBadge"),refreshReportsBtn=document.getElementById("refreshReportsBtn");
+function reportName(uid){return uid||"—";}
+async function loadReports(){
+  if(!reportsList)return; reportsList.innerHTML='<div style="color:#777">Завантаження...</div>';
+  try{
+    const snap=await getDocs(collection(db,"player_reports"));
+    const rows=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    const fresh=rows.filter(x=>x.status!=="resolved").length; reportsBadge.textContent=fresh?"("+fresh+")":"";
+    if(!rows.length){reportsList.innerHTML='<div style="color:#777">Репортів немає 🎉</div>';return;}
+    reportsList.innerHTML=rows.map(r=>{
+      const badge=r.status!=="resolved"?'<span class="report-badge">NEW</span> ':'';
+      const duel=r.duelId?' · Дуель: '+escapeHtml(r.duelId):'';
+      const action=r.status!=="resolved"?'<button class="primary-btn" style="width:auto" data-report-resolve="'+r.id+'">✓ Опрацьовано</button>':'<span style="color:#7bd88f">✓ Опрацьовано</span>';
+      return '<div class="report-row '+(r.status!=="resolved"?'new':'')+'"><div class="report-meta">'+badge+'Від: '+escapeHtml(reportName(r.reporterId))+' → На: '+escapeHtml(reportName(r.targetId))+duel+'</div><div class="report-msg">'+escapeHtml(r.message||'')+'</div><div class="report-actions">'+action+'<button class="user-action-btn block" data-report-delete="'+r.id+'">Видалити</button></div></div>';
+    }).join('');
+    document.querySelectorAll('[data-report-resolve]').forEach(b=>b.onclick=async()=>{await setDoc(doc(db,"player_reports",b.dataset.reportResolve),{status:"resolved",resolvedAt:serverTimestamp()},{merge:true});loadReports();});
+    document.querySelectorAll('[data-report-delete]').forEach(b=>b.onclick=async()=>{if(confirm("Видалити репорт?")){await deleteDoc(doc(db,"player_reports",b.dataset.reportDelete));loadReports();}});
+  }catch(e){console.error(e);reportsList.innerHTML='<div style="color:#ff7777">Не вдалося завантажити репорти.</div>';}
+}
+refreshReportsBtn?.addEventListener("click",loadReports);
+const menuItems = document.querySelectorAll(".menu-item");
     const sections = document.querySelectorAll(".section");
     const pageTitle = document.getElementById("pageTitle");
 
@@ -2657,6 +2606,7 @@
       comics: "Комікси",
       chapters: "Додати розділ",
       users: "Користувачі",
+      reports: "Репорти",
       duels: "Дуелі й турніри",
       qr: "QR-коди",
       stats: "Статистика",
@@ -2678,6 +2628,7 @@
         if (id === "users") {
           loadAdminUsers();
         }
+        if (id === "reports") { loadReports(); }
         if (id === "figures") {
           refreshFigureComicSelect();
           renderFigures();
