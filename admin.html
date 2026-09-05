@@ -1286,6 +1286,7 @@
     @media(max-width:900px){.duel-admin-grid{grid-template-columns:1fr}.tournament-row{grid-template-columns:1fr}}
 
 .report-row{background:#121212;border:1px solid #3a2626;border-left:4px solid #e53935;border-radius:10px;padding:12px;margin:10px 0}.report-row.new{background:#1b1111}.report-meta{font-size:12px;color:#999;margin-bottom:7px}.report-msg{white-space:pre-wrap;line-height:1.5}.report-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.report-badge{display:inline-block;background:#b71c1c;color:#fff;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:900}.aa-panel{line-height:1.55}.aa-panel h3{margin:22px 0 10px}.aa-panel p{color:#bdbdbd;margin:12px 0}.aa-controls{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.aa-panel button{padding:9px 12px;border:1px solid #555;border-radius:8px;background:#272727;color:#fff;cursor:pointer}.aa-panel button[aria-pressed="true"]{background:#684b91;border-color:#c9a3ff}.aa-panel button:disabled{opacity:.5}.aa-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:20px 0}.aa-card,.aa-box{padding:16px;border:1px solid #3b3547;border-radius:12px;background:#211e28}.aa-card strong{display:block;font-size:25px;color:#e3cdff}.aa-card small{color:#aaa}.aa-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:25px}.aa-top{margin:12px 0;overflow-wrap:anywhere}.aa-track{height:7px;background:#333;border-radius:6px;margin-top:6px}.aa-track div{height:100%;background:#b695e6;border-radius:6px}.aa-high{color:#ff9292}.aa-mid{color:#ffcf7b}#aaCoverage{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;margin-top:12px}.aa-panel td{overflow-wrap:anywhere;max-width:480px}.aa-panel details{margin-top:20px}
+.lounge-panel{margin-bottom:24px;line-height:1.5}.lounge-panel p{color:#aaa;margin:12px 0}.lounge-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}.lounge-panel button{background:#30281d;color:#ffe0a3;border:1px solid #695033;border-radius:8px;padding:9px 13px;cursor:pointer}.lounge-panel button:disabled{opacity:.4;cursor:default}.lounge-panel button:focus-visible{outline:3px solid #ffac33;outline-offset:2px}.lounge-media{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,320px);gap:24px;margin-top:22px}.lounge-media h3{margin-bottom:12px}.lounge-player{background:#111;border:1px solid #363636;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;color:#aaa}.lounge-player iframe{width:100%;height:100%;border:0}.lounge-youtube{aspect-ratio:16/9;min-height:220px}.lounge-tiktok{height:490px}.lounge-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0}.lounge-panel a{color:#ffbd62;display:inline-block;margin-top:10px}.lounge-panel a[hidden]{display:none}.lounge-panel textarea{width:100%;background:#111;color:#eee;border:1px solid #555;border-radius:8px;padding:12px;font:inherit}.sol-scroll{overflow-x:auto}.sol-board{min-width:620px;padding:18px;background:#123e32;border-radius:12px}.sol-top{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px;margin-bottom:25px}#solFound{grid-column:4/8;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}#solColumns{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px}.sol-column{position:relative}.lounge-panel .sol-card{width:100%;height:112px;padding:7px;text-align:left;vertical-align:top;background:#faf7ef;color:#18202d;font-size:21px;font-weight:bold;border:1px solid #cabfa8;border-radius:7px;box-shadow:0 2px 4px #0005;display:flex;align-items:flex-start}.lounge-panel .sol-red{color:#bc2540}.lounge-panel .sol-back{background:repeating-linear-gradient(45deg,#223957,#223957 6px,#2d4768 6px,#2d4768 12px);color:#fff}.lounge-panel .sol-empty{background:#ffffff0a;border:2px dashed #7ea595;color:#a1cbb9}.lounge-panel .sol-selected{outline:3px solid #ffb21e;outline-offset:-3px;background:#ffe1a3}@media(max-width:1000px){.lounge-media{grid-template-columns:1fr}.lounge-tiktok{max-width:340px;margin:auto}.lounge-nav{max-width:340px;margin:10px auto}}
 </style>
 </head>
 <body>
@@ -1360,11 +1361,12 @@
     <main class="content">
       <!-- Головна -->
       <section class="section active" id="dashboard">
-        <div class="placeholder">
-          <h2>Вітаю в адмін-панелі</h2>
-          <p>Обери розділ зліва, щоб почати роботу</p>
-        </div>
-      </section>
+<div class="panel lounge-panel"><div class="lounge-heading"><div><h2>☕ Куточок адміністратора</h2><p>Відео та невелика перерва між справами</p></div><button type="button" id="loungeSettings">⚙️ Посилання на відео</button></div>
+<div class="lounge-media"><div><h3>▶ YouTube</h3><div id="loungeYtPlayer" class="lounge-player lounge-youtube"></div><a id="loungeYtLink" hidden target="_blank" rel="noopener noreferrer">Відкрити на YouTube ↗</a></div>
+<div><h3>♪ TikTok · твоя добірка</h3><div id="loungeTtPlayer" class="lounge-player lounge-tiktok"></div><div class="lounge-nav"><button id="loungePrev" type="button">↑ Назад</button><span id="loungeCount" aria-live="polite"></span><button id="loungeNext" type="button">Далі ↓</button></div><a id="loungeTtLink" hidden target="_blank" rel="noopener noreferrer">Відкрити в TikTok ↗</a></div></div>
+<p class="lounge-note">Якщо автор обмежив вбудовування, відкрий відео за посиланням під програвачем. Відео зупиняються при переході в інший розділ адмінки.</p></div>
+<div class="panel lounge-panel"><div class="lounge-heading"><h2>🃏 Пасьянс «Косинка»</h2><div><button id="solUndo" type="button">↶ Скасувати хід</button> <button id="solNew" type="button">Нова гра</button></div></div><p>Натисни відкриту карту, потім місце призначення. Можна переносити відкриті послідовності. На порожній стовпчик — лише короля. Колода видає по одній карті; повторні проходи необмежені. Партія триває до перезавантаження сторінки.</p><p id="solStatus" role="status"></p><p id="solMoves"></p><div class="sol-scroll"><div class="sol-board"><div class="sol-top"><button id="solStock" class="sol-card sol-back" type="button"></button><div id="solWaste"></div><div id="solFound"></div></div><div id="solColumns"></div></div></div></div>
+</section>
 
       <!-- Картки -->
       <section class="section" id="cards">
@@ -1889,6 +1891,7 @@
 
       <!-- Налаштування -->
       <section class="section" id="settings">
+<div class="panel lounge-panel"><h2>▶ Відео для адміністратора</h2><p>Особиста добірка на головній адмінки. Зберігається лише в цьому браузері; не змінює публічні посилання сайту чи Firestore.</p><div class="form-group"><label for="loungeYoutube">Посилання на YouTube-відео</label><input id="loungeYoutube" type="url" placeholder="https://www.youtube.com/watch?v=…"></div><div class="form-group"><label for="loungeTiktok">TikTok-відео — одне повне посилання на рядок, до 100</label><textarea id="loungeTiktok" rows="6" placeholder="https://www.tiktok.com/@name/video/123…"></textarea></div><p>Це твоя добірка для перегортання. Для коротких TikTok-посилань відкрий відео й скопіюй повну адресу. Порожні поля прибирають відео.</p><button type="button" id="loungeSave">💾 Зберегти відео</button><p id="loungeMessage" role="status"></p></div>
         <div class="panel banner-settings">
           <h2>🖼️ Банер головної сторінки</h2>
           <p class="panel-subtitle">
@@ -4645,6 +4648,141 @@ const menuItems = document.querySelectorAll(".menu-item");
     });
     aaEl('aaRefresh').addEventListener('click',aaLoad);
     document.querySelectorAll('[data-aa-days]').forEach(b=>b.addEventListener('click',()=>{aaState.days=Number(b.dataset.aaDays);aaRender();}));
+
+    // Private browser-only dashboard preferences and Klondike (draw one).
+    const loungeKey = 'cc:lounge:' + auth.app.options.projectId + ':' + ADMIN_UID;
+    const loungeEl = id => document.getElementById(id);
+    function loungeParse(raw, service) {
+      const u = new URL(raw.trim());
+      if(u.protocol!=='https:' || u.username || u.password) throw Error('Використайте HTTPS-посилання на відео.');
+      const host=u.hostname.toLowerCase(), parts=u.pathname.split('/').filter(Boolean);
+      let id;
+      if(service==='yt') {
+        if(host==='youtu.be') id=parts[0];
+        else if(['youtube.com','www.youtube.com','m.youtube.com','www.youtube-nocookie.com'].includes(host)) id=u.searchParams.get('v') || (['embed','shorts','live'].includes(parts[0])?parts[1]:null);
+        if(!/^[\w-]{11}$/.test(id||'')) throw Error('YouTube: потрібне посилання на окреме відео (watch, youtu.be, Shorts або live).');
+        return {id, url:'https://www.youtube.com/watch?v='+id, embed:'https://www.youtube-nocookie.com/embed/'+id};
+      }
+      if(['www.tiktok.com','tiktok.com','m.tiktok.com'].includes(host)) {
+        const index=parts.indexOf('video');
+        id=index>=0?parts[index+1]:parts[0]==='player'&&parts[1]==='v1'?parts[2]:null;
+      }
+      if(!/^\d{15,25}$/.test(id||'')) throw Error('TikTok: вставте повне посилання https://www.tiktok.com/@ім’я/video/123…; коротке посилання спершу відкрийте й скопіюйте повну адресу.');
+      return {id,url:'https://www.tiktok.com/'+(parts[0]?.startsWith('@')?parts[0]:'@user')+'/video/'+id,embed:'https://www.tiktok.com/player/v1/'+id};
+    }
+    let loungePrefs={yt:'',tt:[]}, loungeIndex=0;
+    try {
+      const saved=JSON.parse(localStorage.getItem(loungeKey)||'null');
+      if(saved) {
+        if(typeof saved.yt==='string'&&saved.yt) loungePrefs.yt=loungeParse(saved.yt,'yt').url;
+        if(Array.isArray(saved.tt)) loungePrefs.tt=saved.tt.slice(0,100).flatMap(v=>{try{return [loungeParse(v,'tt').url]}catch{return []}});
+      }
+    } catch { /* Empty defaults if storage is unavailable or invalid. */ }
+    loungeEl('loungeYoutube').value=loungePrefs.yt;
+    loungeEl('loungeTiktok').value=loungePrefs.tt.join('\n');
+    function loungePlayer(target, raw, service) {
+      const box=loungeEl(target); box.replaceChildren();
+      if(!raw) { box.textContent='Додайте посилання в Налаштуваннях → Відео для адміністратора.'; return; }
+      const media=loungeParse(raw,service), frame=document.createElement('iframe');
+      frame.title=service==='yt'?'YouTube відео':'TikTok відео'; frame.src=media.embed;
+      frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
+      frame.referrerPolicy='strict-origin-when-cross-origin';
+      box.append(frame);
+      const link=loungeEl(service==='yt'?'loungeYtLink':'loungeTtLink');link.href=media.url;link.hidden=false;
+    }
+    function loungeRender() {
+      loungeEl('loungeYtLink').hidden=true;loungeEl('loungeTtLink').hidden=true;
+      loungePlayer('loungeYtPlayer',loungePrefs.yt,'yt');loungeRenderTiktok();
+    }
+    function loungeRenderTiktok() {
+      loungeEl('loungeTtLink').hidden=true;
+      loungePlayer('loungeTtPlayer',loungePrefs.tt[loungeIndex],'tt');
+      loungeEl('loungeCount').textContent=loungePrefs.tt.length?`${loungeIndex+1} / ${loungePrefs.tt.length}`:'Немає відео';
+      loungeEl('loungePrev').disabled=loungeIndex===0;
+      loungeEl('loungeNext').disabled=loungeIndex>=loungePrefs.tt.length-1;
+    }
+    loungeEl('loungeSave').addEventListener('click',()=>{
+      if(auth.currentUser?.uid!==ADMIN_UID)return;
+      try {
+        const yt=loungeEl('loungeYoutube').value.trim();
+        const lines=loungeEl('loungeTiktok').value.split('\n').map(s=>s.trim()).filter(Boolean);
+        if(lines.length>100)throw Error('Додайте до 100 TikTok-відео.');
+        const next={yt:yt?loungeParse(yt,'yt').url:'',tt:[...new Set(lines.map(s=>loungeParse(s,'tt').url))]};
+        let stored=true;try{localStorage.setItem(loungeKey,JSON.stringify(next))}catch{stored=false}
+        loungePrefs=next;loungeIndex=0;
+        if(loungeEl('dashboard').classList.contains('active'))loungeRender();
+        loungeEl('loungeMessage').textContent=stored?'Збережено в цьому браузері. Відео доступні на головній адмінки.':'Діє до перезавантаження: браузер не дозволив зберегти налаштування.';
+      } catch(e) {loungeEl('loungeMessage').textContent=e.message;}
+    });
+    loungeEl('loungePrev').addEventListener('click',()=>{if(loungeIndex>0){loungeIndex--;loungeRenderTiktok()}});
+    loungeEl('loungeNext').addEventListener('click',()=>{if(loungeIndex<loungePrefs.tt.length-1){loungeIndex++;loungeRenderTiktok()}});
+    loungeEl('loungeSettings').addEventListener('click',()=>document.querySelector('[data-section="settings"]').click());
+    document.querySelectorAll('.menu-item').forEach(item=>item.addEventListener('click',()=>{
+      if(item.dataset.section==='dashboard'&&auth.currentUser?.uid===ADMIN_UID) loungeRender();
+      else {loungeEl('loungeYtPlayer').replaceChildren();loungeEl('loungeTtPlayer').replaceChildren();}
+    }));
+    onAuthStateChanged(auth,user=>{if(user?.uid===ADMIN_UID&&loungeEl('dashboard').classList.contains('active'))loungeRender();else{loungeEl('loungeYtPlayer').replaceChildren();loungeEl('loungeTtPlayer').replaceChildren();}});
+
+    const solSuits=['♠','♥','♣','♦'];
+    let sol={stock:[],waste:[],found:[[],[],[],[]],cols:[],moves:0}, solSelected=null, solHistory=[];
+    const solRed=c=>c.s===1||c.s===3;
+    const solLabel=c=>(['','A','2','3','4','5','6','7','8','9','10','J','Q','K'][c.r])+solSuits[c.s];
+    function solNew() {
+      const deck=solSuits.flatMap((_,s)=>Array.from({length:13},(_,i)=>({s,r:i+1,up:false})));
+      for(let i=deck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]];}
+      sol={stock:[],waste:[],found:[[],[],[],[]],cols:[],moves:0};
+      for(let i=0;i<7;i++){const col=deck.splice(0,i+1);col[col.length-1].up=true;sol.cols.push(col)}
+      sol.stock=deck;solSelected=null;solHistory=[];solRender();
+    }
+    function solPile(loc){return loc.kind==='col'?sol.cols[loc.i]:loc.kind==='found'?sol.found[loc.i]:sol.waste;}
+    function solRemember(){solHistory.push(JSON.stringify(sol));if(solHistory.length>200)solHistory.shift();}
+    function solMove(from,to) {
+      if(!from || from.kind===to.kind&&from.i===to.i)return false;
+      const src=solPile(from),dest=solPile(to),moving=src.slice(from.at),card=moving[0];
+      if(!card||!card.up || from.at<0 || (from.kind!=='col'&&moving.length!==1))return false;
+      if(!moving.every((c,i)=>c.up&&(i===0||(moving[i-1].r===c.r+1&&solRed(moving[i-1])!==solRed(c)))))return false;
+      const top=dest[dest.length-1];
+      if(to.kind==='found') {if(moving.length!==1||card.s!==to.i||card.r!==(top?top.r+1:1))return false;}
+      else if(to.kind==='col'){if(top?(!top.up||top.r!==card.r+1||solRed(top)===solRed(card)):card.r!==13)return false;}
+      else return false;
+      solRemember();dest.push(...src.splice(from.at));if(src.length)src[src.length-1].up=true;
+      sol.moves++;solSelected=null;return true;
+    }
+    function solClick(loc) {
+      if(solSelected&&solMove(solSelected,loc)){solRender();return;}
+      const pile=solPile(loc),card=pile[loc.at];
+      solSelected=card?.up?loc:null;solRender();
+      loungeEl('solStatus').textContent=solSelected?'Карту вибрано. Натисніть на стовпчик або відповідну основу.':'Оберіть відкриту карту.';
+    }
+    function solRender() {
+      loungeEl('solStock').textContent=sol.stock.length?'🂠 '+sol.stock.length:'↻ Колода';
+      loungeEl('solUndo').disabled=!solHistory.length;
+      loungeEl('solMoves').textContent='Ходів: '+sol.moves;
+      function button(c,loc,offset) {
+        const b=document.createElement('button');b.type='button';b.className='sol-card'+(c?(c.up?(solRed(c)?' sol-red':''):' sol-back'):' sol-empty');
+        b.textContent=c?(c.up?solLabel(c):'🂠'):(loc.kind==='found'?solSuits[loc.i]:'K');
+        b.setAttribute('aria-label',c?(c.up?solLabel(c):'Закрита карта'):'Порожнє місце');
+        if(offset!=null){b.style.position='absolute';b.style.top=offset+'px';}
+        if(solSelected&&solSelected.kind===loc.kind&&solSelected.i===loc.i&&solSelected.at===loc.at)b.classList.add('sol-selected');
+        b.addEventListener('click',()=>solClick(loc));return b;
+      }
+      const waste=loungeEl('solWaste');waste.replaceChildren();waste.append(button(sol.waste.at(-1),{kind:'waste',i:0,at:sol.waste.length-1}));
+      const found=loungeEl('solFound');found.replaceChildren();sol.found.forEach((p,i)=>found.append(button(p.at(-1),{kind:'found',i,at:p.length-1})));
+      const columns=loungeEl('solColumns');columns.replaceChildren();
+      sol.cols.forEach((p,i)=>{const col=document.createElement('div');col.className='sol-column';col.style.height=Math.max(112,(p.length-1)*30+112)+'px';
+        if(!p.length)col.append(button(null,{kind:'col',i,at:0},0));
+        p.forEach((c,at)=>col.append(button(c,{kind:'col',i,at},at*30)));columns.append(col);
+      });
+      loungeEl('solStatus').textContent=sol.found.every(p=>p.length===13)?'🎉 Перемога! Усі карти зібрані.':'Червона на чорну, від короля до туза. Основи — від туза до короля за мастю.';
+    }
+    loungeEl('solStock').addEventListener('click',()=>{
+      if(!sol.stock.length&&!sol.waste.length)return;
+      solRemember();if(sol.stock.length){const c=sol.stock.pop();c.up=true;sol.waste.push(c)}else{sol.stock=sol.waste.reverse();sol.stock.forEach(c=>c.up=false);sol.waste=[];}
+      sol.moves++;solSelected=null;solRender();
+    });
+    loungeEl('solUndo').addEventListener('click',()=>{if(solHistory.length){sol=JSON.parse(solHistory.pop());solSelected=null;solRender()}});
+    loungeEl('solNew').addEventListener('click',()=>{if(confirm('Почати новий пасьянс? Поточна партія завершиться.'))solNew()});
+    solNew();
 
   </script>
 </body>
