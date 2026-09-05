@@ -152,10 +152,10 @@
   .treasury-modal{width:min(760px,96vw);max-height:92vh;overflow:auto;position:relative;text-align:center;background:radial-gradient(circle at 50% 15%,rgba(255,193,7,.13),transparent 38%),#151515;border:1px solid #59451e;border-radius:20px;padding:26px;box-shadow:0 28px 90px rgba(0,0,0,.65)}
   .treasury-close{position:absolute;top:12px;right:12px;width:40px;height:40px;border:0;border-radius:50%;background:#292929;color:#fff;font-size:20px;cursor:pointer}
   .treasury-title{font-size:30px;margin:0 45px 6px}.treasury-sub{color:#9b9b9b;font-size:14px;margin-bottom:18px}
-  .treasury-stage{min-height:330px;border:1px solid #4b3a1d;border-radius:16px;background:linear-gradient(180deg,#17130d,#0c0b09);display:flex;align-items:center;justify-content:center;overflow:hidden;padding:20px}
-  .treasury-visual{font-size:112px;line-height:1;filter:drop-shadow(0 14px 20px rgba(0,0,0,.5));user-select:none}
+  .treasury-stage{position:relative;min-height:330px;border:1px solid #5d4720;border-radius:16px;background:#090806;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:0;box-shadow:inset 0 0 45px rgba(0,0,0,.55)}
+  .treasury-visual{width:100%;height:auto;max-height:62vh;display:block;object-fit:contain;user-select:none;background:#090806}.treasury-stage::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 45px rgba(0,0,0,.38)}
   .treasury-balance{font-size:34px;font-weight:900;color:#ffd166;margin-top:18px}.treasury-level{font-size:18px;font-weight:800;color:#ffb347;margin-top:6px}.treasury-next{color:#888;font-size:13px;margin-top:10px;line-height:1.5}
-  @media(max-width:650px){.treasury-stage{min-height:250px}.treasury-visual{font-size:82px}.treasury-balance{font-size:28px}}
+  @media(max-width:650px){.treasury-stage{min-height:220px}.treasury-visual{max-height:48vh}.treasury-balance{font-size:28px}}
 
 </style>
 </head>
@@ -266,7 +266,7 @@
     <button class="treasury-close" id="treasuryCloseBtn" type="button">✕</button>
     <h2 class="treasury-title" id="treasuryTitle">🏦 Моя скарбниця</h2>
     <p class="treasury-sub">Твоє золото росте разом із балансом. Просто милуйся багатством 😼</p>
-    <div class="treasury-stage"><div class="treasury-visual" id="treasuryVisual">🪙</div></div>
+    <div class="treasury-stage"><img class="treasury-visual" id="treasuryVisual" src="1.gif" alt="Скарбниця користувача"></div>
     <div class="treasury-balance"><span id="treasuryBalance">0</span> 💰</div>
     <div class="treasury-level" id="treasuryLevel">Жменька монет</div>
     <div class="treasury-next" id="treasuryNext"></div>
@@ -830,14 +830,14 @@
   }
 
   const TREASURY_LEVELS=[
-    {min:0,emoji:"🪙",name:"Жменька монет"},
-    {min:100,emoji:"💰",name:"Мішечок золота"},
-    {min:1000,emoji:"🧰💰",name:"Скриня зі скарбами"},
-    {min:5000,emoji:"🧰🪙🪙",name:"Велика скриня золота"},
-    {min:10000,emoji:"💰💰🪙",name:"Купа золота"},
-    {min:50000,emoji:"🧰🧰💰",name:"Сховище зі скринями"},
-    {min:100000,emoji:"🏰💰",name:"Королівська скарбниця"},
-    {min:1000000,emoji:"👑🏦💰",name:"Золотий зал"}
+    {min:0,image:"1.gif",name:"Перший мішечок"},
+    {min:100,image:"2.gif",name:"Два мішки золота"},
+    {min:500,image:"3.gif",name:"Перша скриня"},
+    {min:1000,image:"4.gif",name:"Повна скриня золота"},
+    {min:5000,image:"5.gif",name:"Багате сховище"},
+    {min:10000,image:"6.gif",name:"Королівська скарбниця"},
+    {min:50000,image:"7.gif",name:"Велика королівська скарбниця"},
+    {min:100000,image:"8.gif",name:"Легендарна скарбниця дракона"}
   ];
 
   function updateTreasury(){
@@ -845,7 +845,8 @@
     let idx=0;
     TREASURY_LEVELS.forEach((level,i)=>{if(balance>=level.min)idx=i});
     const level=TREASURY_LEVELS[idx],next=TREASURY_LEVELS[idx+1];
-    treasuryVisual.textContent=level.emoji;
+    treasuryVisual.src=level.image;
+    treasuryVisual.alt=level.name;
     treasuryBalance.textContent=balance.toLocaleString("uk-UA");
     treasuryLevel.textContent=level.name;
     treasuryNext.textContent=next
