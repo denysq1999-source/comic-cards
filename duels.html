@@ -70,6 +70,22 @@
     .duel-countdown{display:inline-flex;align-items:center;gap:5px;margin-top:7px;padding:5px 8px;border-radius:999px;background:#302817;border:1px solid #51431f;color:#ffd166;font-size:12px;font-weight:900}
     .duel-countdown.danger{background:#3a2020;border-color:#663333;color:#ff9d9d}
 
+
+  .presence-note{margin-top:7px;color:#777;font-size:11px}
+
+  .opponent-picker{position:relative;width:100%}
+  .opponent-picker-btn{width:100%;min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#101010;color:#fff;border:1px solid #ff9800;border-radius:8px;padding:10px 12px;cursor:pointer;text-align:left}
+  .opponent-picker-btn:hover{background:#161616}
+  .opponent-picker-arrow{color:#ddd;font-size:16px}
+  .opponent-picker-menu{display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:120;background:#111;border:1px solid #3b3b3b;border-radius:8px;box-shadow:0 14px 35px rgba(0,0,0,.55);max-height:280px;overflow:auto;padding:5px}
+  .opponent-picker.open .opponent-picker-menu{display:block}
+  .opponent-option{width:100%;border:0;background:transparent;color:#fff;display:flex;align-items:center;gap:9px;padding:10px 11px;border-radius:6px;cursor:pointer;text-align:left;font:inherit}
+  .opponent-option:hover{background:#1f5f9f}
+  .presence-dot{width:10px;height:10px;min-width:10px;border-radius:50%;display:inline-block;box-shadow:0 0 0 2px rgba(255,255,255,.05)}
+  .presence-dot.online{background:#35d46a;box-shadow:0 0 9px rgba(53,212,106,.65)}
+  .presence-dot.offline{background:#e54848;box-shadow:0 0 8px rgba(229,72,72,.38)}
+  .opponent-status-text{margin-left:auto;color:#777;font-size:11px}
+
 </style>
 </head>
 <body>
@@ -96,7 +112,14 @@
       <h2 style="margin-top:0">➕ Новий інвайт</h2>
       <div class="group">
         <label for="opponentSelect">Суперник</label>
-        <select id="opponentSelect"><option value="">Оберіть гравця...</option></select>
+        <select id="opponentSelect" style="display:none"><option value="">Оберіть гравця...</option></select>
+        <div class="opponent-picker" id="opponentPicker">
+          <button class="opponent-picker-btn" id="opponentPickerBtn" type="button">
+            <span class="opponent-picker-text" id="opponentPickerText">Оберіть гравця...</span>
+            <span class="opponent-picker-arrow">⌄</span>
+          </button>
+          <div class="opponent-picker-menu" id="opponentPickerMenu"></div>
+        </div>
       </div>
       <div class="group">
         <label for="stakeInput">Ставка, 💰</label>
@@ -141,6 +164,10 @@
   const db=getFirestore(auth.app);
   const balanceEl=document.getElementById("balance");
   const opponentSelect=document.getElementById("opponentSelect");
+  const opponentPicker=document.getElementById("opponentPicker");
+  const opponentPickerBtn=document.getElementById("opponentPickerBtn");
+  const opponentPickerText=document.getElementById("opponentPickerText");
+  const opponentPickerMenu=document.getElementById("opponentPickerMenu");
   const stakeInput=document.getElementById("stakeInput");
   const inviteBtn=document.getElementById("inviteBtn");
   const inviteMsg=document.getElementById("inviteMsg");
@@ -153,6 +180,9 @@
   const DUEL_INVITE_MS=60000;
   let duelTimerInterval=null;
   const expiringDuelIds=new Set();
+  const ONLINE_WINDOW_MS=90000;
+  let presenceInterval=null;
+  let profilesInterval=null;
 
   function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
   function labelFor(uid){const p=profiles.find(x=>x.id===uid);return p?.displayName||p?.emailMasked||`Гравець ${uid.slice(0,6)}`}
@@ -198,6 +228,27 @@
     });
   }
 
+
+  function tsMillis(ts){
+    try{
+      if(!ts)return 0;
+      if(typeof ts.toMillis==="function")return ts.toMillis();
+      return Number(ts.seconds||0)*1000+Number(ts.nanoseconds||0)/1000000;
+    }catch{return 0}
+  }
+  function isProfileOnline(p){
+    return Date.now()-tsMillis(p?.lastSeenAt) <= ONLINE_WINDOW_MS;
+  }
+  async function touchPresence(){
+    if(!user)return;
+    try{
+      await setDoc(doc(db,"player_profiles",user.uid),{
+        userId:user.uid,
+        lastSeenAt:serverTimestamp(),
+        presenceStatus:"online"
+      },{merge:true});
+    }catch(e){console.error("Presence heartbeat:",e)}
+  }
 
   function extractGoogleDriveFileId(url=""){
     const value=String(url||"").trim();
@@ -251,15 +302,62 @@
     }
   });
 
+  function renderOpponentPicker(){
+    if(!opponentPickerMenu)return;
+    opponentPickerMenu.innerHTML=profiles.map(p=>{
+      const online=isProfileOnline(p);
+      const name=p.displayName||p.emailMasked||"Гравець";
+      return `<button type="button" class="opponent-option" data-opponent-id="${esc(p.id)}"><span class="presence-dot ${online?"online":"offline"}"></span><span>${esc(name)}</span><span class="opponent-status-text">${online?"онлайн":"офлайн"}</span></button>`;
+    }).join("") || '<div class="note" style="padding:10px">Немає доступних гравців.</div>';
+
+    opponentPickerMenu.querySelectorAll("[data-opponent-id]").forEach(btn=>btn.addEventListener("click",()=>{
+      const id=btn.dataset.opponentId;
+      opponentSelect.value=id;
+      const p=profiles.find(x=>x.id===id);
+      const online=p?isProfileOnline(p):false;
+      const name=p?.displayName||p?.emailMasked||"Гравець";
+      opponentPickerText.innerHTML=`<span style="display:inline-flex;align-items:center;gap:9px"><span class="presence-dot ${online?"online":"offline"}"></span><span>${esc(name)}</span></span>`;
+      opponentPicker.classList.remove("open");
+    }));
+  }
+
+  opponentPickerBtn?.addEventListener("click",e=>{
+    e.stopPropagation();
+    opponentPicker.classList.toggle("open");
+  });
+  document.addEventListener("click",e=>{
+    if(opponentPicker && !opponentPicker.contains(e.target))opponentPicker.classList.remove("open");
+  });
+
   async function loadProfiles(){
+    const previousValue=opponentSelect.value;
     const snap=await getDocs(collection(db,"player_profiles"));
     profiles=snap.docs
       .map(d=>({id:d.id,...d.data()}))
       .filter(p=>p.id!==user.uid && p.blocked!==true);
 
+    profiles.sort((a,b)=>{
+      const ao=isProfileOnline(a)?1:0, bo=isProfileOnline(b)?1:0;
+      if(ao!==bo)return bo-ao;
+      return String(a.displayName||a.emailMasked||"").localeCompare(String(b.displayName||b.emailMasked||""),"uk");
+    });
+
     opponentSelect.innerHTML='<option value="">Оберіть гравця...</option>'+profiles
-      .sort((a,b)=>String(a.displayName||"").localeCompare(String(b.displayName||""),"uk"))
-      .map(p=>`<option value="${esc(p.id)}">${esc(p.displayName||p.emailMasked||"Гравець")}</option>`).join("");
+      .map(p=>{
+        const name=p.displayName||p.emailMasked||"Гравець";
+        return `<option value="${esc(p.id)}">${esc(name)}</option>`;
+      }).join("");
+
+    if(previousValue && profiles.some(p=>p.id===previousValue)){
+      opponentSelect.value=previousValue;
+      const p=profiles.find(x=>x.id===previousValue);
+      const online=p?isProfileOnline(p):false;
+      const name=p?.displayName||p?.emailMasked||"Гравець";
+      opponentPickerText.innerHTML=`<span style="display:inline-flex;align-items:center;gap:9px"><span class="presence-dot ${online?"online":"offline"}"></span><span>${esc(name)}</span></span>`;
+    } else {
+      opponentPickerText.textContent="Оберіть гравця...";
+    }
+    renderOpponentPicker();
   }
 
 
@@ -533,12 +631,21 @@
     }
 
     user=currentUser;
+    await touchPresence();
     await loadOwnedCardsForWager();
     await loadProfiles();
     await loadState();
     tickDuelTimers();
     if(duelTimerInterval)clearInterval(duelTimerInterval);
     duelTimerInterval=setInterval(tickDuelTimers,500);
+    if(presenceInterval)clearInterval(presenceInterval);
+    presenceInterval=setInterval(async()=>{
+      await touchPresence();
+      try{await loadProfiles();}catch(e){console.error("Presence refresh:",e)}
+    },30000);
+    if(profilesInterval)clearInterval(profilesInterval);
+    profilesInterval=setInterval(()=>loadProfiles().catch(console.error),15000);
+    document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")touchPresence()},{passive:true});
   });
 </script>
 </body>
