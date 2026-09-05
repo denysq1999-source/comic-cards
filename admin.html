@@ -1363,8 +1363,8 @@
       <section class="section active" id="dashboard">
 <div class="panel lounge-panel"><div class="lounge-heading"><div><h2>☕ Куточок адміністратора</h2><p>Відео та невелика перерва між справами</p></div><button type="button" id="loungeSettings">⚙️ Посилання на відео</button></div>
 <div class="lounge-media"><div><h3>▶ YouTube</h3><div id="loungeYtPlayer" class="lounge-player lounge-youtube"></div><a id="loungeYtLink" hidden target="_blank" rel="noopener noreferrer">Відкрити на YouTube ↗</a></div>
-<div><h3>♪ TikTok · твоя добірка</h3><div id="loungeTtPlayer" class="lounge-player lounge-tiktok"></div><div class="lounge-nav"><button id="loungePrev" type="button">↑ Назад</button><span id="loungeCount" aria-live="polite"></span><button id="loungeNext" type="button">Далі ↓</button></div><a id="loungeTtLink" hidden target="_blank" rel="noopener noreferrer">Відкрити в TikTok ↗</a></div></div>
-<p class="lounge-note">Якщо автор обмежив вбудовування, відкрий відео за посиланням під програвачем. Відео зупиняються при переході в інший розділ адмінки.</p></div>
+<div><h3>♪ TikTok · головна стрічка</h3><div class="lounge-player lounge-tiktok" style="padding:24px;flex-direction:column;gap:18px"><span style="font-size:48px">♪</span><p>Відкрий TikTok у вузькому вікні поруч і гортай відео у звичайній стрічці.</p><button id="loungeOpenTiktok" type="button">↗ Відкрити TikTok поруч</button><p id="loungePopupStatus" role="status"></p><a href="https://www.tiktok.com/" target="_blank" rel="noopener noreferrer">Відкрити TikTok у вкладці ↗</a></div><p>Браузер визначає розміщення вікна; за потреби перетягни його поруч. Вхід у TikTok — у самому TikTok.</p></div></div>
+<p class="lounge-note">Якщо автор обмежив вбудовування, відкрий відео за посиланням під програвачем. YouTube зупиняється при переході в інший розділ адмінки. Окреме вікно TikTok залишається відкритим.</p></div>
 <div class="panel lounge-panel"><div class="lounge-heading"><h2>🃏 Пасьянс «Косинка»</h2><div><button id="solUndo" type="button">↶ Скасувати хід</button> <button id="solNew" type="button">Нова гра</button></div></div><p>Натисни відкриту карту, потім місце призначення. Можна переносити відкриті послідовності. На порожній стовпчик — лише короля. Колода видає по одній карті; повторні проходи необмежені. Партія триває до перезавантаження сторінки.</p><p id="solStatus" role="status"></p><p id="solMoves"></p><div class="sol-scroll"><div class="sol-board"><div class="sol-top"><button id="solStock" class="sol-card sol-back" type="button"></button><div id="solWaste"></div><div id="solFound"></div></div><div id="solColumns"></div></div></div></div>
 </section>
 
@@ -1891,7 +1891,7 @@
 
       <!-- Налаштування -->
       <section class="section" id="settings">
-<div class="panel lounge-panel"><h2>▶ Відео для адміністратора</h2><p>Особиста добірка на головній адмінки. Зберігається лише в цьому браузері; не змінює публічні посилання сайту чи Firestore.</p><div class="form-group"><label for="loungeYoutube">Посилання на YouTube-відео</label><input id="loungeYoutube" type="url" placeholder="https://www.youtube.com/watch?v=…"></div><div class="form-group"><label for="loungeTiktok">TikTok-відео — одне повне посилання на рядок, до 100</label><textarea id="loungeTiktok" rows="6" placeholder="https://www.tiktok.com/@name/video/123…"></textarea></div><p>Це твоя добірка для перегортання. Для коротких TikTok-посилань відкрий відео й скопіюй повну адресу. Порожні поля прибирають відео.</p><button type="button" id="loungeSave">💾 Зберегти відео</button><p id="loungeMessage" role="status"></p></div>
+<div class="panel lounge-panel"><h2>▶ Відео для адміністратора</h2><p>Особиста добірка на головній адмінки. Зберігається лише в цьому браузері; не змінює публічні посилання сайту чи Firestore.</p><div class="form-group"><label for="loungeYoutube">Посилання на YouTube-відео</label><input id="loungeYoutube" type="url" placeholder="https://www.youtube.com/watch?v=…"></div><p>TikTok відкривається кнопкою на головній адмінки — посилання на окремі ролики більше не потрібні. Порожнє поле YouTube прибирає відео.</p><button type="button" id="loungeSave">💾 Зберегти відео</button><p id="loungeMessage" role="status"></p></div>
         <div class="panel banner-settings">
           <h2>🖼️ Банер головної сторінки</h2>
           <p class="panel-subtitle">
@@ -4679,7 +4679,7 @@ const menuItems = document.querySelectorAll(".menu-item");
       }
     } catch { /* Empty defaults if storage is unavailable or invalid. */ }
     loungeEl('loungeYoutube').value=loungePrefs.yt;
-    loungeEl('loungeTiktok').value=loungePrefs.tt.join('\n');
+
     function loungePlayer(target, raw, service) {
       const box=loungeEl(target); box.replaceChildren();
       if(!raw) { box.textContent='Додайте посилання в Налаштуваннях → Відео для адміністратора.'; return; }
@@ -4691,37 +4691,56 @@ const menuItems = document.querySelectorAll(".menu-item");
       const link=loungeEl(service==='yt'?'loungeYtLink':'loungeTtLink');link.href=media.url;link.hidden=false;
     }
     function loungeRender() {
-      loungeEl('loungeYtLink').hidden=true;loungeEl('loungeTtLink').hidden=true;
-      loungePlayer('loungeYtPlayer',loungePrefs.yt,'yt');loungeRenderTiktok();
+      loungeEl('loungeYtLink').hidden=true;
+      loungePlayer('loungeYtPlayer',loungePrefs.yt,'yt');
     }
-    function loungeRenderTiktok() {
-      loungeEl('loungeTtLink').hidden=true;
-      loungePlayer('loungeTtPlayer',loungePrefs.tt[loungeIndex],'tt');
-      loungeEl('loungeCount').textContent=loungePrefs.tt.length?`${loungeIndex+1} / ${loungePrefs.tt.length}`:'Немає відео';
-      loungeEl('loungePrev').disabled=loungeIndex===0;
-      loungeEl('loungeNext').disabled=loungeIndex>=loungePrefs.tt.length-1;
-    }
+    let loungeTiktokWindow = null;
+    loungeEl('loungeOpenTiktok').addEventListener('click', () => {
+      if (auth.currentUser?.uid !== ADMIN_UID) return;
+      const status = loungeEl('loungePopupStatus');
+      try {
+        if (loungeTiktokWindow && !loungeTiktokWindow.closed) {
+          loungeTiktokWindow.focus();
+          status.textContent = 'Вікно TikTok уже відкрите.';
+          return;
+        }
+        const width = Math.min(420, screen.availWidth || 420);
+        const height = Math.min(820, screen.availHeight || 820);
+        const left = Math.max(screen.availLeft || 0, (screen.availLeft || 0) + (screen.availWidth || width) - width);
+        const top = screen.availTop || 0;
+        // Open synchronously from the click and remove opener before external navigation.
+        const popup = window.open('about:blank', '_blank', 'popup=yes,width=' + width + ',height=' + height + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes');
+        if (!popup) {
+          status.textContent = 'Браузер заблокував вікно. Дозволь спливні вікна для адмінки або скористайся посиланням нижче.';
+          return;
+        }
+        try {
+          popup.opener = null;
+          popup.location.replace('https://www.tiktok.com/');
+        } catch (error) { popup.close(); throw error; }
+        loungeTiktokWindow = popup;
+        status.textContent = 'TikTok відкрито. Якщо браузер створив вкладку, перетягни її в окреме вікно поруч.';
+      } catch {
+        status.textContent = 'Не вдалося відкрити окреме вікно. Скористайся посиланням нижче.';
+      }
+    });
     loungeEl('loungeSave').addEventListener('click',()=>{
       if(auth.currentUser?.uid!==ADMIN_UID)return;
       try {
         const yt=loungeEl('loungeYoutube').value.trim();
-        const lines=loungeEl('loungeTiktok').value.split('\n').map(s=>s.trim()).filter(Boolean);
-        if(lines.length>100)throw Error('Додайте до 100 TikTok-відео.');
-        const next={yt:yt?loungeParse(yt,'yt').url:'',tt:[...new Set(lines.map(s=>loungeParse(s,'tt').url))]};
+        const next={yt:yt?loungeParse(yt,'yt').url:'',tt:loungePrefs.tt};
         let stored=true;try{localStorage.setItem(loungeKey,JSON.stringify(next))}catch{stored=false}
         loungePrefs=next;loungeIndex=0;
         if(loungeEl('dashboard').classList.contains('active'))loungeRender();
         loungeEl('loungeMessage').textContent=stored?'Збережено в цьому браузері. Відео доступні на головній адмінки.':'Діє до перезавантаження: браузер не дозволив зберегти налаштування.';
       } catch(e) {loungeEl('loungeMessage').textContent=e.message;}
     });
-    loungeEl('loungePrev').addEventListener('click',()=>{if(loungeIndex>0){loungeIndex--;loungeRenderTiktok()}});
-    loungeEl('loungeNext').addEventListener('click',()=>{if(loungeIndex<loungePrefs.tt.length-1){loungeIndex++;loungeRenderTiktok()}});
     loungeEl('loungeSettings').addEventListener('click',()=>document.querySelector('[data-section="settings"]').click());
     document.querySelectorAll('.menu-item').forEach(item=>item.addEventListener('click',()=>{
       if(item.dataset.section==='dashboard'&&auth.currentUser?.uid===ADMIN_UID) loungeRender();
-      else {loungeEl('loungeYtPlayer').replaceChildren();loungeEl('loungeTtPlayer').replaceChildren();}
+      else {loungeEl('loungeYtPlayer').replaceChildren();}
     }));
-    onAuthStateChanged(auth,user=>{if(user?.uid===ADMIN_UID&&loungeEl('dashboard').classList.contains('active'))loungeRender();else{loungeEl('loungeYtPlayer').replaceChildren();loungeEl('loungeTtPlayer').replaceChildren();}});
+    onAuthStateChanged(auth,user=>{if(user?.uid===ADMIN_UID&&loungeEl('dashboard').classList.contains('active'))loungeRender();else{loungeEl('loungeYtPlayer').replaceChildren();}});
 
     const solSuits=['♠','♥','♣','♦'];
     let sol={stock:[],waste:[],found:[[],[],[],[]],cols:[],moves:0}, solSelected=null, solHistory=[];
