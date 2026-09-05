@@ -465,6 +465,27 @@
 
     const db = getFirestore(auth.app);
 
+    // ===== Глобальний online-статус =====
+    let presenceHeartbeat=null;
+    async function touchPresence(){
+      if(!currentUser)return;
+      try{
+        await setDoc(doc(db,"player_profiles",currentUser.uid),{
+          userId:currentUser.uid,
+          lastSeenAt:serverTimestamp(),
+          presenceStatus:"online"
+        },{merge:true});
+      }catch(e){console.error("Presence heartbeat:",e)}
+    }
+    function startPresence(){
+      touchPresence();
+      if(presenceHeartbeat)clearInterval(presenceHeartbeat);
+      presenceHeartbeat=setInterval(touchPresence,30000);
+      document.addEventListener("visibilitychange",()=>{
+        if(document.visibilityState==="visible")touchPresence();
+      },{passive:true});
+    }
+
     const params = new URLSearchParams(window.location.search);
     const comicId = params.get("comic");
     const requestedChapter = params.get("chapter");
@@ -1024,6 +1045,7 @@
       }
 
       currentUser = user;
+      startPresence();
 
       getDoc(doc(db, "blocked_users", user.uid)).then(async blockedSnap => {
         if (blockedSnap.exists() && blockedSnap.data().blocked === true) {

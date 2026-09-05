@@ -60,10 +60,31 @@
   import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     getFirestore, collection, getDocs, getDoc, doc, query, where,
-    runTransaction, serverTimestamp
+    runTransaction, serverTimestamp, setDoc
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const db=getFirestore(auth.app);
+
+  // ===== Глобальний online-статус =====
+  let presenceHeartbeat=null;
+  async function touchPresence(){
+    if(!user)return;
+    try{
+      await setDoc(doc(db,"player_profiles",user.uid),{
+        userId:user.uid,
+        lastSeenAt:serverTimestamp(),
+        presenceStatus:"online"
+      },{merge:true});
+    }catch(e){console.error("Presence heartbeat:",e)}
+  }
+  function startPresence(){
+    touchPresence();
+    if(presenceHeartbeat)clearInterval(presenceHeartbeat);
+    presenceHeartbeat=setInterval(touchPresence,30000);
+    document.addEventListener("visibilitychange",()=>{
+      if(document.visibilityState==="visible")touchPresence();
+    },{passive:true});
+  }
   const ADMIN_UID="pSMXTD18TYYLLA3CnBb8shBzHII3";
   const balanceEl=document.getElementById("balance");
   const grid=document.getElementById("grid");
@@ -211,6 +232,7 @@
       return;
     }
     user=currentUser;
+    startPresence();
     await loadData();
   });
 </script>

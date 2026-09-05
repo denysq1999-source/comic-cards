@@ -301,6 +301,27 @@
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const db = getFirestore(auth.app);
+
+  // ===== Глобальний online-статус =====
+  let presenceHeartbeat=null;
+  async function touchPresence(){
+    if(!user)return;
+    try{
+      await setDoc(doc(db,"player_profiles",user.uid),{
+        userId:user.uid,
+        lastSeenAt:serverTimestamp(),
+        presenceStatus:"online"
+      },{merge:true});
+    }catch(e){console.error("Presence heartbeat:",e)}
+  }
+  function startPresence(){
+    touchPresence();
+    if(presenceHeartbeat)clearInterval(presenceHeartbeat);
+    presenceHeartbeat=setInterval(touchPresence,30000);
+    document.addEventListener("visibilitychange",()=>{
+      if(document.visibilityState==="visible")touchPresence();
+    },{passive:true});
+  }
   const ADMIN_UID = "pSMXTD18TYYLLA3CnBb8shBzHII3";
 
   const displayName = document.getElementById("displayName");
@@ -701,6 +722,7 @@
     }
 
     user = currentUser;
+    startPresence();
 
     await setDoc(doc(db, "users", currentUser.uid), {
       email: currentUser.email || "",
@@ -712,7 +734,9 @@
       userId:currentUser.uid,
       displayName:currentUser.displayName || (currentUser.email ? currentUser.email.split("@")[0] : "Гравець"),
       emailMasked:currentUser.email ? currentUser.email.replace(/^(.{1,2}).*(@.*)$/,"$1***$2") : "",
-      updatedAt:serverTimestamp()
+      updatedAt:serverTimestamp(),
+      lastSeenAt:serverTimestamp(),
+      presenceStatus:"online"
     },{merge:true});
 
     displayName.textContent =
