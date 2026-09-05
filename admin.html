@@ -1849,7 +1849,8 @@
 <div class="panel aa-panel">
 <h2>📊 AI-аналітика / автоаналіз</h2>
 <p>Локальний детермінований аналіз Firestore. Зовнішня модель ШІ не підключена. Сигнали — привід для ручної перевірки, а не вирок. Жодних автоматичних покарань.</p>
-<div class="aa-controls"><button type="button" data-aa-days="1" aria-pressed="true">Сьогодні</button><button type="button" data-aa-days="7" aria-pressed="false">7 днів</button><button type="button" data-aa-days="30" aria-pressed="false">30 днів</button><button type="button" id="aaRefresh">↻ Оновити дані</button></div>
+<div class="aa-controls"><button type="button" data-aa-days="1" aria-pressed="true">Сьогодні</button><button type="button" data-aa-days="7" aria-pressed="false">7 днів</button><button type="button" data-aa-days="30" aria-pressed="false">30 днів</button><button type="button" id="aaRefresh">↻ Оновити дані</button><button type="button" id="aaReset">🗑️ Обнулити відлік</button></div>
+<p id="aaResetStatus" role="status"></p>
 <p id="aaStatus" role="status">Відкрийте статистику для завантаження.</p>
 <div id="aaKpis" class="aa-grid"></div>
 <h3>🧠 Брифінг адміністратора</h3><p id="aaBrief" class="aa-box"></p>
@@ -4490,6 +4491,12 @@ const menuItems = document.querySelectorAll(".menu-item");
     });
     // Read-only deterministic analytics. No model endpoint or automatic moderation.
     const aaNames = ['users','player_profiles','wallets','economy_actions','user_shop_figures','user_outfits','duels','player_reports','referral_claims','chapter_rewards','shop_figures','figure_outfits'];
+    const aaResetKey = 'comiccards:analytics-start:' + auth.app.options.projectId + ':' + ADMIN_UID;
+    let aaResetAt = 0;
+    try {
+      const saved = Number(localStorage.getItem(aaResetKey));
+      if (Number.isFinite(saved) && saved > 0 && saved <= Date.now()) aaResetAt = saved;
+    } catch { /* Analytics remains usable when browser storage is unavailable. */ }
     const aaState = {days:1, data:{}, errors:{}, loaded:0, busy:false};
     const aaEl = id => document.getElementById(id);
     const aaNum = v => (typeof v === 'number' || (typeof v === 'string' && v.trim())) && Number.isFinite(Number(v)) ? Number(v) : null;
@@ -4546,9 +4553,9 @@ const menuItems = document.querySelectorAll(".menu-item");
     }
     function aaRender() {
       if(!aaState.loaded) return;
-      const d=aaState.data, now=aaState.loaded;
+      const d=aaState.data, now=Math.max(aaState.loaded, aaResetAt);
       const startDate=new Date(now); startDate.setHours(0,0,0,0); startDate.setDate(startDate.getDate()-(aaState.days-1));
-      const start=startDate.getTime(), inRange=r=>{const t=aaDate(r); return t!=null&&t>=start&&t<=now;};
+      const start=Math.max(startDate.getTime(), aaResetAt), inRange=r=>{const t=aaDate(r); return t!=null&&t>=start&&t<=now;};
       const rows=name=>(d[name]||[]).filter(inRange);
       const available=name=>Object.hasOwn(d,name);
       const figures=aaPurchases(d,'figure').filter(inRange), outfits=aaPurchases(d,'outfit').filter(inRange);
@@ -4618,9 +4625,24 @@ const menuItems = document.querySelectorAll(".menu-item");
         const missing=(d[name]||[]).filter(r=>aaDate(r)==null).length;
         return `${name}: ${d[name].length} документів${aaState.errors[name]?'; '+aaState.errors[name]:''}${missing?`; без дати події: ${missing}`:''}`;
       }).join('\n');
-      aaEl('aaStatus').textContent=`Оновлено ${aaWhen(now)}. Період: ${aaWhen(start)} — ${aaWhen(now)} (час браузера). ${Object.keys(aaState.errors).length?'Увага: неповні дані, див. джерела нижче.':'Завантажено доступні джерела.'}`;
+      aaEl('aaStatus').textContent=`Оновлено ${aaWhen(aaState.loaded)}. Період: ${aaWhen(start)} — ${aaWhen(now)} (час браузера). ${Object.keys(aaState.errors).length?'Увага: неповні дані, див. джерела нижче.':'Завантажено доступні джерела.'}`;
       document.querySelectorAll('[data-aa-days]').forEach(b=>{b.setAttribute('aria-pressed',String(Number(b.dataset.aaDays)===aaState.days));});
     }
+    function aaShowResetStatus(persisted = true) {
+      aaEl('aaResetStatus').textContent = aaResetAt
+        ? 'Відлік обнулено: ' + aaWhen(aaResetAt) + '. ' + (persisted ? 'Збережено лише в цьому браузері.' : 'Браузер не дозволив збереження: скидання діє лише до перезавантаження сторінки.') + ' Фільтри враховують лише події після цієї дати. Онлайн, поточні баланси та відкриті репорти не обнуляються.'
+        : 'Відлік без скидання. 🗑️ починає новий відлік подій лише в цьому браузері; Firestore не змінюється.';
+    }
+    aaShowResetStatus();
+    aaEl('aaReset').addEventListener('click', () => {
+      if (auth.currentUser?.uid !== ADMIN_UID) return;
+      if (!confirm('Обнулити відлік статистики від поточного моменту?\n\nПокупки, реєстрації, потоки монет та PvP рахуватимуться лише після скидання. Історія у Firestore, баланси та інвентар залишаться без змін. Онлайн і відкриті репорти показуватимуть поточний стан.\n\nДата скидання збережеться лише в цьому браузері.')) return;
+      aaResetAt = Date.now();
+      let persisted = true;
+      try { localStorage.setItem(aaResetKey, String(aaResetAt)); } catch { persisted = false; }
+      aaRender();
+      aaShowResetStatus(persisted);
+    });
     aaEl('aaRefresh').addEventListener('click',aaLoad);
     document.querySelectorAll('[data-aa-days]').forEach(b=>b.addEventListener('click',()=>{aaState.days=Number(b.dataset.aaDays);aaRender();}));
 
