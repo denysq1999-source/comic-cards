@@ -117,7 +117,7 @@
 </main>
 
 <div class="wardrobe-overlay" id="wardrobeOverlay" aria-hidden="true">
-  <div class="wardrobe-modal">
+  <div class="wardrobe-modal" role="dialog" aria-modal="true" aria-labelledby="wardrobeTitle">
     <button class="wardrobe-close" id="wardrobeCloseBtn" type="button">✕</button>
     <h2 id="wardrobeTitle">👔 Гардероб</h2>
     <p style="color:#999;margin-top:7px">Образи — косметичні доповнення до фігурки. Після покупки вони з’являться у твоєму профілі.</p>
@@ -151,10 +151,9 @@
     touchPresence();
     if(presenceHeartbeat)clearInterval(presenceHeartbeat);
     presenceHeartbeat=setInterval(touchPresence,30000);
-    document.addEventListener("visibilitychange",()=>{
-      if(document.visibilityState==="visible")touchPresence();
-    },{passive:true});
+
   }
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")touchPresence();},{passive:true});
   const ADMIN_UID="pSMXTD18TYYLLA3CnBb8shBzHII3";
   const balanceEl=document.getElementById("balance");
   const grid=document.getElementById("grid");
@@ -168,6 +167,7 @@
 
   function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
   function driveImage(url=""){
+    if(typeof url!=="string")return placeholder();
     const m=url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)||url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
     return m?`https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`:url;
   }
@@ -191,6 +191,9 @@
     }catch(error){
       console.error("coin sales setting:",error);
       coinSalesEnabled=false;
+      document.getElementById("coinSalesPublicStatus").textContent="Поповнення недоступне";
+      document.getElementById("coinStoreNote").textContent="Не вдалося перевірити доступність поповнення. Спробуй оновити сторінку пізніше. Монети можна заробляти на сайті.";
+      return;
     }
     const status=document.getElementById("coinSalesPublicStatus");
     const note=document.getElementById("coinStoreNote");
@@ -206,6 +209,14 @@
     }
   }
 
+  let purchaseBusy=false;
+  function coinNumber(value){
+    if(value===null || value===undefined || value==="" || typeof value==="boolean")return null;
+    const n=Number(value);return Number.isSafeInteger(n)&&n>=0?n:null;
+  }
+  async function refreshAfterPurchase(){
+    try{await loadData();return true;}catch(error){console.error(error);alert("Покупка успішна, але дані не оновилися. Перезавантаж сторінку; повторно купувати не потрібно.");return false;}
+  }
   async function loadData(){
     await loadCoinSalesPublicSetting();
     const [walletSnap,shopSnap,ownedSnap,duelLockSnap,outfitSnap,ownedOutfitSnap]=await Promise.all([
@@ -217,11 +228,11 @@
       getDocs(query(collection(db,"user_outfits"),where("userId","==",user.uid)))
     ]);
     wallet=walletSnap.exists()?{balance:0,frozen:false,...walletSnap.data()}:{balance:0,frozen:false};
-    shopFigures=shopSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled!==false);
-    ownedShop=ownedSnap.docs.map(d=>({id:d.id,...d.data()}));
+    shopFigures=shopSnap.docs.map(d=>({...d.data(),id:d.id})).filter(x=>x.enabled!==false);
+    ownedShop=ownedSnap.docs.map(d=>({...d.data(),id:d.id}));
     duelLocked=duelLockSnap.exists()&&duelLockSnap.data().active===true;
-    figureOutfits=outfitSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled!==false);
-    ownedOutfits=ownedOutfitSnap.docs.map(d=>({id:d.id,...d.data()}));
+    figureOutfits=outfitSnap.docs.map(d=>({...d.data(),id:d.id})).filter(x=>x.enabled!==false);
+    ownedOutfits=ownedOutfitSnap.docs.map(d=>({...d.data(),id:d.id}));
     render();
   }
 
@@ -238,14 +249,14 @@
 
     grid.innerHTML=shopFigures.map(item=>{
       const owned=ownedShop.some(x=>x.shopFigureId===item.id);
-      const canAfford=Number(wallet.balance||0)>=Number(item.price||0);
+      const canAfford=coinNumber(wallet.balance)!==null&&coinNumber(item.price)!==null&&Number(wallet.balance)>=Number(item.price);
       return `
         <article class="item">
           <img src="${esc(item.image?driveImage(item.image):placeholder())}" alt="${esc(item.name||"Фігурка")}">
           <div class="body">
             <div class="name">${esc(item.name||"Без назви")}</div>
             <div class="desc">${esc(item.description||"Без опису")}</div>
-            <div class="price">💰 ${Number(item.price||0)}</div>
+            <div class="price">💰 ${coinNumber(item.price)??"Ціну не задано"}</div>
             ${item.wardrobeEnabled===true?`<span class="wardrobe-badge">👔 ${figureOutfits.filter(o=>o.shopFigureId===item.id).length} образів</span>`:""}
             <div class="item-actions">
               ${owned
@@ -270,6 +281,7 @@
     activeWardrobeFigureId=null;
   }
   wardrobeCloseBtn.addEventListener("click",closeWardrobe);
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&wardrobeOverlay.classList.contains("show"))closeWardrobe()});
   wardrobeOverlay.addEventListener("click",e=>{if(e.target===wardrobeOverlay)closeWardrobe()});
 
   function openWardrobe(figureId){
@@ -284,13 +296,13 @@
       const ownsFigure=ownedShop.some(x=>x.shopFigureId===figureId);
       wardrobeGrid.innerHTML=outfits.map(o=>{
         const owned=ownedOutfits.some(x=>x.outfitId===o.id);
-        const canAfford=Number(wallet.balance||0)>=Number(o.price||5000);
+        const canAfford=coinNumber(wallet.balance)!==null&&coinNumber(o.price)!==null&&Number(wallet.balance)>=Number(o.price);
         return `<article class="outfit-card">
           <img src="${esc(o.image?driveImage(o.image):placeholder())}" alt="${esc(o.name||"Образ")}">
           <div class="outfit-body">
             <div class="outfit-slot">Слот ${Number(o.slot||0)}/10</div>
             <div class="outfit-name">${esc(o.name||"Образ")}</div>
-            <div class="outfit-price">💰 ${Number(o.price||5000)}</div>
+            <div class="outfit-price">💰 ${coinNumber(o.price)??"Ціну не задано"}</div>
             ${owned
               ? '<div class="outfit-owned">✅ Куплено</div>'
               : `<button class="outfit-buy" type="button" data-buy-outfit="${esc(o.id)}" ${!ownsFigure||wallet.frozen||duelLocked||!canAfford?"disabled":""}>${!ownsFigure?"Спочатку купи фігурку":wallet.frozen?"🔒 Баланс заморожений":duelLocked?"⚔️ Активна дуель":canAfford?"Купити образ":"Недостатньо монет"}</button>`}
@@ -306,90 +318,117 @@
 
   async function buyOutfit(outfitId,button){
     const outfit=figureOutfits.find(x=>x.id===outfitId);
-    if(!outfit||!user||wallet.frozen||duelLocked)return;
+    if(!outfit||!user||wallet.frozen||duelLocked||purchaseBusy)return;
+    if(ownedOutfits.some(x=>x.outfitId===outfitId))return;
+    if(!ownedShop.some(x=>x.shopFigureId===outfit.shopFigureId)){alert("Спочатку купи базову фігурку.");return;}
     const figure=shopFigures.find(x=>x.id===outfit.shopFigureId);
     if(!figure)return;
-    const price=Number(outfit.price||5000);
+    const price=coinNumber(outfit.price);
+    if(price===null){alert("Для образу задано некоректну ціну.");return;}
     if(!confirm(`Купити образ «${outfit.name||"Без назви"}» за ${price} монет?`))return;
     button.disabled=true;
+    purchaseBusy=true;
+    const buyerUid=user.uid;
     try{
-      const walletRef=doc(db,"wallets",user.uid);
+      const walletRef=doc(db,"wallets",buyerUid);
       const outfitRef=doc(db,"figure_outfits",outfitId);
-      const ownedRef=doc(db,"user_outfits",`${user.uid}_${outfitId}`);
-      const actionRef=doc(db,"economy_actions",`buy_outfit_${user.uid}_${outfitId}`);
+      const ownedRef=doc(db,"user_outfits",`${buyerUid}_${outfitId}`);
+      const actionRef=doc(db,"economy_actions",`buy_outfit_${buyerUid}_${outfitId}`);
       await runTransaction(db,async tx=>{
-        const [walletSnap,outfitSnap]=await Promise.all([tx.get(walletRef),tx.get(outfitRef)]);
+        const [walletSnap,outfitSnap,lockSnap,baseSnap,baseOwnedSnap]=await Promise.all([tx.get(walletRef),tx.get(outfitRef),tx.get(doc(db,"duel_locks",buyerUid)),tx.get(doc(db,"shop_figures",outfit.shopFigureId)),tx.get(doc(db,"user_shop_figures",`${buyerUid}_${outfit.shopFigureId}`))]);
+        if(auth.currentUser?.uid!==buyerUid)throw new Error("AUTH_CHANGED");
+        if(lockSnap.exists()&&lockSnap.data().active===true)throw new Error("DUEL_LOCKED");
+        if(!baseSnap.exists()||baseSnap.data().enabled===false||baseSnap.data().wardrobeEnabled!==true)throw new Error("NOT_AVAILABLE");
+        if(!baseOwnedSnap.exists()||baseOwnedSnap.data().userId!==buyerUid)throw new Error("BASE_REQUIRED");
+        if(outfitSnap.exists()&&outfitSnap.data().shopFigureId!==outfit.shopFigureId)throw new Error("NOT_AVAILABLE");
         if(!outfitSnap.exists()||outfitSnap.data().enabled===false)throw new Error("NOT_AVAILABLE");
         const freshWallet=walletSnap.exists()?walletSnap.data():{balance:0,frozen:false};
-        const freshPrice=Number(outfitSnap.data().price||5000);
+        const freshPrice=coinNumber(outfitSnap.data().price);
+        if(freshPrice===null||coinNumber(freshWallet.balance)===null)throw new Error("INVALID_AMOUNT");
+        if(freshPrice!==price)throw new Error("PRICE_CHANGED");
         if(freshWallet.frozen===true)throw new Error("WALLET_FROZEN");
         if(Number(freshWallet.balance||0)<freshPrice)throw new Error("NO_MONEY");
         tx.set(actionRef,{
-          userId:user.uid,type:"buy_figure_outfit",outfitId,shopFigureId:outfit.shopFigureId,amount:freshPrice,createdAt:serverTimestamp()
+          userId:buyerUid,type:"buy_figure_outfit",outfitId,shopFigureId:outfit.shopFigureId,amount:freshPrice,createdAt:serverTimestamp()
         });
         tx.set(ownedRef,{
-          userId:user.uid,outfitId,shopFigureId:outfit.shopFigureId,purchasePrice:freshPrice,actionId:actionRef.id,obtainedAt:serverTimestamp()
+          userId:buyerUid,outfitId,shopFigureId:outfit.shopFigureId,purchasePrice:freshPrice,actionId:actionRef.id,obtainedAt:serverTimestamp()
         });
         tx.set(walletRef,{
-          userId:user.uid,balance:Number(freshWallet.balance||0)-freshPrice,frozen:false,lastActionId:actionRef.id,updatedAt:serverTimestamp()
+          userId:buyerUid,balance:Number(freshWallet.balance||0)-freshPrice,frozen:false,lastActionId:actionRef.id,updatedAt:serverTimestamp()
         },{merge:true});
       });
-      await loadData();
-      openWardrobe(outfit.shopFigureId);
+      ownedOutfits.push({outfitId,shopFigureId:outfit.shopFigureId,userId:buyerUid});
+      if(await refreshAfterPurchase()) {
+        if(activeWardrobeFigureId===outfit.shopFigureId)openWardrobe(outfit.shopFigureId);
+      } else if(activeWardrobeFigureId===outfit.shopFigureId)openWardrobe(outfit.shopFigureId);
     }catch(error){
       console.error(error);
       alert({
+        AUTH_CHANGED:"Сесію змінено. Перезавантаж сторінку.",
+        DUEL_LOCKED:"Під час активної дуелі покупки недоступні.",
+        BASE_REQUIRED:"Потрібна придбана базова фігурка.",
+        INVALID_AMOUNT:"Некоректна ціна або баланс. Звернися до адміністратора.",
+        PRICE_CHANGED:"Ціна змінилася. Онови сторінку та перевір нову ціну.",
         NOT_AVAILABLE:"Образ уже недоступний.",
         WALLET_FROZEN:"Баланс заморожений.",
         NO_MONEY:"Недостатньо монет."
-      }[error?.message] || (String(error?.code||"").includes("permission-denied")?"Firestore відхилив покупку образу. Онови Rules.":"Не вдалося купити образ."));
+      }[error?.message] || (String(error?.code||"").includes("permission-denied")?"Покупку образу відхилено. Онови сторінку; якщо проблема повториться, повідом адміністратора.":"Не вдалося купити образ."));
       button.disabled=false;
-    }
+    }finally{purchaseBusy=false;}
   }
 
 
   async function buyFigure(id,button){
     const item=shopFigures.find(x=>x.id===id);
-    if(!item||wallet.frozen||duelLocked)return;
-    const price=Number(item.price||0);
+    if(!item||!user||wallet.frozen||duelLocked||purchaseBusy)return;
+    if(ownedShop.some(x=>x.shopFigureId===id))return;
+    const price=coinNumber(item.price);
+    if(price===null){alert("Для фігурки задано некоректну ціну.");return;}
     if(!confirm(`Купити «${item.name||"фігурку"}» за ${price} монет?`))return;
 
+    purchaseBusy=true;
+    const buyerUid=user.uid;
     try{
       button.disabled=true;
-      const walletRef=doc(db,"wallets",user.uid);
-      const ownedRef=doc(db,"user_shop_figures",`${user.uid}_${item.id}`);
-      const actionRef=doc(db,"economy_actions",`buy_${user.uid}_${item.id}`);
+      const walletRef=doc(db,"wallets",buyerUid);
+      const ownedRef=doc(db,"user_shop_figures",`${buyerUid}_${item.id}`);
+      const actionRef=doc(db,"economy_actions",`buy_${buyerUid}_${item.id}`);
       const shopRef=doc(db,"shop_figures",item.id);
 
       await runTransaction(db,async tx=>{
         // ВАЖЛИВО: не читаємо ownedRef до створення.
         // Для нового документа Firestore Rules могли блокувати get неіснуючого запису.
         // Якщо фігурка вже куплена, tx.set нижче стане update, а rules його заборонять.
-        const [walletSnap,shopSnap]=await Promise.all([
-          tx.get(walletRef),tx.get(shopRef)
+        const [walletSnap,shopSnap,lockSnap]=await Promise.all([
+          tx.get(walletRef),tx.get(shopRef),tx.get(doc(db,"duel_locks",buyerUid))
         ]);
+        if(auth.currentUser?.uid!==buyerUid)throw new Error("AUTH_CHANGED");
+        if(lockSnap.exists()&&lockSnap.data().active===true)throw new Error("DUEL_LOCKED");
         if(!shopSnap.exists()||shopSnap.data().enabled===false)throw new Error("NOT_AVAILABLE");
         const freshWallet=walletSnap.exists()?walletSnap.data():{balance:0,frozen:false};
         if(freshWallet.frozen===true)throw new Error("WALLET_FROZEN");
-        const freshPrice=Number(shopSnap.data().price||0);
+        const freshPrice=coinNumber(shopSnap.data().price);
+        if(freshPrice===null||coinNumber(freshWallet.balance)===null)throw new Error("INVALID_AMOUNT");
+        if(freshPrice!==price)throw new Error("PRICE_CHANGED");
         if(Number(freshWallet.balance||0)<freshPrice)throw new Error("NO_MONEY");
 
         tx.set(actionRef,{
-          userId:user.uid,
+          userId:buyerUid,
           type:"buy_shop_figure",
           shopFigureId:item.id,
           amount:freshPrice,
           createdAt:serverTimestamp()
         });
         tx.set(ownedRef,{
-          userId:user.uid,
+          userId:buyerUid,
           shopFigureId:item.id,
           purchasePrice:freshPrice,
           actionId:actionRef.id,
           obtainedAt:serverTimestamp()
         });
         tx.set(walletRef,{
-          userId:user.uid,
+          userId:buyerUid,
           balance:Number(freshWallet.balance||0)-freshPrice,
           frozen:false,
           lastActionId:actionRef.id,
@@ -397,10 +436,16 @@
         },{merge:true});
       });
 
-      await loadData();
+      ownedShop.push({shopFigureId:id,userId:buyerUid});
+      render();
+      await refreshAfterPurchase();
     }catch(error){
       console.error(error);
       const msg={
+        AUTH_CHANGED:"Сесію змінено. Перезавантаж сторінку.",
+        DUEL_LOCKED:"Під час активної дуелі покупки недоступні.",
+        INVALID_AMOUNT:"Некоректна ціна або баланс. Звернися до адміністратора.",
+        PRICE_CHANGED:"Ціна змінилася. Онови сторінку та перевір нову ціну.",
         ALREADY_OWNED:"Ця фігурка вже є у тебе.",
         NOT_AVAILABLE:"Товар уже недоступний.",
         WALLET_FROZEN:"Баланс заморожений адміністратором.",
@@ -411,12 +456,15 @@
           : "Не вдалося купити фігурку.");
       alert(msg);
       button.disabled=false;
-    }
+    }finally{purchaseBusy=false;}
   }
 
   onAuthStateChanged(auth,async currentUser=>{
-    if(await maintenanceCheck(currentUser))return;
+    if(presenceHeartbeat){clearInterval(presenceHeartbeat);presenceHeartbeat=null;}
+    user=null;
     if(!currentUser){location.href="login.html";return;}
+    try{
+    if(await maintenanceCheck(currentUser))return;
     const blocked=await getDoc(doc(db,"blocked_users",currentUser.uid));
     if(blocked.exists()&&blocked.data().blocked===true){
       alert("Цей акаунт заблоковано адміністратором.");
@@ -427,6 +475,11 @@
     user=currentUser;
     startPresence();
     await loadData();
+    }catch(error){
+      console.error("Shop initialization:",error);
+      grid.innerHTML='<div class="state">Не вдалося завантажити магазин. Перевір з’єднання та <button class="btn" id="shopRetry" type="button">Спробуй ще раз</button></div>';
+      document.getElementById("shopRetry").addEventListener("click",()=>location.reload());
+    }
   });
 </script>
 </body>
