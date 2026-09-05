@@ -1285,7 +1285,8 @@
     .tournament-row{display:grid;grid-template-columns:1fr 140px;gap:12px}
     @media(max-width:900px){.duel-admin-grid{grid-template-columns:1fr}.tournament-row{grid-template-columns:1fr}}
 
-.report-row{background:#121212;border:1px solid #3a2626;border-left:4px solid #e53935;border-radius:10px;padding:12px;margin:10px 0}.report-row.new{background:#1b1111}.report-meta{font-size:12px;color:#999;margin-bottom:7px}.report-msg{white-space:pre-wrap;line-height:1.5}.report-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.report-badge{display:inline-block;background:#b71c1c;color:#fff;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:900}</style>
+.report-row{background:#121212;border:1px solid #3a2626;border-left:4px solid #e53935;border-radius:10px;padding:12px;margin:10px 0}.report-row.new{background:#1b1111}.report-meta{font-size:12px;color:#999;margin-bottom:7px}.report-msg{white-space:pre-wrap;line-height:1.5}.report-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.report-badge{display:inline-block;background:#b71c1c;color:#fff;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:900}.aa-panel{line-height:1.55}.aa-panel h3{margin:22px 0 10px}.aa-panel p{color:#bdbdbd;margin:12px 0}.aa-controls{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.aa-panel button{padding:9px 12px;border:1px solid #555;border-radius:8px;background:#272727;color:#fff;cursor:pointer}.aa-panel button[aria-pressed="true"]{background:#684b91;border-color:#c9a3ff}.aa-panel button:disabled{opacity:.5}.aa-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:20px 0}.aa-card,.aa-box{padding:16px;border:1px solid #3b3547;border-radius:12px;background:#211e28}.aa-card strong{display:block;font-size:25px;color:#e3cdff}.aa-card small{color:#aaa}.aa-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:25px}.aa-top{margin:12px 0;overflow-wrap:anywhere}.aa-track{height:7px;background:#333;border-radius:6px;margin-top:6px}.aa-track div{height:100%;background:#b695e6;border-radius:6px}.aa-high{color:#ff9292}.aa-mid{color:#ffcf7b}#aaCoverage{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;margin-top:12px}.aa-panel td{overflow-wrap:anywhere;max-width:480px}.aa-panel details{margin-top:20px}
+</style>
 </head>
 <body>
   <!-- Ліве меню -->
@@ -1845,11 +1846,19 @@
 
       <!-- Статистика -->
       <section class="section" id="stats">
-        <div class="placeholder">
-          <h2>Статистика</h2>
-          <p>Тут буде аналітика</p>
-        </div>
-      </section>
+<div class="panel aa-panel">
+<h2>📊 AI-аналітика / автоаналіз</h2>
+<p>Локальний детермінований аналіз Firestore. Зовнішня модель ШІ не підключена. Сигнали — привід для ручної перевірки, а не вирок. Жодних автоматичних покарань.</p>
+<div class="aa-controls"><button type="button" data-aa-days="1" aria-pressed="true">Сьогодні</button><button type="button" data-aa-days="7" aria-pressed="false">7 днів</button><button type="button" data-aa-days="30" aria-pressed="false">30 днів</button><button type="button" id="aaRefresh">↻ Оновити дані</button></div>
+<p id="aaStatus" role="status">Відкрийте статистику для завантаження.</p>
+<div id="aaKpis" class="aa-grid"></div>
+<h3>🧠 Брифінг адміністратора</h3><p id="aaBrief" class="aa-box"></p>
+<div class="aa-columns"><div><h3>Топ фігурок</h3><div id="aaTopFigures"></div></div><div><h3>Топ образів</h3><div id="aaTopOutfits"></div></div></div>
+<h3>Активність та економіка</h3><p id="aaSummary" class="aa-box"></p>
+<h3>⚠️ Потребує уваги</h3><p>Події — за обраний період; баланси, онлайн і відкриті репорти — поточний стан. Дані без дати не входять до показників за період.</p>
+<p id="aaAuditStatus" role="status"></p><div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Важливість</th><th>Причина</th><th>UID</th><th>Час</th><th>Перевірка</th></tr></thead><tbody id="aaFlags"></tbody></table></div>
+<details><summary>Джерела та повнота даних</summary><p>До 5000 документів на колекцію, без фонових повторних читань. Якщо межу досягнуто, це часткова вибірка, а не точні підсумки. Порожня колекція може означати відсутню колекцію. Облік власності може не містити історії повторних або видалених покупок. Невідомі поля не вгадуються. Нові колекції не створюються.</p><pre id="aaCoverage"></pre></details>
+</div></section>
 
       <!-- Технічні роботи -->
       <section class="section" id="maintenance">
@@ -2079,6 +2088,7 @@
       sendPasswordResetEmail
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import {
+      limit,
       getFirestore,
       collection,
       getDocs,
@@ -2841,6 +2851,7 @@ const menuItems = document.querySelectorAll(".menu-item");
         if (id === "users") {
           loadAdminUsers();
         }
+        if (id === "stats") { aaLoad(); }
         if (id === "reports") { loadReports(); }
         if (id === "figures") {
           refreshFigureComicSelect();
@@ -4477,6 +4488,142 @@ const menuItems = document.querySelectorAll(".menu-item");
       console.error("Firestore error:", error);
       alert("Не вдалося завантажити дані Firestore. Перевір, чи Firestore увімкнено в Firebase.");
     });
+    // Read-only deterministic analytics. No model endpoint or automatic moderation.
+    const aaNames = ['users','player_profiles','wallets','economy_actions','user_shop_figures','user_outfits','duels','player_reports','referral_claims','chapter_rewards','shop_figures','figure_outfits'];
+    const aaState = {days:1, data:{}, errors:{}, loaded:0, busy:false};
+    const aaEl = id => document.getElementById(id);
+    const aaNum = v => (typeof v === 'number' || (typeof v === 'string' && v.trim())) && Number.isFinite(Number(v)) ? Number(v) : null;
+    function aaTime(v) {
+      if (v == null) return null;
+      try {
+        const n = typeof v.toMillis === 'function' ? v.toMillis() : typeof v.seconds === 'number' ? v.seconds*1000 : typeof v === 'number' ? (v<1e11?v*1000:v) : Date.parse(v);
+        return Number.isFinite(n) ? n : null;
+      } catch { return null; }
+    }
+    const aaDate = r => ['createdAt','obtainedAt','purchasedAt','claimedAt','completedAt','timestamp'].map(k=>aaTime(r[k])).find(v=>v!=null) ?? null;
+    const aaUid = r => String(r.userId || r.uid || '');
+    const aaFmt = n => n == null ? 'Немає даних' : n.toLocaleString('uk-UA');
+    const aaWhen = t => t == null ? 'Час невідомий' : new Date(t).toLocaleString('uk-UA');
+    function aaFlow(r) {
+      const delta = aaNum(r.delta ?? r.balanceDelta);
+      if(delta != null) return delta;
+      const before=aaNum(r.balanceBefore), after=aaNum(r.balanceAfter);
+      if(before!=null && after!=null) return after-before;
+      const amount=aaNum(r.amount);
+      if(amount==null || amount<0) return null;
+      if(['buy_shop_figure','buy_outfit','buy_figure_outfit','buy_card'].includes(r.type)) return -amount;
+      if(['sell_card','sell_figure','chapter_reward','referral_reward','daily_reward'].includes(r.type)) return amount;
+      return null;
+    }
+    function aaPurchases(data, kind) {
+      const field=kind==='figure'?'shopFigureId':'outfitId';
+      const types=kind==='figure'?['buy_shop_figure']:['buy_outfit','buy_figure_outfit'];
+      const actions=(data.economy_actions||[]).filter(r=>types.includes(r.type));
+      const ids=new Set(actions.map(r=>r.id));
+      const keys=new Set(actions.map(r=>`${aaUid(r)}|${r[field]||r.figureOutfitId||''}`));
+      const owned=(data[kind==='figure'?'user_shop_figures':'user_outfits']||[]).filter(r=>
+        !ids.has(r.actionId) && !keys.has(`${aaUid(r)}|${r[field]||r.figureOutfitId||''}`) &&
+        (aaNum(r.purchasePrice)!=null || r.actionId || r.source==='shop' || r.source==='purchase'));
+      return [...actions,...owned];
+    }
+    async function aaLoad() {
+      if(aaState.busy || auth.currentUser?.uid!==ADMIN_UID) return;
+      aaState.busy=true; aaEl('aaRefresh').disabled=true;
+      aaEl('aaStatus').textContent='Читаємо наявні колекції…';
+      try {
+        const results=await Promise.allSettled(aaNames.map(name=>getDocs(query(collection(db,name),limit(5001)))));
+        if(auth.currentUser?.uid!==ADMIN_UID) { aaState.data={}; return; }
+        aaState.data={}; aaState.errors={};
+        results.forEach((r,i)=>{
+          const name=aaNames[i];
+          if(r.status==='fulfilled') {
+            aaState.data[name]=r.value.docs.slice(0,5000).map(d=>({...d.data(),id:d.id}));
+            if(r.value.size>5000) aaState.errors[name]='перші 5000 документів; неповна вибірка';
+          } else aaState.errors[name]=r.reason?.code==='permission-denied'?'немає дозволу на читання':'помилка читання';
+        });
+        aaState.loaded=Date.now(); aaRender();
+      } finally { aaState.busy=false; aaEl('aaRefresh').disabled=false; }
+    }
+    function aaRender() {
+      if(!aaState.loaded) return;
+      const d=aaState.data, now=aaState.loaded;
+      const startDate=new Date(now); startDate.setHours(0,0,0,0); startDate.setDate(startDate.getDate()-(aaState.days-1));
+      const start=startDate.getTime(), inRange=r=>{const t=aaDate(r); return t!=null&&t>=start&&t<=now;};
+      const rows=name=>(d[name]||[]).filter(inRange);
+      const available=name=>Object.hasOwn(d,name);
+      const figures=aaPurchases(d,'figure').filter(inRange), outfits=aaPurchases(d,'outfit').filter(inRange);
+      const actions=rows('economy_actions'), flows=actions.map(aaFlow).filter(n=>n!=null);
+      const incoming=flows.filter(n=>n>0).reduce((a,b)=>a+b,0), outgoing=-flows.filter(n=>n<0).reduce((a,b)=>a+b,0);
+      const online=(d.player_profiles||[]).filter(r=>{const t=aaTime(r.lastSeenAt); return t!=null&&now-t>=0&&now-t<=ONLINE_WINDOW_MS;}).length;
+      const reports=(d.player_reports||[]).filter(r=>r.status!=='resolved');
+      const cards=[['Онлайн зараз',available('player_profiles')?online:null,'За наявним lastSeenAt'],['Реєстрації',available('users')?rows('users').length:null,'За датою створення'],['Покупки фігурок',available('economy_actions')||available('user_shop_figures')?figures.length:null,'Журнал + підтверджені придбання'],['Покупки образів',available('economy_actions')||available('user_outfits')?outfits.length:null,'Без повторного обліку actionId / власника й товару'],['Монет надійшло',available('economy_actions')?incoming:null,'Розпізнані операції журналу'],['Монет витрачено',available('economy_actions')?outgoing:null,'Розпізнані операції журналу'],['PvP матчі',available('duels')?rows('duels').length:null,'Створені за період'],['Відкриті репорти',available('player_reports')?reports.length:null,'Усі неопрацьовані зараз']];
+      aaEl('aaKpis').innerHTML=cards.map(([label,value,hint])=>`<div class="aa-card"><span>${label}</span><strong>${aaFmt(value)}</strong><small>${hint}</small></div>`).join('');
+      const flags=[];
+      const flag=(severity,reason,uid,time)=>flags.push({severity,reason,uid:String(uid||''),time});
+      for(const w of d.wallets||[]) {
+        const b=aaNum(w.balance);
+        if(b!=null&&(b<0||b>=1000000)) flag(b<0?'Висока':'Середня',`Поточний баланс ${aaFmt(b)}: ${b<0?'від’ємне значення':'поріг перевірки ≥ 1 000 000 монет'}. Це не доказ порушення.`,aaUid(w)||w.id,aaTime(w.updatedAt));
+      }
+      for(const a of actions) {
+        const amount=aaFlow(a);
+        if(amount!=null&&Math.abs(amount)>=100000) flag('Висока',`Велика операція ${a.type||'без типу'}: ${aaFmt(amount)} монет (поріг 100 000).`,aaUid(a),aaDate(a));
+      }
+      const grouped=new Map();
+      for(const p of [...figures,...outfits]) {const uid=aaUid(p); if(!uid)continue; if(!grouped.has(uid))grouped.set(uid,[]); grouped.get(uid).push(aaDate(p));}
+      for(const [uid,times] of grouped) {
+        times.sort((a,b)=>a-b); let left=0;
+        for(let right=0;right<times.length;right++) {while(times[right]-times[left]>60000)left++; if(right-left+1>=5){flag('Середня','Щонайменше 5 покупок за 60 секунд. Перевірте журнал і джерело монет.',uid,times[right]);break;}}
+      }
+      const refs=rows('referral_claims'), refCounts=new Map();
+      for(const r of refs) {
+        const uid=aaUid(r)||r.id, admin=r.ownerId===ADMIN_UID||r.isAdminCode===true;
+        if(uid===r.ownerId || (aaNum(r.newUserReward)??0)>(admin?1000:500) || (aaNum(r.ownerReward)??0)>(admin?0:200)) flag('Висока','Самореферал або нагорода перевищує пороги поточної схеми (500/200; адмін-код 1000/0). Перевірте можливі зміни правил винагород.',uid,aaDate(r));
+        if(r.ownerId&&r.ownerId!==ADMIN_UID) {const list=refCounts.get(r.ownerId)||[]; list.push(r);refCounts.set(r.ownerId,list);}
+      }
+      for(const [uid,list] of refCounts) if(list.length>=20) flag('Середня',`${list.length} реферальних активацій за період (поріг 20). Популярність коду сама по собі не є порушенням.`,uid,Math.max(...list.map(aaDate)));
+      const trade=new Map();
+      for(const a of actions) {
+        const uid=aaUid(a), item=a.cardId||a.shopFigureId||a.figureId;
+        if(!uid||!item||! /^(buy_|sell_)/.test(a.type||''))continue;
+        const key=JSON.stringify([uid,item]); const list=trade.get(key)||[];list.push(a);trade.set(key,list);
+      }
+      for(const [key,list] of trade) {
+        list.sort((a,b)=>aaDate(a)-aaDate(b));
+        for(let i=1;i<list.length;i++) if(list[i].type.startsWith('sell_')&&list[i-1].type.startsWith('buy_')&&aaDate(list[i])-aaDate(list[i-1])<=300000) {
+          flag('Середня',`Купівля та продаж того самого товару (${JSON.parse(key)[1]}) за ≤ 5 хвилин. Перевірте контекст.`,JSON.parse(key)[0],aaDate(list[i]));break;
+        }
+      }
+      flags.sort((a,b)=>(a.severity==='Висока'?0:1)-(b.severity==='Висока'?0:1)||(b.time||0)-(a.time||0));
+      aaEl('aaFlags').innerHTML=flags.length?flags.map((f,i)=>`<tr><td><b class="${f.severity==='Висока'?'aa-high':'aa-mid'}">${f.severity}</b></td><td>${escapeHtml(f.reason)}</td><td>${escapeHtml(f.uid||'UID невідомий')}</td><td>${aaWhen(f.time)}</td><td>${f.uid?`<button type="button" data-aa-audit="${i}">Аудит / інвентар</button>`:'—'}</td></tr>`).join(''):'<tr><td colspan="5">Пороги не спрацювали в доступних даних. Це не гарантія відсутності порушень.</td></tr>';
+      aaEl('aaFlags').querySelectorAll('[data-aa-audit]').forEach(button=>button.addEventListener('click',async()=>{
+        button.disabled=true;
+        try {
+          await loadAdminUsers();
+          const uid=flags[Number(button.dataset.aaAudit)].uid;
+          if(adminUsers.some(u=>u.id===uid)) openInventoryAudit(uid);
+          else aaEl('aaAuditStatus').textContent=`Користувача ${uid} немає в доступному списку. Скопіюйте UID для ручної перевірки.`;
+        } finally {button.disabled=false;}
+      }));
+      function top(items,catalog,field) {
+        const counts=new Map(); for(const r of items){const id=String(r[field]||r.figureOutfitId||'Невідомий товар');counts.set(id,(counts.get(id)||0)+1);}
+        const sorted=[...counts].sort((a,b)=>b[1]-a[1]).slice(0,10), max=sorted[0]?.[1]||1;
+        return sorted.length?sorted.map(([id,n])=>`<div class="aa-top"><span>${escapeHtml(String((d[catalog]||[]).find(c=>c.id===id)?.name|| (d[catalog]||[]).find(c=>c.id===id)?.title||id))} · ${n}</span><div class="aa-track"><div style="width:${n/max*100}%"></div></div></div>`).join(''):'Немає підтверджених покупок із датою за цей період.';
+      }
+      aaEl('aaTopFigures').innerHTML=top(figures,'shop_figures','shopFigureId'); aaEl('aaTopOutfits').innerHTML=top(outfits,'figure_outfits','outfitId');
+      const unknown=actions.length-flows.length;
+      aaEl('aaSummary').textContent=`Журнал економіки: ${available('economy_actions')?`${actions.length} операцій; чистий потік ${aaFmt(incoming-outgoing)} монет; ${unknown} операцій із невідомим напрямком/сумою виключено з потоків.`:'недоступний.'} Реферальні активації: ${available('referral_claims')?refs.length:'немає даних'}. Нагороди за глави: ${available('chapter_rewards')?rows('chapter_rewards').length:'немає даних'}. Нагороди не додаються повторно до потоків журналу; потоки не є повним балансом економіки. PvP завершено серед матчів періоду: ${available('duels')?rows('duels').filter(r=>r.status==='completed'||r.completedAt).length:'немає даних'}.`;
+      aaEl('aaBrief').textContent=`За обраний період: реєстрації — ${aaFmt(cards[1][1])}, покупки фігурок — ${aaFmt(cards[2][1])}, образів — ${aaFmt(cards[3][1])}. Онлайн на момент оновлення — ${aaFmt(cards[0][1])}; відкриті репорти — ${aaFmt(cards[7][1])}. Автоаналіз сформував ${flags.length} сигналів, із них ${flags.filter(f=>f.severity==='Висока').length} високої важливості. ${flags.length?'Почніть із сигналів високої важливості та перевірте інвентар і журнал користувача.':'Перегляньте відкриті репорти та повноту джерел.'} Остаточне рішення приймає головний адміністратор.`;
+      aaEl('aaCoverage').textContent=aaNames.map(name=> {
+        if(!available(name))return `${name}: ${aaState.errors[name]}`;
+        const missing=(d[name]||[]).filter(r=>aaDate(r)==null).length;
+        return `${name}: ${d[name].length} документів${aaState.errors[name]?'; '+aaState.errors[name]:''}${missing?`; без дати події: ${missing}`:''}`;
+      }).join('\n');
+      aaEl('aaStatus').textContent=`Оновлено ${aaWhen(now)}. Період: ${aaWhen(start)} — ${aaWhen(now)} (час браузера). ${Object.keys(aaState.errors).length?'Увага: неповні дані, див. джерела нижче.':'Завантажено доступні джерела.'}`;
+      document.querySelectorAll('[data-aa-days]').forEach(b=>{b.setAttribute('aria-pressed',String(Number(b.dataset.aaDays)===aaState.days));});
+    }
+    aaEl('aaRefresh').addEventListener('click',aaLoad);
+    document.querySelectorAll('[data-aa-days]').forEach(b=>b.addEventListener('click',()=>{aaState.days=Number(b.dataset.aaDays);aaRender();}));
+
   </script>
 </body>
 </html>
