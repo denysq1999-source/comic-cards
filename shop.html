@@ -150,10 +150,10 @@
       getDocs(query(collection(db,"user_outfits"),where("userId","==",user.uid)))
     ]);
     wallet=walletSnap.exists()?{balance:0,frozen:false,...walletSnap.data()}:{balance:0,frozen:false};
-    shopFigures=shopSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled!==false);
+    shopFigures=shopSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled===true);
     ownedShop=ownedSnap.docs.map(d=>({id:d.id,...d.data()}));
     duelLocked=duelLockSnap.exists()&&duelLockSnap.data().active===true;
-    figureOutfits=outfitSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled!==false);
+    figureOutfits=outfitSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled===true);
     ownedOutfits=ownedOutfitSnap.docs.map(d=>({id:d.id,...d.data()}));
     render();
   }
@@ -217,13 +217,13 @@
       const ownsFigure=ownedShop.some(x=>x.shopFigureId===figureId);
       wardrobeGrid.innerHTML=outfits.map(o=>{
         const owned=ownedOutfits.some(x=>x.outfitId===o.id);
-        const canAfford=Number(wallet.balance||0)>=Number(o.price||5000);
+        const canAfford=Number(wallet.balance||0)>=Number(o.price??5000);
         return `<article class="outfit-card">
           <img src="${esc(o.image?driveImage(o.image):placeholder())}" alt="${esc(o.name||"Образ")}">
           <div class="outfit-body">
             <div class="outfit-slot">Слот ${Number(o.slot||0)}/10</div>
             <div class="outfit-name">${esc(o.name||"Образ")}</div>
-            <div class="outfit-price">💰 ${Number(o.price||5000)}</div>
+            <div class="outfit-price">💰 ${Number(o.price??5000)}</div>
             ${owned
               ? '<div class="outfit-owned">✅ Куплено</div>'
               : `<button class="outfit-buy" type="button" data-buy-outfit="${esc(o.id)}" ${!ownsFigure||wallet.frozen||duelLocked||!canAfford?"disabled":""}>${!ownsFigure?"Спочатку купи фігурку":wallet.frozen?"🔒 Баланс заморожений":duelLocked?"⚔️ Активна дуель":canAfford?"Купити образ":"Недостатньо монет"}</button>`}
@@ -237,112 +237,90 @@
     document.body.style.overflow="hidden";
   }
 
-  async function buyOutfit(outfitId,button){
-    const outfit=figureOutfits.find(x=>x.id===outfitId);
-    if(!outfit||!user||wallet.frozen||duelLocked)return;
-    const figure=shopFigures.find(x=>x.id===outfit.shopFigureId);
-    if(!figure)return;
-    const price=Number(outfit.price||5000);
-    if(!confirm(`Купити образ «${outfit.name||"Без назви"}» за ${price} монет?`))return;
-    button.disabled=true;
-    try{
-      const walletRef=doc(db,"wallets",user.uid);
-      const outfitRef=doc(db,"figure_outfits",outfitId);
-      const ownedRef=doc(db,"user_outfits",`${user.uid}_${outfitId}`);
-      const actionRef=doc(db,"economy_actions",`buy_outfit_${user.uid}_${outfitId}`);
-      await runTransaction(db,async tx=>{
-        const [walletSnap,outfitSnap]=await Promise.all([tx.get(walletRef),tx.get(outfitRef)]);
-        if(!outfitSnap.exists()||outfitSnap.data().enabled===false)throw new Error("NOT_AVAILABLE");
-        const freshWallet=walletSnap.exists()?walletSnap.data():{balance:0,frozen:false};
-        const freshPrice=Number(outfitSnap.data().price||5000);
-        if(freshWallet.frozen===true)throw new Error("WALLET_FROZEN");
-        if(Number(freshWallet.balance||0)<freshPrice)throw new Error("NO_MONEY");
-        tx.set(actionRef,{
-          userId:user.uid,type:"buy_figure_outfit",outfitId,shopFigureId:outfit.shopFigureId,amount:freshPrice,createdAt:serverTimestamp()
-        });
-        tx.set(ownedRef,{
-          userId:user.uid,outfitId,shopFigureId:outfit.shopFigureId,purchasePrice:freshPrice,actionId:actionRef.id,obtainedAt:serverTimestamp()
-        });
-        tx.set(walletRef,{
-          userId:user.uid,balance:Number(freshWallet.balance||0)-freshPrice,frozen:false,lastActionId:actionRef.id,updatedAt:serverTimestamp()
-        },{merge:true});
-      });
-      await loadData();
-      openWardrobe(outfit.shopFigureId);
-    }catch(error){
-      console.error(error);
-      alert({
-        NOT_AVAILABLE:"Образ уже недоступний.",
-        WALLET_FROZEN:"Баланс заморожений.",
-        NO_MONEY:"Недостатньо монет."
-      }[error?.message] || (String(error?.code||"").includes("permission-denied")?"Firestore відхилив покупку образу. Онови Rules.":"Не вдалося купити образ."));
-      button.disabled=false;
-    }
+  let purchaseBusy=false;
+  const purchaseMessages={
+    NOT_AVAILABLE:"Товар уже недоступний. Онови сторінку.",
+    WALLET_FROZEN:"Баланс заморожений адміністратором.",
+    WALLET_MISSING:"Гаманець ще не створено. Відкрий кабінет і повернися до магазину.",
+    INVALID_WALLET:"Дані гаманця некоректні. Звернися до адміністратора.",
+    INVALID_PRICE:"Ціна товару некоректна. Звернися до адміністратора.",
+    PRICE_CHANGED:"Ціна змінилася. Перевір нову ціну й підтвердь покупку ще раз.",
+    NO_MONEY:"Недостатньо монет.",
+    DUEL_LOCKED:"Покупки заблоковані до завершення дуелі.",
+    BASE_REQUIRED:"Спочатку купи базову фігурку.",
+    ALREADY_OWNED:"Цей товар уже є у твоїй колекції.",
+    RECEIPT_EXISTS:"Цю покупку вже зареєстровано, але товар відсутній. Звернися до адміністратора для відновлення — повторного списання не буде."
+  };
+
+  async function buyOutfit(id,button){
+    return purchaseItem(id,true,button);
   }
-
-
   async function buyFigure(id,button){
-    const item=shopFigures.find(x=>x.id===id);
-    if(!item||wallet.frozen||duelLocked)return;
-    const price=Number(item.price||0);
-    if(!confirm(`Купити «${item.name||"фігурку"}» за ${price} монет?`))return;
-
+    return purchaseItem(id,false,button);
+  }
+  async function purchaseItem(id,isOutfit,button){
+    const item=(isOutfit?figureOutfits:shopFigures).find(x=>x.id===id);
+    if(!user||!item||purchaseBusy)return;
+    const uid=user.uid, quotedPrice=item.price;
+    if(!Number.isSafeInteger(quotedPrice)||quotedPrice<0){alert(purchaseMessages.INVALID_PRICE);return;}
+    if(!confirm(`Купити «${item.name||"Товар"}» за ${quotedPrice} монет?`))return;
+    purchaseBusy=true;
+    button.disabled=true;
+    let committed=false;
     try{
-      button.disabled=true;
-      const walletRef=doc(db,"wallets",user.uid);
-      const ownedRef=doc(db,"user_shop_figures",`${user.uid}_${item.id}`);
-      const actionRef=doc(db,"economy_actions",`buy_${user.uid}_${item.id}`);
-      const shopRef=doc(db,"shop_figures",item.id);
-
+      const walletRef=doc(db,"wallets",uid);
+      const catalogRef=doc(db,isOutfit?"figure_outfits":"shop_figures",id);
+      const ownedRef=doc(db,isOutfit?"user_outfits":"user_shop_figures",uid+"_"+id);
+      const actionRef=doc(db,"economy_actions",(isOutfit?"buy_outfit_":"buy_")+uid+"_"+id);
+      const lockRef=doc(db,"duel_locks",uid);
       await runTransaction(db,async tx=>{
-        // ВАЖЛИВО: не читаємо ownedRef до створення.
-        // Для нового документа Firestore Rules могли блокувати get неіснуючого запису.
-        // Якщо фігурка вже куплена, tx.set нижче стане update, а rules його заборонять.
-        const [walletSnap,shopSnap]=await Promise.all([
-          tx.get(walletRef),tx.get(shopRef)
+        // All reads precede writes; retries use authoritative price, wallet and lock.
+        const [w,c,o,a,l]=await Promise.all([
+          tx.get(walletRef),tx.get(catalogRef),tx.get(ownedRef),tx.get(actionRef),tx.get(lockRef)
         ]);
-        if(!shopSnap.exists()||shopSnap.data().enabled===false)throw new Error("NOT_AVAILABLE");
-        const freshWallet=walletSnap.exists()?walletSnap.data():{balance:0,frozen:false};
-        if(freshWallet.frozen===true)throw new Error("WALLET_FROZEN");
-        const freshPrice=Number(shopSnap.data().price||0);
-        if(Number(freshWallet.balance||0)<freshPrice)throw new Error("NO_MONEY");
-
-        tx.set(actionRef,{
-          userId:user.uid,
-          type:"buy_shop_figure",
-          shopFigureId:item.id,
-          amount:freshPrice,
-          createdAt:serverTimestamp()
-        });
-        tx.set(ownedRef,{
-          userId:user.uid,
-          shopFigureId:item.id,
-          purchasePrice:freshPrice,
-          actionId:actionRef.id,
-          obtainedAt:serverTimestamp()
-        });
-        tx.set(walletRef,{
-          userId:user.uid,
-          balance:Number(freshWallet.balance||0)-freshPrice,
-          frozen:false,
-          lastActionId:actionRef.id,
-          updatedAt:serverTimestamp()
-        },{merge:true});
+        if(o.exists())throw new Error("ALREADY_OWNED");
+        if(a.exists())throw new Error("RECEIPT_EXISTS");
+        if(!w.exists())throw new Error("WALLET_MISSING");
+        const fresh=w.data();
+        if((fresh.frozen??false)!==false)throw new Error("WALLET_FROZEN");
+        if((l.exists()&&l.data().active===true)||(fresh.activeDuelId??null)!==null||(fresh.duelEscrow??0)!==0)throw new Error("DUEL_LOCKED");
+        if(!Number.isSafeInteger(fresh.balance)||fresh.balance<0||('userId' in fresh&&fresh.userId!==uid)||('frozen' in fresh&&fresh.frozen!==false))throw new Error("INVALID_WALLET");
+        if(!c.exists()||c.data().enabled!==true)throw new Error("NOT_AVAILABLE");
+        const product=c.data(), price=product.price;
+        if(!Number.isSafeInteger(price)||price<0)throw new Error("INVALID_PRICE");
+        if(price!==quotedPrice)throw new Error("PRICE_CHANGED");
+        if(fresh.balance<price)throw new Error("NO_MONEY");
+        let shopFigureId=id;
+        if(isOutfit){
+          shopFigureId=product.shopFigureId;
+          if(typeof shopFigureId!=="string"||!shopFigureId||shopFigureId.includes("/"))throw new Error("NOT_AVAILABLE");
+          const [base,baseOwned]=await Promise.all([
+            tx.get(doc(db,"shop_figures",shopFigureId)),
+            tx.get(doc(db,"user_shop_figures",uid+"_"+shopFigureId))
+          ]);
+          if(!base.exists()||base.data().enabled!==true||base.data().wardrobeEnabled!==true)throw new Error("NOT_AVAILABLE");
+          if(!baseOwned.exists()||baseOwned.data().userId!==uid)throw new Error("BASE_REQUIRED");
+        }
+        const identity=isOutfit?{outfitId:id,shopFigureId}:{shopFigureId};
+        tx.set(actionRef,{userId:uid,type:isOutfit?"buy_figure_outfit":"buy_shop_figure",...identity,amount:price,createdAt:serverTimestamp()});
+        tx.set(ownedRef,{userId:uid,...identity,purchasePrice:price,actionId:actionRef.id,obtainedAt:serverTimestamp()});
+        tx.update(walletRef,{userId:uid,balance:fresh.balance-price,frozen:false,lastActionId:actionRef.id,updatedAt:serverTimestamp()});
       });
-
-      await loadData();
+      committed=true;
     }catch(error){
-      console.error(error);
-      const msg={
-        ALREADY_OWNED:"Ця фігурка вже є у тебе.",
-        NOT_AVAILABLE:"Товар уже недоступний.",
-        WALLET_FROZEN:"Баланс заморожений адміністратором.",
-        NO_MONEY:"Недостатньо монет."
-      }[error?.message]
-        || (String(error?.code||"").includes("permission-denied")
-          ? "Firestore відхилив покупку. Перевір правила економіки."
-          : "Не вдалося купити фігурку.");
-      alert(msg);
+      console.error("Shop purchase:",error);
+      alert(purchaseMessages[error?.message]||(String(error?.code||"").includes("permission-denied")
+        ?"Покупку відхилено правилами доступу. Онови сторінку; якщо помилка повториться, звернися до адміністратора."
+        :"Не вдалося підтвердити покупку. Перевір з’єднання та онови сторінку."));
+    }finally{
+      try{
+        await loadData();
+        if(activeWardrobeFigureId)openWardrobe(activeWardrobeFigureId);
+      }catch(error){
+        console.error("Shop refresh:",error);
+        if(committed)alert("Покупка успішна, але список не оновився. Онови сторінку — повторно купувати не потрібно.");
+      }
+      purchaseBusy=false;
       button.disabled=false;
     }
   }
