@@ -953,8 +953,41 @@
       padding:22px;
       position:relative;
       box-shadow:0 24px 70px rgba(0,0,0,.55);
+      transition:max-height .2s ease, width .2s ease;
     }
-    .audit-danger-zone{margin-top:20px;padding:14px;border:1px solid #5a2727;border-radius:10px;background:#241515}
+    .inventory-audit-modal.collapsed{
+      width:min(920px,96vw);
+      max-height:108px;
+      overflow:hidden;
+    }
+    .audit-header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:14px;
+      padding-right:46px;
+    }
+    .audit-header-main{min-width:0;flex:1}
+    .audit-header-actions{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    .audit-collapse-btn{
+      border:1px solid #454545;
+      border-radius:8px;
+      background:#242424;
+      color:#fff;
+      padding:9px 12px;
+      cursor:pointer;
+      font-size:13px;
+      font-weight:800;
+    }
+    .audit-collapse-btn:hover{background:#303030}
+    .audit-body{display:block}
+    .inventory-audit-modal.collapsed .audit-body{display:none}
     .audit-clear-btn{border:1px solid #8a3434;border-radius:8px;background:#6b2525;color:#fff;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:800}
     .audit-clear-btn:hover{background:#842f2f}
     .audit-clear-btn:disabled{opacity:.45;cursor:not-allowed}
@@ -976,7 +1009,7 @@
     .audit-email{color:#8f8f8f;margin-bottom:18px;word-break:break-all}
     .audit-summary{
       display:grid;
-      grid-template-columns:repeat(4,minmax(120px,1fr));
+      grid-template-columns:repeat(5,minmax(120px,1fr));
       gap:10px;
       margin-bottom:18px;
     }
@@ -1017,6 +1050,8 @@
     .audit-table th{color:#999;background:#191919}
     .audit-table tr:last-child td{border-bottom:0}
     @media(max-width:760px){
+      .audit-header{flex-direction:column;padding-right:46px}
+      .audit-header-actions{justify-content:flex-start}
       .audit-summary{grid-template-columns:repeat(2,1fr)}
     }
     .users-note {
@@ -1964,14 +1999,24 @@
 
 
   <div class="inventory-audit-overlay" id="inventoryAuditOverlay" aria-hidden="true">
-    <div class="inventory-audit-modal">
+    <div class="inventory-audit-modal" id="inventoryAuditModal">
       <button class="inventory-audit-close" id="inventoryAuditClose" type="button">✕</button>
-      <h2 class="audit-title" id="auditTitle">Перевірка інвентарю</h2>
-      <div class="audit-email" id="auditEmail"></div>
+      <div class="audit-header">
+        <div class="audit-header-main">
+          <h2 class="audit-title" id="auditTitle">Перевірка інвентарю</h2>
+          <div class="audit-email" id="auditEmail"></div>
+        </div>
+        <div class="audit-header-actions">
+          <button class="audit-clear-btn" id="auditClearInventoryBtn" type="button">🗑️ Очистити інвентар</button>
+          <button class="audit-collapse-btn" id="auditCollapseBtn" type="button">▴ Згорнути</button>
+        </div>
+      </div>
 
+      <div class="audit-body" id="auditBody">
       <div class="audit-summary">
         <div class="audit-stat"><strong id="auditCards">0</strong><span>Карток</span></div>
         <div class="audit-stat"><strong id="auditFigures">0</strong><span>Фігурок</span></div>
+        <div class="audit-stat"><strong id="auditShopFigures">0</strong><span>🛒 Куплено фігурок</span></div>
         <div class="audit-stat"><strong id="auditTenMin">0</strong><span>За 10 хв</span></div>
         <div class="audit-stat"><strong id="auditHour">0</strong><span>За годину</span></div>
       </div>
@@ -1998,8 +2043,6 @@
         </table>
       </div>
 
-      <div class="audit-danger-zone">
-        <button class="audit-clear-btn" id="auditClearInventoryBtn" type="button">🗑️ Очистити весь інвентар</button>
       </div>
     </div>
   </div>
@@ -2088,11 +2131,14 @@
     const usersTableBody = document.getElementById("usersTableBody");
 
     const inventoryAuditOverlay = document.getElementById("inventoryAuditOverlay");
+    const inventoryAuditModal = document.getElementById("inventoryAuditModal");
     const inventoryAuditClose = document.getElementById("inventoryAuditClose");
+    const auditCollapseBtn = document.getElementById("auditCollapseBtn");
     const auditTitle = document.getElementById("auditTitle");
     const auditEmail = document.getElementById("auditEmail");
     const auditCards = document.getElementById("auditCards");
     const auditFigures = document.getElementById("auditFigures");
+    const auditShopFigures = document.getElementById("auditShopFigures");
     const auditTenMin = document.getElementById("auditTenMin");
     const auditHour = document.getElementById("auditHour");
     const auditAlerts = document.getElementById("auditAlerts");
@@ -2105,6 +2151,7 @@
     let blockedUserIds = new Set();
     let adminUserCards = [];
     let adminUserFigures = [];
+    let adminUserShopFigures = [];
     let adminCardsCatalog = [];
     let adminFiguresCatalog = [];
     let adminWallets = [];
@@ -2272,6 +2319,7 @@
           blockedSnap,
           userCardsSnap,
           userFiguresSnap,
+          userShopFiguresSnap,
           cardsSnap,
           figuresSnap,
           walletsSnap,
@@ -2281,6 +2329,7 @@
           getDocs(collection(db, "blocked_users")),
           getDocs(collection(db, "user_cards")),
           getDocs(collection(db, "user_figures")),
+          getDocs(collection(db, "user_shop_figures")),
           getDocs(collection(db, "cards")),
           getDocs(collection(db, "figures")),
           getDocs(collection(db, "wallets")),
@@ -2293,6 +2342,7 @@
           .map(d => ({ id:d.id, ...d.data() }))
           .filter(item => item.sold !== true);
         adminUserFigures = userFiguresSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+        adminUserShopFigures = userShopFiguresSnap.docs.map(d => ({ id:d.id, ...d.data() }));
         adminCardsCatalog = cardsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
         adminFiguresCatalog = figuresSnap.docs.map(d => ({ id:d.id, ...d.data() }));
         adminWallets = walletsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
@@ -2597,6 +2647,7 @@
       auditEmail.textContent = user.email || uid;
       auditCards.textContent = audit.cardsOwned.length;
       auditFigures.textContent = audit.figuresOwned.length;
+      auditShopFigures.textContent = adminUserShopFigures.filter(item => item.userId === uid).length;
       auditTenMin.textContent = audit.in10min;
       auditHour.textContent = audit.inHour;
 
@@ -2654,6 +2705,8 @@
         }).join("");
       }
 
+      inventoryAuditModal.classList.remove("collapsed");
+      auditCollapseBtn.textContent = "▴ Згорнути";
       inventoryAuditOverlay.classList.add("show");
       inventoryAuditOverlay.setAttribute("aria-hidden","false");
       document.body.style.overflow = "hidden";
@@ -2701,11 +2754,16 @@
         alert("Не вдалося повністю очистити інвентар.");
       } finally {
         auditClearInventoryBtn.disabled = false;
-        auditClearInventoryBtn.textContent = "🗑️ Очистити весь інвентар";
+        auditClearInventoryBtn.textContent = "🗑️ Очистити інвентар";
       }
     }
 
     auditClearInventoryBtn.addEventListener("click", clearCurrentUserInventory);
+
+    auditCollapseBtn.addEventListener("click", () => {
+      const collapsed = inventoryAuditModal.classList.toggle("collapsed");
+      auditCollapseBtn.textContent = collapsed ? "▾ Розгорнути" : "▴ Згорнути";
+    });
 
     function closeInventoryAudit() {
       inventoryAuditOverlay.classList.remove("show");
