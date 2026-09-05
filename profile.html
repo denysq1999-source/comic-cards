@@ -136,6 +136,15 @@
   .ref-claim{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}.ref-claim input{background:#101010;color:#fff;border:1px solid #363636;border-radius:8px;padding:10px 12px}
   .ref-status{margin-top:10px;color:#aaa;font-size:13px}.ref-status.ok{color:#7fda94}.ref-status.err{color:#ff9292}
   @media(max-width:700px){.ref-grid,.ref-claim{grid-template-columns:1fr}.ref-grid .ref-btn{width:100%}}
+  .figure-wardrobe-controls{display:none;align-items:center;gap:10px;margin-top:8px;padding:10px;background:#111;border:1px solid #303030;border-radius:10px}
+  .figure-wardrobe-controls.show{display:flex}
+  .wardrobe-arrow{width:42px;height:42px;border:1px solid #454545;border-radius:9px;background:#292929;color:#fff;font-size:24px;font-weight:900;cursor:pointer}
+  .wardrobe-arrow:hover{background:#3a3a3a}
+  .wardrobe-caption{flex:1;text-align:center;min-width:0}
+  .wardrobe-caption strong{display:block;color:#ffd18b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wardrobe-caption span{display:block;color:#777;font-size:11px;margin-top:3px}
+  .wardrobe-count-badge{display:inline-flex;align-items:center;gap:4px;background:#2f2442;color:#dbcaff;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:900}
+
 </style>
 </head>
 <body>
@@ -266,6 +275,14 @@
       <span class="viewer-rarity" id="viewerRarity"></span>
       <div class="viewer-description" id="viewerDescription"></div>
       <div class="item-meta" id="viewerObtained"></div>
+      <div class="figure-wardrobe-controls" id="figureWardrobeControls">
+        <button class="wardrobe-arrow" id="wardrobePrevBtn" type="button">‹</button>
+        <div class="wardrobe-caption">
+          <strong id="wardrobeOutfitName">Базовий образ</strong>
+          <span id="wardrobeOutfitCounter">1/1</span>
+        </div>
+        <button class="wardrobe-arrow" id="wardrobeNextBtn" type="button">›</button>
+      </div>
     </div>
   </div>
 </div>
@@ -366,6 +383,11 @@
   const viewerRarity = document.getElementById("viewerRarity");
   const viewerDescription = document.getElementById("viewerDescription");
   const viewerObtained = document.getElementById("viewerObtained");
+  const figureWardrobeControls=document.getElementById("figureWardrobeControls");
+  const wardrobePrevBtn=document.getElementById("wardrobePrevBtn");
+  const wardrobeNextBtn=document.getElementById("wardrobeNextBtn");
+  const wardrobeOutfitName=document.getElementById("wardrobeOutfitName");
+  const wardrobeOutfitCounter=document.getElementById("wardrobeOutfitCounter");
   const packBtnTop = document.getElementById("packBtnTop");
   const packOverlay = document.getElementById("packOverlay");
   const packCloseBtn = document.getElementById("packCloseBtn");
@@ -381,6 +403,10 @@
   let wallet = { balance:0, frozen:false };
   let ownedShopFigures = [];
   let shopFigures = [];
+  let figureOutfits = [];
+  let ownedOutfits = [];
+  let activeFigureLooks = [];
+  let activeFigureLookIndex = 0;
   let duelLocked = false;
   let activeDuelId = null;
   let duelStats = { rating:0, wins:0, losses:0 };
@@ -810,14 +836,16 @@
   }
 
   async function loadInventory() {
-    const [ownedSnap, cardSnap, ownedFiguresSnap, figureSnap, comicSnap, ownedShopSnap, shopFigureSnap] = await Promise.all([
+    const [ownedSnap, cardSnap, ownedFiguresSnap, figureSnap, comicSnap, ownedShopSnap, shopFigureSnap, outfitSnap, ownedOutfitSnap] = await Promise.all([
       getDocs(query(collection(db, "user_cards"), where("userId", "==", user.uid))),
       getDocs(collection(db, "cards")),
       getDocs(query(collection(db, "user_figures"), where("userId", "==", user.uid))),
       getDocs(collection(db, "figures")),
       getDocs(collection(db, "comics")),
       getDocs(query(collection(db, "user_shop_figures"), where("userId", "==", user.uid))),
-      getDocs(collection(db, "shop_figures"))
+      getDocs(collection(db, "shop_figures")),
+      getDocs(collection(db, "figure_outfits")),
+      getDocs(query(collection(db, "user_outfits"), where("userId", "==", user.uid)))
     ]);
 
     owned = ownedSnap.docs
@@ -829,6 +857,8 @@
     comics = comicSnap.docs.map(d => ({ id:d.id, ...d.data() }));
     ownedShopFigures = ownedShopSnap.docs.map(d => ({ id:d.id, ...d.data() }));
     shopFigures = shopFigureSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    figureOutfits = outfitSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled!==false);
+    ownedOutfits = ownedOutfitSnap.docs.map(d=>({id:d.id,...d.data()}));
     await loadWallet();
 
     fillComicFilter();
@@ -1135,6 +1165,7 @@
           <div class="figure-item-info">
             <div class="figure-item-title">${esc(figure.name||"Без назви")}</div>
             <span class="figure-source-badge shop">🛒 Куплено в магазині</span>
+            ${figure.wardrobeEnabled===true?`<span class="wardrobe-count-badge">👔 ${ownedOutfits.filter(o=>o.shopFigureId===figure.id).length}/${figureOutfits.filter(o=>o.shopFigureId===figure.id).length}</span>`:""}
             <div class="figure-item-desc">${esc(figure.description||"Без опису")}</div>
             <div class="item-meta">Придбано: ${formatDate(own.obtainedAt)}</div>
             <div class="figure-actions">
@@ -1157,6 +1188,51 @@
 
     figureShelf.innerHTML = normalHtml + shopHtml;
   }
+
+
+  function setFigureLook(look){
+    if(!look)return;
+    viewerImage.src=look.image?driveImage(look.image):placeholder();
+    if(look.backImage){
+      viewerBackImage.src=driveImage(look.backImage);
+      viewerBackImage.style.display="block";
+      generatedBack.style.display="none";
+    }else{
+      viewerBackImage.removeAttribute("src");
+      viewerBackImage.style.display="none";
+      generatedBack.style.display="flex";
+      backCardName.textContent=look.name||"Без назви";
+      backCardDescription.textContent=look.description||"Опис відсутній.";
+    }
+    wardrobeOutfitName.textContent=look.name||"Образ";
+    wardrobeOutfitCounter.textContent=`${activeFigureLookIndex+1}/${activeFigureLooks.length}`;
+    resetCard3D();
+  }
+
+  function setupFigureWardrobe(figure){
+    const boughtIds=new Set(ownedOutfits.filter(x=>x.shopFigureId===figure.id).map(x=>x.outfitId));
+    const bought=figureOutfits
+      .filter(x=>x.shopFigureId===figure.id&&boughtIds.has(x.id))
+      .sort((a,b)=>Number(a.slot||0)-Number(b.slot||0));
+    activeFigureLooks=[
+      {id:"base",name:"Базовий образ",image:figure.image,backImage:figure.backImage,description:figure.description},
+      ...bought.map(o=>({id:o.id,name:o.name,image:o.image,backImage:o.backImage,description:o.description||figure.description}))
+    ];
+    activeFigureLookIndex=0;
+    figureWardrobeControls.classList.toggle("show",activeFigureLooks.length>1);
+    if(activeFigureLooks.length) setFigureLook(activeFigureLooks[0]);
+  }
+
+  wardrobePrevBtn.addEventListener("click",()=>{
+    if(activeFigureLooks.length<2)return;
+    activeFigureLookIndex=(activeFigureLookIndex-1+activeFigureLooks.length)%activeFigureLooks.length;
+    setFigureLook(activeFigureLooks[activeFigureLookIndex]);
+  });
+  wardrobeNextBtn.addEventListener("click",()=>{
+    if(activeFigureLooks.length<2)return;
+    activeFigureLookIndex=(activeFigureLookIndex+1)%activeFigureLooks.length;
+    setFigureLook(activeFigureLooks[activeFigureLookIndex]);
+  });
 
 
   figureShelf.addEventListener("click", async event => {
@@ -1201,31 +1277,7 @@
       );
       if (!figure) return;
 
-      viewerImage.src = figure.image
-        ? driveImage(figure.image)
-        : placeholder();
-
-      if (figure.backImage) {
-        viewerBackImage.src = driveImage(figure.backImage);
-        viewerBackImage.style.display = "block";
-        generatedBack.style.display = "none";
-      } else {
-        viewerBackImage.removeAttribute("src");
-        viewerBackImage.style.display = "none";
-        generatedBack.style.display = "flex";
-        backCardName.textContent = figure.name || "Без назви";
-        backCardDescription.textContent =
-          figure.description || "Опис відсутній.";
-      }
-
-      cardRotationY = 0;
-      cardRotationX = 0;
-      applyCardTransform();
-
-      [cardShineFront, cardShineBack].forEach(shine => {
-        shine.style.setProperty("--shine-x", "50%");
-        shine.style.setProperty("--shine-y", "50%");
-      });
+      setupFigureWardrobe(figure);
 
       viewerName.textContent = figure.name || "Без назви";
       viewerComic.textContent = "🛒 Магазинна фігурка";
@@ -1286,6 +1338,8 @@
       item => item.id === figure.comicId
     );
 
+    figureWardrobeControls.classList.remove("show");
+    activeFigureLooks=[];activeFigureLookIndex=0;
     viewerImage.src = figure.image
       ? driveImage(figure.image)
       : placeholder();

@@ -32,6 +32,24 @@
     .state{grid-column:1/-1;padding:50px 20px;border:1px dashed #333;border-radius:14px;text-align:center;color:#777}
     .notice{margin:0 0 18px;color:#ff9a9a;display:none}
     @media(max-width:650px){.hero h1{font-size:27px}.grid{grid-template-columns:1fr}}
+    .item-actions{display:flex;gap:8px;align-items:stretch}
+    .item-actions .buy,.item-actions .owned{flex:1}
+    .wardrobe-open{width:46px;border:1px solid #5a4420;border-radius:9px;background:#3b2b13;color:#ffd166;font-size:24px;font-weight:900;cursor:pointer}
+    .wardrobe-open:hover{background:#563d16}
+    .wardrobe-open:disabled{opacity:.45;cursor:not-allowed}
+    .wardrobe-badge{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;padding:5px 9px;border-radius:999px;background:#2f2442;color:#dbcaff;font-size:11px;font-weight:900}
+    .wardrobe-overlay{position:fixed;inset:0;z-index:1600;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;padding:18px}
+    .wardrobe-overlay.show{display:flex}
+    .wardrobe-modal{width:min(980px,96vw);max-height:92vh;overflow:auto;background:#151515;border:1px solid #363636;border-radius:18px;padding:22px;position:relative}
+    .wardrobe-close{position:absolute;right:12px;top:12px;width:40px;height:40px;border:0;border-radius:50%;background:#292929;color:#fff;font-size:20px;cursor:pointer}
+    .wardrobe-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:18px}
+    .outfit-card{background:#101010;border:1px solid #303030;border-radius:12px;overflow:hidden}
+    .outfit-card img{width:100%;aspect-ratio:3/4;object-fit:contain;background:#090909}
+    .outfit-body{padding:12px;display:grid;gap:8px}
+    .outfit-name{font-weight:900}.outfit-price{color:#ffd166;font-weight:900}.outfit-slot{color:#888;font-size:11px}
+    .outfit-buy{border:0;border-radius:8px;padding:10px;background:#ff9800;color:#fff;font-weight:900;cursor:pointer}.outfit-buy:disabled{opacity:.5;cursor:not-allowed}
+    .outfit-owned{padding:10px;border-radius:8px;background:#173c23;color:#8fe5a6;text-align:center;font-weight:900}
+
   </style>
 </head>
 <body>
@@ -54,6 +72,15 @@
   <p class="notice" id="duelNotice">⚔️ Під час активної дуелі покупки заблоковані до завершення матчу.</p>
   <div class="grid" id="grid"><div class="state">Завантаження...</div></div>
 </main>
+
+<div class="wardrobe-overlay" id="wardrobeOverlay" aria-hidden="true">
+  <div class="wardrobe-modal">
+    <button class="wardrobe-close" id="wardrobeCloseBtn" type="button">✕</button>
+    <h2 id="wardrobeTitle">👔 Гардероб</h2>
+    <p style="color:#999;margin-top:7px">Образи — косметичні доповнення до фігурки. Після покупки вони з’являться у твоєму профілі.</p>
+    <div class="wardrobe-grid" id="wardrobeGrid"></div>
+  </div>
+</div>
 
 <script type="module">
   import { auth } from './js/firebase.js';
@@ -90,7 +117,11 @@
   const grid=document.getElementById("grid");
   const notice=document.getElementById("notice");
   const duelNotice=document.getElementById("duelNotice");
-  let user=null,wallet={balance:0,frozen:false},shopFigures=[],ownedShop=[],duelLocked=false;
+  const wardrobeOverlay=document.getElementById("wardrobeOverlay");
+  const wardrobeCloseBtn=document.getElementById("wardrobeCloseBtn");
+  const wardrobeTitle=document.getElementById("wardrobeTitle");
+  const wardrobeGrid=document.getElementById("wardrobeGrid");
+  let user=null,wallet={balance:0,frozen:false},shopFigures=[],ownedShop=[],duelLocked=false,figureOutfits=[],ownedOutfits=[],activeWardrobeFigureId=null;
 
   function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
   function driveImage(url=""){
@@ -110,16 +141,20 @@
   }
 
   async function loadData(){
-    const [walletSnap,shopSnap,ownedSnap,duelLockSnap]=await Promise.all([
+    const [walletSnap,shopSnap,ownedSnap,duelLockSnap,outfitSnap,ownedOutfitSnap]=await Promise.all([
       getDoc(doc(db,"wallets",user.uid)),
       getDocs(collection(db,"shop_figures")),
       getDocs(query(collection(db,"user_shop_figures"),where("userId","==",user.uid))),
-      getDoc(doc(db,"duel_locks",user.uid))
+      getDoc(doc(db,"duel_locks",user.uid)),
+      getDocs(collection(db,"figure_outfits")),
+      getDocs(query(collection(db,"user_outfits"),where("userId","==",user.uid)))
     ]);
     wallet=walletSnap.exists()?{balance:0,frozen:false,...walletSnap.data()}:{balance:0,frozen:false};
     shopFigures=shopSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled!==false);
     ownedShop=ownedSnap.docs.map(d=>({id:d.id,...d.data()}));
     duelLocked=duelLockSnap.exists()&&duelLockSnap.data().active===true;
+    figureOutfits=outfitSnap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.enabled!==false);
+    ownedOutfits=ownedOutfitSnap.docs.map(d=>({id:d.id,...d.data()}));
     render();
   }
 
@@ -144,16 +179,107 @@
             <div class="name">${esc(item.name||"Без назви")}</div>
             <div class="desc">${esc(item.description||"Без опису")}</div>
             <div class="price">💰 ${Number(item.price||0)}</div>
-            ${owned
-              ? '<div class="owned">✅ Уже на твоїй поличці</div>'
-              : `<button class="buy" type="button" data-buy="${esc(item.id)}" ${wallet.frozen||duelLocked||!canAfford?"disabled":""}>${wallet.frozen?"🔒 Баланс заморожений":duelLocked?"⚔️ Активна дуель":canAfford?"Купити":"Недостатньо монет"}</button>`
-            }
+            ${item.wardrobeEnabled===true?`<span class="wardrobe-badge">👔 ${figureOutfits.filter(o=>o.shopFigureId===item.id).length} образів</span>`:""}
+            <div class="item-actions">
+              ${owned
+                ? '<div class="owned">✅ Уже на твоїй поличці</div>'
+                : `<button class="buy" type="button" data-buy="${esc(item.id)}" ${wallet.frozen||duelLocked||!canAfford?"disabled":""}>${wallet.frozen?"🔒 Баланс заморожений":duelLocked?"⚔️ Активна дуель":canAfford?"Купити":"Недостатньо монет"}</button>`
+              }
+              ${item.wardrobeEnabled===true?`<button class="wardrobe-open" type="button" data-wardrobe="${esc(item.id)}" title="Відкрити гардероб">＋</button>`:""}
+            </div>
           </div>
         </article>`;
     }).join("");
 
     document.querySelectorAll("[data-buy]").forEach(btn=>btn.addEventListener("click",()=>buyFigure(btn.dataset.buy,btn)));
+    document.querySelectorAll("[data-wardrobe]").forEach(btn=>btn.addEventListener("click",()=>openWardrobe(btn.dataset.wardrobe)));
   }
+
+
+  function closeWardrobe(){
+    wardrobeOverlay.classList.remove("show");
+    wardrobeOverlay.setAttribute("aria-hidden","true");
+    document.body.style.overflow="";
+    activeWardrobeFigureId=null;
+  }
+  wardrobeCloseBtn.addEventListener("click",closeWardrobe);
+  wardrobeOverlay.addEventListener("click",e=>{if(e.target===wardrobeOverlay)closeWardrobe()});
+
+  function openWardrobe(figureId){
+    const figure=shopFigures.find(x=>x.id===figureId);
+    if(!figure)return;
+    activeWardrobeFigureId=figureId;
+    wardrobeTitle.textContent=`👔 Гардероб — ${figure.name||"Фігурка"}`;
+    const outfits=figureOutfits.filter(x=>x.shopFigureId===figureId).sort((a,b)=>Number(a.slot||0)-Number(b.slot||0));
+    if(!outfits.length){
+      wardrobeGrid.innerHTML='<div class="state">Для цієї фігурки поки немає образів.</div>';
+    }else{
+      const ownsFigure=ownedShop.some(x=>x.shopFigureId===figureId);
+      wardrobeGrid.innerHTML=outfits.map(o=>{
+        const owned=ownedOutfits.some(x=>x.outfitId===o.id);
+        const canAfford=Number(wallet.balance||0)>=Number(o.price||5000);
+        return `<article class="outfit-card">
+          <img src="${esc(o.image?driveImage(o.image):placeholder())}" alt="${esc(o.name||"Образ")}">
+          <div class="outfit-body">
+            <div class="outfit-slot">Слот ${Number(o.slot||0)}/10</div>
+            <div class="outfit-name">${esc(o.name||"Образ")}</div>
+            <div class="outfit-price">💰 ${Number(o.price||5000)}</div>
+            ${owned
+              ? '<div class="outfit-owned">✅ Куплено</div>'
+              : `<button class="outfit-buy" type="button" data-buy-outfit="${esc(o.id)}" ${!ownsFigure||wallet.frozen||duelLocked||!canAfford?"disabled":""}>${!ownsFigure?"Спочатку купи фігурку":wallet.frozen?"🔒 Баланс заморожений":duelLocked?"⚔️ Активна дуель":canAfford?"Купити образ":"Недостатньо монет"}</button>`}
+          </div>
+        </article>`;
+      }).join("");
+      wardrobeGrid.querySelectorAll("[data-buy-outfit]").forEach(btn=>btn.addEventListener("click",()=>buyOutfit(btn.dataset.buyOutfit,btn)));
+    }
+    wardrobeOverlay.classList.add("show");
+    wardrobeOverlay.setAttribute("aria-hidden","false");
+    document.body.style.overflow="hidden";
+  }
+
+  async function buyOutfit(outfitId,button){
+    const outfit=figureOutfits.find(x=>x.id===outfitId);
+    if(!outfit||!user||wallet.frozen||duelLocked)return;
+    const figure=shopFigures.find(x=>x.id===outfit.shopFigureId);
+    if(!figure)return;
+    const price=Number(outfit.price||5000);
+    if(!confirm(`Купити образ «${outfit.name||"Без назви"}» за ${price} монет?`))return;
+    button.disabled=true;
+    try{
+      const walletRef=doc(db,"wallets",user.uid);
+      const outfitRef=doc(db,"figure_outfits",outfitId);
+      const ownedRef=doc(db,"user_outfits",`${user.uid}_${outfitId}`);
+      const actionRef=doc(db,"economy_actions",`buy_outfit_${user.uid}_${outfitId}`);
+      await runTransaction(db,async tx=>{
+        const [walletSnap,outfitSnap]=await Promise.all([tx.get(walletRef),tx.get(outfitRef)]);
+        if(!outfitSnap.exists()||outfitSnap.data().enabled===false)throw new Error("NOT_AVAILABLE");
+        const freshWallet=walletSnap.exists()?walletSnap.data():{balance:0,frozen:false};
+        const freshPrice=Number(outfitSnap.data().price||5000);
+        if(freshWallet.frozen===true)throw new Error("WALLET_FROZEN");
+        if(Number(freshWallet.balance||0)<freshPrice)throw new Error("NO_MONEY");
+        tx.set(actionRef,{
+          userId:user.uid,type:"buy_figure_outfit",outfitId,shopFigureId:outfit.shopFigureId,amount:freshPrice,createdAt:serverTimestamp()
+        });
+        tx.set(ownedRef,{
+          userId:user.uid,outfitId,shopFigureId:outfit.shopFigureId,purchasePrice:freshPrice,actionId:actionRef.id,obtainedAt:serverTimestamp()
+        });
+        tx.set(walletRef,{
+          userId:user.uid,balance:Number(freshWallet.balance||0)-freshPrice,frozen:false,lastActionId:actionRef.id,updatedAt:serverTimestamp()
+        },{merge:true});
+      });
+      await loadData();
+      openWardrobe(outfit.shopFigureId);
+    }catch(error){
+      console.error(error);
+      alert({
+        NOT_AVAILABLE:"Образ уже недоступний.",
+        WALLET_FROZEN:"Баланс заморожений.",
+        NO_MONEY:"Недостатньо монет."
+      }[error?.message] || (String(error?.code||"").includes("permission-denied")?"Firestore відхилив покупку образу. Онови Rules.":"Не вдалося купити образ."));
+      button.disabled=false;
+    }
+  }
+
 
   async function buyFigure(id,button){
     const item=shopFigures.find(x=>x.id===id);

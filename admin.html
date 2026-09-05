@@ -867,6 +867,10 @@
       background:#482020;
       color:#ff9c9c;
     }
+    .presence-badge{display:inline-flex;align-items:center;gap:7px;padding:5px 9px;border-radius:999px;background:#242424;border:1px solid #343434;color:#cfcfcf;font-size:12px;font-weight:800;white-space:nowrap}
+    .presence-dot{width:10px;height:10px;min-width:10px;border-radius:50%;display:inline-block}
+    .presence-dot.online{background:#35d46a;box-shadow:0 0 9px rgba(53,212,106,.65)}
+    .presence-dot.offline{background:#e54848;box-shadow:0 0 8px rgba(229,72,72,.38)}
     .user-actions {
       display:flex;
       gap:7px;
@@ -1106,6 +1110,22 @@
     }
 
     .shop-admin-grid{display:grid;grid-template-columns:minmax(280px,390px) minmax(0,1fr);gap:24px;align-items:start}
+    .wardrobe-admin-panel{margin-top:24px}
+    .wardrobe-head{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:16px}
+    .wardrobe-head .form-group{margin:0;min-width:260px;flex:1}
+    .wardrobe-slots{display:grid;gap:12px}
+    .wardrobe-slot{background:#141414;border:1px solid #303030;border-radius:12px;padding:14px}
+    .wardrobe-slot-top{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}
+    .wardrobe-slot-title{font-weight:900;color:#ffb347}
+    .wardrobe-slot-grid{display:grid;grid-template-columns:1.1fr 1.5fr 1.5fr 120px auto;gap:9px;align-items:center}
+    .wardrobe-slot-grid input{width:100%;border:1px solid #343434;background:#101010;color:#fff;padding:9px 10px;border-radius:8px}
+    .wardrobe-slot-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+    .wardrobe-save,.wardrobe-delete{border:0;border-radius:8px;padding:9px 11px;font-weight:800;cursor:pointer}
+    .wardrobe-save{background:#ff9800;color:#fff}.wardrobe-delete{background:#4a2525;color:#ffc0c0}
+    .wardrobe-empty{color:#777;font-size:12px}
+    @media(max-width:1050px){.wardrobe-slot-grid{grid-template-columns:1fr 1fr}.wardrobe-slot-grid .slot-price{max-width:none}}
+    @media(max-width:650px){.wardrobe-slot-grid{grid-template-columns:1fr}}
+
     .shop-figures-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px}
     .shop-figure-card{background:#151515;border:1px solid #2c2c2c;border-radius:12px;overflow:hidden}
     .shop-figure-card img{width:100%;aspect-ratio:3/4;object-fit:contain;background:#0d0d0d;display:block}
@@ -1403,6 +1423,7 @@
               <div class="form-group"><label for="shopFigureDescription">Опис</label><textarea id="shopFigureDescription"></textarea></div>
               <div class="form-group"><label for="shopFigurePrice">Ціна в монетах</label><input id="shopFigurePrice" type="number" min="1" step="1" value="100" required></div>
               <label class="ad-toggle"><input id="shopFigureEnabled" type="checkbox" checked><span>Показувати в магазині</span></label>
+              <label class="ad-toggle"><input id="shopFigureWardrobe" type="checkbox"><span>👔 Увімкнути гардероб для цієї фігурки</span></label>
               <button class="primary-btn" type="submit" id="shopFigureSubmitBtn">💾 Додати товар</button>
               <button class="cancel-edit-btn" type="button" id="cancelShopFigureEditBtn">Скасувати редагування</button>
               <div class="message" id="shopFigureMessage"></div>
@@ -1412,6 +1433,20 @@
             <h2>🛒 Товари</h2>
             <p class="panel-subtitle">Ціну можна змінювати редагуванням товару.</p>
             <div class="shop-figures-grid" id="shopFiguresGrid"></div>
+          </div>
+        </div>
+
+        <div class="panel wardrobe-admin-panel">
+          <h2>👔 Гардероб фігурок</h2>
+          <p class="panel-subtitle">Для кожної магазинної фігурки доступно до 10 образів. Рекомендована ціна — 5000 монет.</p>
+          <div class="wardrobe-head">
+            <div class="form-group">
+              <label for="wardrobeFigureSelect">Фігурка</label>
+              <select id="wardrobeFigureSelect"><option value="">— Обери фігурку —</option></select>
+            </div>
+          </div>
+          <div class="wardrobe-slots" id="wardrobeSlots">
+            <div class="empty-state">Оберіть фігурку, щоб керувати гардеробом.</div>
           </div>
         </div>
       </section>
@@ -1689,7 +1724,8 @@
               <thead>
                 <tr>
                   <th>Email</th>
-                  <th>Статус</th>
+                  <th>Статус акаунта</th>
+                  <th>Онлайн</th>
                   <th>Інвентар</th>
                   <th>Баланс</th>
                   <th>Ризик</th>
@@ -1698,7 +1734,7 @@
                 </tr>
               </thead>
               <tbody id="usersTableBody">
-                <tr><td colspan="7" style="color:#777;">Завантаження...</td></tr>
+                <tr><td colspan="8" style="color:#777;">Завантаження...</td></tr>
               </tbody>
             </table>
           </div>
@@ -2070,6 +2106,9 @@
     let adminCardsCatalog = [];
     let adminFiguresCatalog = [];
     let adminWallets = [];
+    let adminPlayerProfiles = [];
+    const ONLINE_WINDOW_MS = 90000;
+    let adminPresenceInterval = null;
 
 
     // ===== Захист адмінки — Firebase НЕ змінено =====
@@ -2086,6 +2125,12 @@
       }
 
       setupAdminReferral().catch(error=>console.error("Referral setup error:",error));
+      touchAdminPresence();
+      if (adminPresenceInterval) clearInterval(adminPresenceInterval);
+      adminPresenceInterval = setInterval(() => {
+        touchAdminPresence();
+        loadAdminUsers().catch?.(()=>{});
+      }, 30000);
     });
 
     // ===== Вихід =====
@@ -2106,6 +2151,29 @@
     function formatUserTimestamp(value) {
       const d = toJsDate(value);
       return d ? d.toLocaleString("uk-UA") : "—";
+    }
+
+    function getPresenceProfile(uid) {
+      return adminPlayerProfiles.find(item => item.id === uid) || null;
+    }
+
+    function isProfileOnline(profile) {
+      const d = toJsDate(profile?.lastSeenAt);
+      if (!d) return false;
+      const age = Date.now() - d.getTime();
+      return age >= 0 && age <= ONLINE_WINDOW_MS;
+    }
+
+    async function touchAdminPresence() {
+      try {
+        await setDoc(doc(db, "player_profiles", ADMIN_UID), {
+          userId: ADMIN_UID,
+          lastSeenAt: serverTimestamp(),
+          presenceStatus: "online"
+        }, { merge:true });
+      } catch (error) {
+        console.error("Admin presence heartbeat:", error);
+      }
     }
 
     function getUserInventoryAudit(uid) {
@@ -2195,7 +2263,7 @@
     async function loadAdminUsers() {
       try {
         usersTableBody.innerHTML =
-          '<tr><td colspan="6" style="color:#777;">Завантаження...</td></tr>';
+          '<tr><td colspan="8" style="color:#777;">Завантаження...</td></tr>';
 
         const [
           usersSnap,
@@ -2204,7 +2272,8 @@
           userFiguresSnap,
           cardsSnap,
           figuresSnap,
-          walletsSnap
+          walletsSnap,
+          profilesSnap
         ] = await Promise.all([
           getDocs(collection(db, "users")),
           getDocs(collection(db, "blocked_users")),
@@ -2212,7 +2281,8 @@
           getDocs(collection(db, "user_figures")),
           getDocs(collection(db, "cards")),
           getDocs(collection(db, "figures")),
-          getDocs(collection(db, "wallets"))
+          getDocs(collection(db, "wallets")),
+          getDocs(collection(db, "player_profiles"))
         ]);
 
         adminUsers = usersSnap.docs.map(d => ({ id:d.id, ...d.data() }));
@@ -2224,6 +2294,7 @@
         adminCardsCatalog = cardsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
         adminFiguresCatalog = figuresSnap.docs.map(d => ({ id:d.id, ...d.data() }));
         adminWallets = walletsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+        adminPlayerProfiles = profilesSnap.docs.map(d => ({ id:d.id, ...d.data() }));
 
         adminUsers.sort((a,b) =>
           String(a.email || "").localeCompare(String(b.email || ""), "uk")
@@ -2233,7 +2304,7 @@
       } catch (error) {
         console.error("Users load error:", error);
         usersTableBody.innerHTML =
-          '<tr><td colspan="6" style="color:#ff9292;">Не вдалося завантажити користувачів або інвентарі.</td></tr>';
+          '<tr><td colspan="8" style="color:#ff9292;">Не вдалося завантажити користувачів або інвентарі.</td></tr>';
       }
     }
 
@@ -2278,13 +2349,15 @@
 
       if (!list.length) {
         usersTableBody.innerHTML =
-          '<tr><td colspan="6" style="color:#777;">Користувачів не знайдено.</td></tr>';
+          '<tr><td colspan="8" style="color:#777;">Користувачів не знайдено.</td></tr>';
         return;
       }
 
       usersTableBody.innerHTML = list.map(user => {
         const blocked = blockedUserIds.has(user.id);
         const isSelf = user.id === ADMIN_UID;
+        const profile = getPresenceProfile(user.id);
+        const online = !blocked && isProfileOnline(profile);
         const audit = getUserInventoryAudit(user.id);
 
         const riskHtml = isSelf
@@ -2304,6 +2377,12 @@
               </span>
             </td>
             <td>
+              <span class="presence-badge" title="${escapeHtml(online ? "На сайті зараз" : "Зараз відсутній")}">
+                <span class="presence-dot ${online ? "online" : "offline"}"></span>
+                ${online ? "Онлайн" : "Офлайн"}
+              </span>
+            </td>
+            <td>
               <div class="inventory-mini">
                 <span class="inventory-pill">🃏 ${audit.cardsOwned.length}</span>
                 <span class="inventory-pill">🧍 ${audit.figuresOwned.length}</span>
@@ -2318,7 +2397,7 @@
               })()}
             </td>
             <td>${riskHtml}</td>
-            <td>${escapeHtml(formatUserTimestamp(user.lastSeenAt))}</td>
+            <td>${escapeHtml(formatUserTimestamp(profile?.lastSeenAt || user.lastSeenAt))}</td>
             <td>
               <div class="user-actions">
                 <button
@@ -3389,11 +3468,14 @@ const menuItems = document.querySelectorAll(".menu-item");
     const shopFigureDescription=document.getElementById("shopFigureDescription");
     const shopFigurePrice=document.getElementById("shopFigurePrice");
     const shopFigureEnabled=document.getElementById("shopFigureEnabled");
+    const shopFigureWardrobe=document.getElementById("shopFigureWardrobe");
     const shopFigureSubmitBtn=document.getElementById("shopFigureSubmitBtn");
     const cancelShopFigureEditBtn=document.getElementById("cancelShopFigureEditBtn");
     const shopFigureMessage=document.getElementById("shopFigureMessage");
     const shopFiguresGrid=document.getElementById("shopFiguresGrid");
     const shopFigureFormTitle=document.getElementById("shopFigureFormTitle");
+    const wardrobeFigureSelect=document.getElementById("wardrobeFigureSelect");
+    const wardrobeSlots=document.getElementById("wardrobeSlots");
     let editingShopFigureId=null;
 
     function showShopFigureMessage(text,type){
@@ -3420,6 +3502,7 @@ const menuItems = document.querySelectorAll(".menu-item");
             <strong>${escapeHtml(item.name||"Без назви")}</strong>
             <span class="shop-price">💰 ${Number(item.price||0)}</span>
             <span>${item.enabled===false?"⛔ Приховано":"✅ У магазині"}</span>
+            <span>${item.wardrobeEnabled===true?"👔 Гардероб увімкнено":"— Без гардероба"}</span>
             <div class="figure-actions">
               <button class="figure-edit-btn" type="button" data-shop-edit="${escapeHtml(item.id)}">✏️ Редагувати</button>
               <button class="figure-delete-btn" type="button" data-shop-delete="${escapeHtml(item.id)}">🗑️</button>
@@ -3437,10 +3520,18 @@ const menuItems = document.querySelectorAll(".menu-item");
         shopFigureDescription.value=item.description||"";
         shopFigurePrice.value=Number(item.price||100);
         shopFigureEnabled.checked=item.enabled!==false;
+        shopFigureWardrobe.checked=item.wardrobeEnabled===true;
         shopFigureFormTitle.textContent="✏️ Редагувати товар";
         shopFigureSubmitBtn.textContent="💾 Зберегти зміни";
         cancelShopFigureEditBtn.style.display="block";
       }));
+
+      wardrobeFigureSelect.innerHTML='<option value="">— Обери фігурку —</option>'+items
+        .map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name||"Без назви")}${item.wardrobeEnabled===true?" · 👔":""}</option>`).join("");
+      if(wardrobeFigureSelect.dataset.keepValue){
+        wardrobeFigureSelect.value=wardrobeFigureSelect.dataset.keepValue;
+        delete wardrobeFigureSelect.dataset.keepValue;
+      }
 
       document.querySelectorAll("[data-shop-delete]").forEach(btn=>btn.addEventListener("click",async()=>{
         const id=btn.dataset.shopDelete;
@@ -3460,7 +3551,8 @@ const menuItems = document.querySelectorAll(".menu-item");
         backImage:shopFigureBack.value.trim(),
         description:shopFigureDescription.value.trim(),
         price:Math.max(1,Math.floor(Number(shopFigurePrice.value||0))),
-        enabled:shopFigureEnabled.checked
+        enabled:shopFigureEnabled.checked,
+        wardrobeEnabled:shopFigureWardrobe.checked
       };
       if(!data.name||!data.price){showShopFigureMessage("Введи назву і ціну.","error");return;}
       if(editingShopFigureId){
@@ -3474,6 +3566,7 @@ const menuItems = document.querySelectorAll(".menu-item");
       shopFigureForm.reset();
       shopFigurePrice.value=100;
       shopFigureEnabled.checked=true;
+      shopFigureWardrobe.checked=false;
       shopFigureFormTitle.textContent="➕ Товар у магазин";
       shopFigureSubmitBtn.textContent="💾 Додати товар";
       cancelShopFigureEditBtn.style.display="none";
@@ -3485,12 +3578,74 @@ const menuItems = document.querySelectorAll(".menu-item");
       shopFigureForm.reset();
       shopFigurePrice.value=100;
       shopFigureEnabled.checked=true;
+      shopFigureWardrobe.checked=false;
       shopFigureFormTitle.textContent="➕ Товар у магазин";
       shopFigureSubmitBtn.textContent="💾 Додати товар";
       cancelShopFigureEditBtn.style.display="none";
     });
 
 
+
+    // ===== Гардероб: до 10 образів на магазинну фігурку =====
+    function wardrobeSlotId(figureId,slot){ return `${figureId}_${slot}`; }
+
+    async function loadWardrobeForFigure(figureId){
+      if(!figureId){ wardrobeSlots.innerHTML='<div class="empty-state">Оберіть фігурку, щоб керувати гардеробом.</div>'; return; }
+      const snap=await getDocs(query(collection(db,"figure_outfits"),where("shopFigureId","==",figureId)));
+      const bySlot=new Map(snap.docs.map(d=>[Number(d.data().slot||0),{id:d.id,...d.data()}]));
+      wardrobeSlots.innerHTML=Array.from({length:10},(_,i)=>{
+        const slot=i+1, item=bySlot.get(slot)||{};
+        return `<div class="wardrobe-slot" data-slot="${slot}">
+          <div class="wardrobe-slot-top">
+            <div class="wardrobe-slot-title">👔 Слот ${slot}/10</div>
+            <label class="ad-toggle" style="margin:0"><input type="checkbox" data-outfit-enabled ${item.enabled!==false?"checked":""}><span>Активний</span></label>
+          </div>
+          <div class="wardrobe-slot-grid">
+            <input data-outfit-name placeholder="Назва образу" value="${escapeHtml(item.name||"")}">
+            <input data-outfit-image placeholder="Передня сторона (URL)" value="${escapeHtml(item.image||"")}">
+            <input data-outfit-back placeholder="Задня сторона (URL)" value="${escapeHtml(item.backImage||"")}">
+            <input class="slot-price" data-outfit-price type="number" min="1" step="1" value="${Number(item.price||5000)}" title="Ціна">
+            <span class="wardrobe-empty">${item.id?"✅ Збережено":"Порожньо"}</span>
+          </div>
+          <div class="wardrobe-slot-actions">
+            <button class="wardrobe-save" type="button" data-save-outfit="${slot}">💾 Зберегти слот</button>
+            ${item.id?`<button class="wardrobe-delete" type="button" data-delete-outfit="${slot}">🗑️ Очистити</button>`:""}
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    wardrobeFigureSelect.addEventListener("change",()=>loadWardrobeForFigure(wardrobeFigureSelect.value));
+
+    wardrobeSlots.addEventListener("click",async e=>{
+      const figureId=wardrobeFigureSelect.value;
+      if(!figureId)return;
+      const saveBtn=e.target.closest("[data-save-outfit]");
+      const deleteBtn=e.target.closest("[data-delete-outfit]");
+      if(saveBtn){
+        const slot=Number(saveBtn.dataset.saveOutfit);
+        const row=saveBtn.closest(".wardrobe-slot");
+        const name=row.querySelector("[data-outfit-name]").value.trim();
+        const image=row.querySelector("[data-outfit-image]").value.trim();
+        const backImage=row.querySelector("[data-outfit-back]").value.trim();
+        const price=Math.max(1,Math.floor(Number(row.querySelector("[data-outfit-price]").value||5000)));
+        const enabled=row.querySelector("[data-outfit-enabled]").checked;
+        if(!name||!image){ alert("Для образу потрібні назва і передня картинка."); return; }
+        saveBtn.disabled=true;
+        try{
+          await setDoc(doc(db,"figure_outfits",wardrobeSlotId(figureId,slot)),{
+            shopFigureId:figureId,slot,name,image,backImage,price,enabled,updatedAt:serverTimestamp()
+          },{merge:true});
+          await loadWardrobeForFigure(figureId);
+        }finally{saveBtn.disabled=false}
+      }
+      if(deleteBtn){
+        const slot=Number(deleteBtn.dataset.deleteOutfit);
+        if(!confirm(`Очистити слот ${slot}?`))return;
+        await deleteDoc(doc(db,"figure_outfits",wardrobeSlotId(figureId,slot)));
+        await loadWardrobeForFigure(figureId);
+      }
+    });
 
 
     // ===== Видати картки адміну =====
