@@ -67,6 +67,9 @@
   width:100%;
 }
 
+    .duel-countdown{display:inline-flex;align-items:center;gap:5px;margin-top:7px;padding:5px 8px;border-radius:999px;background:#302817;border:1px solid #51431f;color:#ffd166;font-size:12px;font-weight:900}
+    .duel-countdown.danger{background:#3a2020;border-color:#663333;color:#ff9d9d}
+
 </style>
 </head>
 <body>
@@ -147,11 +150,53 @@
   const wagerCardPreview=document.getElementById("wagerCardPreview");
   const wagerCardPreviewImg=document.getElementById("wagerCardPreviewImg");
   let user=null,wallet={balance:0,frozen:false},profiles=[],duels=[],activeTab="incoming",isLocked=false,ownedCards=[],cardCatalog=[];
+  const DUEL_INVITE_MS=60000;
+  let duelTimerInterval=null;
+  const expiringDuelIds=new Set();
 
   function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
   function labelFor(uid){const p=profiles.find(x=>x.id===uid);return p?.displayName||p?.emailMasked||`Гравець ${uid.slice(0,6)}`}
-  function statusText(s){return ({pending:"Очікує",active:"Активна",finished:"Завершена",rejected:"Відхилена",cancelled:"Скасована"}[s]||s)}
+  function statusText(s){return ({pending:"Очікує",active:"Активна",finished:"Завершена",rejected:"Відхилена",cancelled:"Скасована",expired:"Час вийшов"}[s]||s)}
   function msg(text,type=""){inviteMsg.textContent=text;inviteMsg.className=`msg ${type}`}
+
+
+  function duelCreatedMs(d){
+    const ts=d?.createdAt;
+    if(!ts)return 0;
+    if(typeof ts.toMillis==="function")return ts.toMillis();
+    return Number(ts.seconds||0)*1000+Number(ts.nanoseconds||0)/1000000;
+  }
+  function remainingMs(d){
+    const start=duelCreatedMs(d);
+    return start?Math.max(0,start+DUEL_INVITE_MS-Date.now()):DUEL_INVITE_MS;
+  }
+  function clock(ms){
+    const s=Math.max(0,Math.ceil(ms/1000));
+    return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+  }
+  async function expirePendingDuel(d){
+    if(!d||d.status!=="pending"||expiringDuelIds.has(d.id))return;
+    expiringDuelIds.add(d.id);
+    try{
+      await setDoc(doc(db,"duels",d.id),{status:"expired",closedAt:serverTimestamp()},{merge:true});
+      d.status="expired";
+      if(activeTab==="incoming"||activeTab==="outgoing")renderList();
+    }catch(e){
+      if(String(e?.code||"").includes("permission-denied")){
+        await loadState().catch(console.error);
+      }else{
+        console.error("Expire duel:",e);
+      }
+    }finally{expiringDuelIds.delete(d.id)}
+  }
+  function tickDuelTimers(){
+    duels.filter(d=>d.status==="pending").forEach(d=>{
+      const left=remainingMs(d);
+      const el=document.querySelector(`[data-duel-countdown="${CSS.escape(d.id)}"]`);
+      if(el){el.textContent=clock(left);el.closest(".duel-countdown")?.classList.toggle("danger",left<=10000)}
+      if(left<=0)expirePendingDuel(d);
+    });
+  }
 
 
   function extractGoogleDriveFileId(url=""){
@@ -219,7 +264,7 @@
 
 
   async function clearHistory(){
-    const old=duels.filter(d=>["finished","cancelled","rejected"].includes(d.status));
+    const old=duels.filter(d=>["finished","cancelled","rejected","expired"].includes(d.status));
     if(!old.length){ alert("Історія вже порожня."); return; }
     if(!confirm(`Очистити історію дуелей? Записів: ${old.length}\nАктивні матчі та інвайти залишаться.`)) return;
     const btn=document.getElementById("clearHistoryBtn");
@@ -272,7 +317,7 @@
     if(activeTab==="incoming") return duels.filter(d=>d.status==="pending"&&d.player2Id===user.uid);
     if(activeTab==="outgoing") return duels.filter(d=>d.status==="pending"&&d.player1Id===user.uid);
     if(activeTab==="active") return duels.filter(d=>["active","resolving"].includes(d.status));
-    return duels.filter(d=>["finished","rejected","cancelled"].includes(d.status));
+    return duels.filter(d=>["finished","rejected","cancelled","expired"].includes(d.status));
   }
 
   function renderList(){
@@ -290,6 +335,7 @@
             <div class="duel-title">⚔️ ${esc(labelFor(opponent))}</div>
             <div class="meta">Ставка кожного: <span class="stake">${Number(d.stake||0)} 💰</span> · Банк: ${Number(d.pot||Number(d.stake||0)*2)} 💰</div>
             <div class="meta">${result}${d.matchType==="tournament"?" · 🏟️ Турнір":""}</div>
+            ${d.status==="pending"?`<div class="duel-countdown ${remainingMs(d)<=10000?"danger":""}">⏱️ На відповідь: <span data-duel-countdown="${d.id}">${clock(remainingMs(d))}</span></div>`:""}
           </div>
           <span class="status">${esc(statusText(d.status))}</span>
         </div>
@@ -379,6 +425,7 @@
 
         const d=duelSnap.data();
         if(d.status!=="pending"||d.player2Id!==user.uid)throw new Error("NOT_PENDING");
+        if(remainingMs(d)<=0)throw new Error("EXPIRED");
 
         const stake=Number(d.stake||0);
         if(stake<100||stake>5000)throw new Error("BAD_STAKE");
@@ -449,7 +496,8 @@
         NO_MONEY:"Недостатньо монет для ставки.",
         LOCKED:"Один із гравців уже в іншій дуелі.",
         FROZEN:"Баланс заморожений адміністратором.",
-        BAD_STAKE:"Некоректна ставка."
+        BAD_STAKE:"Некоректна ставка.",
+        EXPIRED:"Час на прийняття виклику вже вийшов."
       }[e?.message]
         || (code.includes("permission-denied")
           ? "Firestore відхилив прийняття дуелі. Онови Rules з комплекту."
@@ -488,6 +536,9 @@
     await loadOwnedCardsForWager();
     await loadProfiles();
     await loadState();
+    tickDuelTimers();
+    if(duelTimerInterval)clearInterval(duelTimerInterval);
+    duelTimerInterval=setInterval(tickDuelTimers,500);
   });
 </script>
 </body>

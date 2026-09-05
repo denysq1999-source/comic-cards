@@ -803,6 +803,33 @@
       }
     }
 
+
+    /* ===== Сповіщення про дуель ===== */
+    #duelsBtnTop{position:relative;overflow:visible}
+    .duel-nav-badge{
+      position:absolute;top:-8px;right:-8px;min-width:20px;height:20px;padding:0 5px;
+      border-radius:999px;background:#e53935;color:#fff;border:2px solid #1f1f1f;
+      display:none;align-items:center;justify-content:center;font-size:11px;font-weight:900;
+      box-shadow:0 4px 14px rgba(229,57,53,.45);z-index:4
+    }
+    .duel-nav-badge.show{display:inline-flex}
+    .duel-invite-pop{
+      position:fixed;top:78px;right:18px;z-index:1600;width:min(390px,calc(100vw - 24px));
+      display:none;background:#171717;border:1px solid #4b2929;border-radius:14px;
+      box-shadow:0 22px 65px rgba(0,0,0,.58);padding:15px;text-align:left
+    }
+    .duel-invite-pop.show{display:block;animation:duelPop .18s ease-out}
+    @keyframes duelPop{from{transform:translateY(-7px);opacity:0}to{transform:none;opacity:1}}
+    .duel-pop-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}
+    .duel-pop-title{font-weight:900;color:#ffb0b0;font-size:16px}
+    .duel-pop-countdown{font-weight:900;color:#ffd166;background:#302817;border:1px solid #51431f;border-radius:999px;padding:6px 9px;white-space:nowrap}
+    .duel-pop-opponent{font-weight:900;font-size:15px;margin-bottom:5px}
+    .duel-pop-meta{color:#aaa;font-size:13px;line-height:1.45}
+    .duel-pop-actions{display:flex;gap:8px;margin-top:12px}
+    .duel-pop-actions a,.duel-pop-actions button{flex:1;border:0;border-radius:8px;padding:10px 11px;font-weight:900;cursor:pointer;text-align:center;text-decoration:none}
+    .duel-pop-open{background:#ff9800;color:#fff}.duel-pop-reject{background:#4b2525;color:#ffc0c0}
+    @media(max-width:650px){.duel-invite-pop{top:132px;right:12px}}
+
 </style>
 </head>
 
@@ -829,13 +856,26 @@
 
       <button class="nav-button nav-auth pack-btn" id="packBtnTop" type="button" style="display:none;">🎁 Пакунок</button>
       <a class="nav-link nav-auth" id="shopBtnTop" href="shop.html" style="display:none;">🛒 Магазин</a>
-      <a class="nav-link nav-auth" id="duelsBtnTop" href="duels.html" style="display:none;">⚔️ Дуелі</a>
+      <a class="nav-link nav-auth" id="duelsBtnTop" href="duels.html" style="display:none;">⚔️ Дуелі<span class="duel-nav-badge" id="duelNavBadge">0</span></a>
       <a class="nav-link nav-auth" id="ratingBtnTop" href="leaderboard.html" style="display:none;">🏆 Рейтинг</a>
       <a class="nav-link nav-auth" id="profileBtnTop" href="profile.html">👤 Особистий кабінет</a>
       <a class="nav-link nav-admin" id="adminBtnTop" href="admin.html">⚙️ Адмін-панель</a>
       <button class="nav-button nav-auth" id="logoutBtnTop" type="button">Вийти</button>
     </nav>
   </header>
+
+  <aside class="duel-invite-pop" id="duelInvitePop" aria-live="polite">
+    <div class="duel-pop-head">
+      <div class="duel-pop-title">⚔️ Новий виклик на дуель!</div>
+      <div class="duel-pop-countdown" id="duelPopCountdown">01:00</div>
+    </div>
+    <div class="duel-pop-opponent" id="duelPopOpponent">Суперник</div>
+    <div class="duel-pop-meta" id="duelPopMeta">Ставка: 0 💰</div>
+    <div class="duel-pop-actions">
+      <a class="duel-pop-open" href="duels.html">⚔️ Відкрити виклик</a>
+      <button class="duel-pop-reject" id="duelPopReject" type="button">✖ Відхилити</button>
+    </div>
+  </aside>
 
   <main>
     <div class="auth-loading" id="authLoading">Завантаження…</div>
@@ -975,7 +1015,10 @@
       doc,
       serverTimestamp,
       runTransaction,
-      Timestamp
+      Timestamp,
+      onSnapshot,
+      query,
+      where
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const db = getFirestore(auth.app);
@@ -987,6 +1030,12 @@
     const profileBtnTop = document.getElementById("profileBtnTop");
     const shopBtnTop = document.getElementById("shopBtnTop");
     const duelsBtnTop = document.getElementById("duelsBtnTop");
+    const duelNavBadge = document.getElementById("duelNavBadge");
+    const duelInvitePop = document.getElementById("duelInvitePop");
+    const duelPopCountdown = document.getElementById("duelPopCountdown");
+    const duelPopOpponent = document.getElementById("duelPopOpponent");
+    const duelPopMeta = document.getElementById("duelPopMeta");
+    const duelPopReject = document.getElementById("duelPopReject");
     const ratingBtnTop = document.getElementById("ratingBtnTop");
     const logoutBtnTop = document.getElementById("logoutBtnTop");
     const userInfo = document.getElementById("userInfo");
@@ -1028,6 +1077,11 @@
     let activeGenre = "";
     let cachedComics = [];
     let cachedRatings = [];
+    let duelInviteUnsub = null;
+    let duelInviteTimer = null;
+    let incomingDuelInvites = [];
+    let expiringDuelIds = new Set();
+    const DUEL_INVITE_MS = 60000;
 
     function escapeHtml(value = "") {
       return String(value)
@@ -1605,6 +1659,103 @@
     packOverlay.addEventListener("click",e=>{if(e.target===packOverlay)closePackOverlay()});
 
 
+
+    function duelCreatedMs(d){
+      const ts=d?.createdAt;
+      if(!ts)return 0;
+      if(typeof ts.toMillis==="function")return ts.toMillis();
+      return Number(ts.seconds||0)*1000+Number(ts.nanoseconds||0)/1000000;
+    }
+
+    function duelRemainingMs(d){
+      const start=duelCreatedMs(d);
+      return start ? Math.max(0,start+DUEL_INVITE_MS-Date.now()) : DUEL_INVITE_MS;
+    }
+
+    function duelClock(ms){
+      const total=Math.max(0,Math.ceil(ms/1000));
+      return `${String(Math.floor(total/60)).padStart(2,"0")}:${String(total%60).padStart(2,"0")}`;
+    }
+
+    async function expireIncomingDuel(d){
+      if(!currentUser||!d||d.status!=="pending"||expiringDuelIds.has(d.id))return;
+      expiringDuelIds.add(d.id);
+      try{
+        await setDoc(doc(db,"duels",d.id),{status:"expired",closedAt:serverTimestamp()},{merge:true});
+      }catch(e){
+        if(!String(e?.code||"").includes("permission-denied"))console.error("Duel expiry:",e);
+      }finally{
+        expiringDuelIds.delete(d.id);
+      }
+    }
+
+    async function duelOpponentLabel(uid){
+      try{
+        const snap=await getDoc(doc(db,"player_profiles",uid));
+        if(snap.exists()){
+          const p=snap.data();
+          return p.displayName||p.emailMasked||`Гравець ${String(uid).slice(0,6)}`;
+        }
+      }catch{}
+      return `Гравець ${String(uid).slice(0,6)}`;
+    }
+
+    async function renderIncomingDuelNotice(){
+      incomingDuelInvites=incomingDuelInvites.filter(d=>d.status==="pending");
+      const active=incomingDuelInvites.filter(d=>duelRemainingMs(d)>0);
+      const expired=incomingDuelInvites.filter(d=>duelRemainingMs(d)<=0);
+      expired.forEach(expireIncomingDuel);
+
+      duelNavBadge.textContent=String(active.length);
+      duelNavBadge.classList.toggle("show",active.length>0);
+      if(!active.length){
+        duelInvitePop.classList.remove("show");
+        return;
+      }
+
+      active.sort((a,b)=>duelCreatedMs(a)-duelCreatedMs(b));
+      const d=active[0];
+      duelInvitePop.dataset.duelId=d.id;
+      duelInvitePop.classList.add("show");
+      duelPopCountdown.textContent=duelClock(duelRemainingMs(d));
+      duelPopMeta.textContent=`Ставка: ${Number(d.stake||0)} 💰${d.wagerOwned1Id?" · 🃏 суперник поставив карту":""}${active.length>1?` · ще ${active.length-1} виклик(и)`:""}`;
+      const label=await duelOpponentLabel(d.player1Id);
+      if(duelInvitePop.dataset.duelId===d.id)duelPopOpponent.textContent=label;
+    }
+
+    function stopDuelInviteWatch(){
+      if(duelInviteUnsub){duelInviteUnsub();duelInviteUnsub=null}
+      if(duelInviteTimer){clearInterval(duelInviteTimer);duelInviteTimer=null}
+      incomingDuelInvites=[];
+      duelNavBadge.classList.remove("show");
+      duelInvitePop.classList.remove("show");
+    }
+
+    function startDuelInviteWatch(uid){
+      stopDuelInviteWatch();
+      const q=query(collection(db,"duels"),where("player2Id","==",uid));
+      duelInviteUnsub=onSnapshot(q,snap=>{
+        incomingDuelInvites=snap.docs.map(x=>({id:x.id,...x.data()})).filter(d=>d.status==="pending");
+        renderIncomingDuelNotice().catch(console.error);
+      },e=>console.error("Duel notifications:",e));
+      duelInviteTimer=setInterval(()=>renderIncomingDuelNotice().catch(console.error),500);
+    }
+
+    duelPopReject.addEventListener("click",async()=>{
+      const id=duelInvitePop.dataset.duelId;
+      const d=incomingDuelInvites.find(x=>x.id===id);
+      if(!d)return;
+      if(duelRemainingMs(d)<=0){await expireIncomingDuel(d);return}
+      duelPopReject.disabled=true;
+      try{
+        await setDoc(doc(db,"duels",id),{status:"rejected",closedAt:serverTimestamp()},{merge:true});
+      }catch(e){
+        console.error(e);
+      }finally{
+        duelPopReject.disabled=false;
+      }
+    });
+
     const settingsPromise = loadSiteSettings().catch(error => {
       authLoading.classList.add("hidden");
       loadErrorSection.style.display = "block";
@@ -1662,6 +1813,7 @@
         shopBtnTop.style.display = "inline-flex";
         duelsBtnTop.style.display = "inline-flex";
         ratingBtnTop.style.display = "inline-flex";
+        startDuelInviteWatch(user.uid);
         packBtnTop.style.display = "inline-flex";
         await loadDuelLockForUser();
         await loadPackStatus();
@@ -1683,6 +1835,7 @@
         shopBtnTop.style.display = "none";
         duelsBtnTop.style.display = "none";
         ratingBtnTop.style.display = "none";
+        stopDuelInviteWatch();
         packBtnTop.style.display = "none";
         adminBtnTop.style.display = "none";
         if(packTimer)clearInterval(packTimer);
